@@ -1,4 +1,4 @@
-import { map, markers as windyMarkers } from '@windy/map';
+import { map } from '@windy/map';
 import { singleclick } from '@windy/singleclick';
 
 import type { LatLon } from '../routing/types';

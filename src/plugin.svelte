@@ -26,7 +26,7 @@
 
 <script lang="ts">
     import bcast from '@windy/broadcast';
-    import { onDestroy, onMount } from 'svelte';
+    import { onDestroy } from 'svelte';
 
     import config from './pluginConfig';
     import RoutingPanel from './ui/RoutingPanel.svelte';
@@ -125,8 +125,6 @@
         waypointMgr = new WaypointManager(name, handleWaypointChange);
         waypointMgr.activate();
     };
-
-    onMount(() => {});
 
     onDestroy(() => {
         waypointMgr?.destroy();
