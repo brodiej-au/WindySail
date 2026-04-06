@@ -28,13 +28,18 @@ export class RoutingOrchestrator {
             throw new Error('Start and end points must be set.');
         }
 
-        // Fetch wind grid
-        onStatus?.('Fetching weather data...', 0);
+        // Sample wind grid from interpolator
+        onStatus?.('Sampling wind data...', 0);
         const bounds = computeBounds(start, end, 1.0);
-        const windGrid = await fetchWindGrid('gfs', bounds, this.pluginName);
+        const windGrid = await fetchWindGrid(
+            bounds,
+            options.startTime,
+            options.maxDuration,
+            (msg, pct) => onStatus?.(msg, Math.round(pct * 0.5)),
+        );
 
         // Compute route via worker
-        onStatus?.('Computing route...', 5);
+        onStatus?.('Computing route...', 50);
         const result = await this.bridge.computeRoute(
             windGrid,
             polar,
@@ -42,8 +47,8 @@ export class RoutingOrchestrator {
             end,
             options,
             (percent) => {
-                // Scale worker progress from 5-100%
-                const scaledPercent = 5 + Math.round(percent * 0.95);
+                // Scale worker progress from 50-100%
+                const scaledPercent = 50 + Math.round(percent * 0.5);
                 onStatus?.(`Computing route... ${scaledPercent}%`, scaledPercent);
             },
         );

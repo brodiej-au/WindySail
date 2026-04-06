@@ -3,21 +3,21 @@ import bcast from '@windy/broadcast';
 import { getLatLonInterpolator } from '@windy/interpolator';
 import type { LatLonBounds, WindGridData } from '../routing/types';
 
-const GRID_STEP = 0.5; // degrees
+const GRID_STEP = 1.0; // degrees — coarser grid for speed, router interpolates
+const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
 
 /**
  * Build a wind grid by scrubbing Windy's timeline and sampling the interpolator.
  * Zero API calls — reads directly from loaded map tiles.
  *
- * Requires: wind overlay active, map viewport covering the routing area,
- * and tiles loaded for each timestamp.
+ * Only samples timestamps from departureTime to departureTime + maxDurationHours.
  */
 export async function fetchWindGrid(
-    _model: string,
     bounds: LatLonBounds,
-    _pluginName: string,
+    departureTime: number,
+    maxDurationHours: number,
+    onProgress?: (msg: string, pct: number) => void,
 ): Promise<WindGridData> {
-    // Build grid coordinates
     const lats: number[] = [];
     const lons: number[] = [];
 
@@ -28,34 +28,25 @@ export async function fetchWindGrid(
         lons.push(Math.round(lon * 1000) / 1000);
     }
 
-    // Ensure at least 2 points per axis for interpolation
-    if (lats.length < 2) {
-        lats.push(lats[0] + GRID_STEP);
-    }
-    if (lons.length < 2) {
-        lons.push(lons[0] + GRID_STEP);
-    }
+    if (lats.length < 2) lats.push(lats[0] + GRID_STEP);
+    if (lons.length < 2) lons.push(lons[0] + GRID_STEP);
 
-    // Get available timestamps from the calendar store
-    const calendar = store.get('calendar') as any;
-    if (!calendar) {
-        throw new Error('No weather data loaded. Ensure the wind overlay is active.');
-    }
-
-    // Build list of timestamps to sample (every 3 hours over the forecast range)
+    // Only sample the time range we need
+    const endTime = departureTime + maxDurationHours * 3600_000;
     const timestamps: number[] = [];
-    const startTs = calendar.start as number;
-    const endTs = calendar.end as number;
-    const STEP_MS = 3 * 3600_000; // 3 hours
-    for (let t = startTs; t <= endTs; t += STEP_MS) {
+    for (let t = departureTime; t <= endTime; t += TIME_STEP_MS) {
         timestamps.push(t);
+    }
+    // Always include the end time
+    if (timestamps[timestamps.length - 1] < endTime) {
+        timestamps.push(endTime);
     }
 
     if (timestamps.length === 0) {
-        throw new Error('No forecast timestamps available.');
+        throw new Error('No forecast timestamps to sample.');
     }
 
-    // Pre-allocate 3D arrays: [latIdx][lonIdx][timeIdx]
+    // Pre-allocate 3D arrays
     const windU: number[][][] = lats.map(() =>
         lons.map(() => new Array(timestamps.length).fill(0)),
     );
@@ -63,55 +54,46 @@ export async function fetchWindGrid(
         lons.map(() => new Array(timestamps.length).fill(0)),
     );
 
-    // Save current timestamp to restore later
     const originalTimestamp = store.get('timestamp');
 
-    // For each timestamp, scrub Windy's timeline and sample the interpolator
     for (let ti = 0; ti < timestamps.length; ti++) {
-        const ts = timestamps[ti];
+        onProgress?.(
+            `Sampling wind ${ti + 1}/${timestamps.length}...`,
+            Math.round((ti / timestamps.length) * 100),
+        );
 
-        // Set the timeline to this timestamp and wait for tiles to load
-        store.set('timestamp', ts);
+        store.set('timestamp', timestamps[ti]);
         await waitForRedraw();
 
-        // Get the interpolator for the current view
         const interpolate = await getLatLonInterpolator();
-        if (!interpolate) {
-            continue; // Skip this timestep if no interpolator available
-        }
+        if (!interpolate) continue;
 
-        // Sample wind at each grid point
         for (let li = 0; li < lats.length; li++) {
             for (let lo = 0; lo < lons.length; lo++) {
                 try {
                     const result = await interpolate({ lat: lats[li], lon: lons[lo] });
-                    // Wind interpolator returns [u, v, ...] in m/s
                     if (result && typeof result === 'object' && result.length >= 2) {
                         windU[li][lo][ti] = result[0];
                         windV[li][lo][ti] = result[1];
                     }
                 } catch {
-                    // Point outside loaded tiles — leave as 0
+                    // Outside loaded tiles — leave as 0
                 }
             }
         }
     }
 
-    // Restore original timestamp
     store.set('timestamp', originalTimestamp);
-
     return { lats, lons, timestamps, windU, windV };
 }
 
 /**
- * Wait for Windy to finish redrawing after a timestamp change.
+ * Wait for Windy to finish redrawing. Short timeout since tiles
+ * are often already cached from nearby timesteps.
  */
 function waitForRedraw(): Promise<void> {
     return new Promise(resolve => {
-        const timeout = setTimeout(() => {
-            resolve(); // Don't hang forever — proceed after 3s even without redraw
-        }, 3000);
-
+        const timeout = setTimeout(resolve, 800);
         bcast.once('redrawFinished', () => {
             clearTimeout(timeout);
             resolve();
