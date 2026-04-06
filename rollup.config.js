@@ -1,5 +1,6 @@
 import resolve from '@rollup/plugin-node-resolve';
 import commonjs from '@rollup/plugin-commonjs';
+import json from '@rollup/plugin-json';
 import terser from '@rollup/plugin-terser';
 
 import serve from 'rollup-plugin-serve';
@@ -39,6 +40,7 @@ const pluginConfig = {
         clearScreen: false,
     },
     plugins: [
+        json(),
         rollupSvelte({
             emitCss: false,
             preprocess: {
@@ -96,6 +98,7 @@ const workerConfig = {
         clearScreen: false,
     },
     plugins: [
+        json(),
         rollupSwc({
             include: ['**/*.ts'],
             sourceMaps: useSourceMaps,
