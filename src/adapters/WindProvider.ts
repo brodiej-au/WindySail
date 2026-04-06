@@ -53,17 +53,30 @@ export async function fetchWindGrid(
 
             tasks.push(async () => {
                 const response = await getPointForecastData(
-                    model,
+                    model as any,
                     { lat, lon },
-                    pluginName,
                 );
                 const data = response.data.data;
+                const windSpeed = data.wind ?? [];   // m/s
+                const windDir = data.windDir ?? [];   // degrees, "from" direction
+
+                // Convert speed+direction to u/v components (m/s)
+                // u = -speed * sin(dir), v = -speed * cos(dir)
+                const uArr = windSpeed.map((spd: number, i: number) => {
+                    const dirRad = (windDir[i] ?? 0) * Math.PI / 180;
+                    return -spd * Math.sin(dirRad);
+                });
+                const vArr = windSpeed.map((spd: number, i: number) => {
+                    const dirRad = (windDir[i] ?? 0) * Math.PI / 180;
+                    return -spd * Math.cos(dirRad);
+                });
+
                 return {
                     latIdx,
                     lonIdx,
-                    timestamps: data.ts,
-                    windU: data['wind_u-surface'] ?? data['wind_u-850h'] ?? [],
-                    windV: data['wind_v-surface'] ?? data['wind_v-850h'] ?? [],
+                    timestamps: data.ts as number[],
+                    windU: uArr,
+                    windV: vArr,
                 };
             });
         }
