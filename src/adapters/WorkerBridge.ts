@@ -19,9 +19,15 @@ export class WorkerBridge {
         options: RoutingOptions,
         onProgress?: ProgressCallback,
     ): Promise<RouteResult> {
-        // Create worker from the bundled worker file
-        const workerUrl = new URL('./router.worker.js', import.meta.url).href;
-        this.worker = new Worker(workerUrl);
+        // Fetch worker script and create blob URL to bypass cross-origin restriction
+        // (plugin JS is served from localhost but runs on windy.com)
+        const scriptUrl = new URL('./router.worker.js', import.meta.url).href;
+        const response = await fetch(scriptUrl);
+        const scriptText = await response.text();
+        const blob = new Blob([scriptText], { type: 'application/javascript' });
+        const blobUrl = URL.createObjectURL(blob);
+        this.worker = new Worker(blobUrl);
+        URL.revokeObjectURL(blobUrl);
 
         return new Promise<RouteResult>((resolve, reject) => {
             if (!this.worker) {
