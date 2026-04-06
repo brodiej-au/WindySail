@@ -14,66 +14,28 @@ import { transformCodeToESMPlugin, keyPEM, certificatePEM } from '@windycom/plug
 
 const useSourceMaps = true;
 
-const buildConfigurations = {
-    src: {
-        input: 'src/plugin.svelte',
-        out: 'plugin',
-    },
-    example01: {
-        input: 'examples/01-hello-world/plugin.svelte',
-        out: 'example01/plugin',
-    },
-    example02: {
-        input: 'examples/02-using-vanilla-js/plugin.svelte',
-        out: 'example02/plugin',
-    },
-    example03: {
-        input: 'examples/03-boat-tracker/plugin.svelte',
-        out: 'example03/plugin',
-    },
-    example04: {
-        input: 'examples/04-aircraft-range/plugin.svelte',
-        out: 'example04/plugin',
-    },
-    example05: {
-        input: 'examples/05-airspace-map/plugin.svelte',
-        out: 'example05/plugin',
-    },
-    example06: {
-        input: 'examples/06-foehn-chart/plugin.svelte',
-        out: 'example06/plugin',
-    },
-    example07: {
-        input: 'examples/07-meteoblue-meteograms/plugin.svelte',
-        out: 'example07/plugin',
-    },
-};
+const isServe = process.env.SERVE !== 'false';
 
-const requiredConfig = process.env.CONFIG || 'src';
-const { input, out } = buildConfigurations[requiredConfig];
-
-export default {
-    input,
+// Main plugin bundle
+const pluginConfig = {
+    input: 'src/plugin.svelte',
     output: [
         {
-            file: `dist/${out}.js`,
+            file: 'dist/plugin.js',
             format: 'module',
             sourcemap: true,
         },
         {
-            file: `dist/${out}.min.js`,
+            file: 'dist/plugin.min.js',
             format: 'module',
             plugins: [rollupCleanup({ comments: 'none', extensions: ['ts'] }), terser()],
         },
     ],
-
-    onwarn: () => {
-        /* We disable all warning messages */
-    },
+    onwarn: () => {},
     external: id => id.startsWith('@windy/'),
     watch: {
-        include: ['src/**', 'examples/**'],
-        exclude: 'node_modules/**',
+        include: ['src/**'],
+        exclude: ['node_modules/**', 'src/worker/**'],
         clearScreen: false,
     },
     plugins: [
@@ -102,7 +64,7 @@ export default {
         }),
         commonjs(),
         transformCodeToESMPlugin(),
-        process.env.SERVE !== 'false' &&
+        isServe &&
             serve({
                 contentBase: 'dist',
                 host: '0.0.0.0',
@@ -117,3 +79,33 @@ export default {
             }),
     ],
 };
+
+// Worker bundle (IIFE, self-contained, no external deps)
+const workerConfig = {
+    input: 'src/worker/router.worker.ts',
+    output: [
+        {
+            file: 'dist/router.worker.js',
+            format: 'iife',
+            sourcemap: true,
+        },
+    ],
+    onwarn: () => {},
+    watch: {
+        include: ['src/worker/**', 'src/routing/**'],
+        clearScreen: false,
+    },
+    plugins: [
+        rollupSwc({
+            include: ['**/*.ts'],
+            sourceMaps: useSourceMaps,
+        }),
+        resolve({
+            browser: true,
+            preferBuiltins: false,
+        }),
+        commonjs(),
+    ],
+};
+
+export default [pluginConfig, workerConfig];
