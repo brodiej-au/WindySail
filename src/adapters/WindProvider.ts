@@ -1,18 +1,21 @@
-import { getPointForecastData } from '@windy/fetch';
+import store from '@windy/store';
+import bcast from '@windy/broadcast';
+import { getLatLonInterpolator } from '@windy/interpolator';
 import type { LatLonBounds, WindGridData } from '../routing/types';
 
 const GRID_STEP = 0.5; // degrees
-const CONCURRENCY = 5;
 
 /**
- * Fetch a wind grid from Windy for a specific weather model.
- * Pre-fetches point forecasts on a 0.5° grid covering the bounding box.
- * Returns a plain serialisable object for transfer to the Web Worker.
+ * Build a wind grid by scrubbing Windy's timeline and sampling the interpolator.
+ * Zero API calls — reads directly from loaded map tiles.
+ *
+ * Requires: wind overlay active, map viewport covering the routing area,
+ * and tiles loaded for each timestamp.
  */
 export async function fetchWindGrid(
-    model: string,
+    _model: string,
     bounds: LatLonBounds,
-    pluginName: string,
+    _pluginName: string,
 ): Promise<WindGridData> {
     // Build grid coordinates
     const lats: number[] = [];
@@ -33,61 +36,26 @@ export async function fetchWindGrid(
         lons.push(lons[0] + GRID_STEP);
     }
 
-    // Fetch all point forecasts with concurrency limiting
-    type ForecastResult = {
-        latIdx: number;
-        lonIdx: number;
-        timestamps: number[];
-        windU: number[];
-        windV: number[];
-    };
-
-    const tasks: (() => Promise<ForecastResult>)[] = [];
-
-    for (let li = 0; li < lats.length; li++) {
-        for (let lo = 0; lo < lons.length; lo++) {
-            const lat = lats[li];
-            const lon = lons[lo];
-            const latIdx = li;
-            const lonIdx = lo;
-
-            tasks.push(async () => {
-                const response = await getPointForecastData(
-                    model as any,
-                    { lat, lon },
-                );
-                const data = response.data.data;
-                const windSpeed = data.wind ?? [];   // m/s
-                const windDir = data.windDir ?? [];   // degrees, "from" direction
-
-                // Convert speed+direction to u/v components (m/s)
-                // u = -speed * sin(dir), v = -speed * cos(dir)
-                const uArr = windSpeed.map((spd: number, i: number) => {
-                    const dirRad = (windDir[i] ?? 0) * Math.PI / 180;
-                    return -spd * Math.sin(dirRad);
-                });
-                const vArr = windSpeed.map((spd: number, i: number) => {
-                    const dirRad = (windDir[i] ?? 0) * Math.PI / 180;
-                    return -spd * Math.cos(dirRad);
-                });
-
-                return {
-                    latIdx,
-                    lonIdx,
-                    timestamps: data.ts as number[],
-                    windU: uArr,
-                    windV: vArr,
-                };
-            });
-        }
+    // Get available timestamps from the calendar store
+    const calendar = store.get('calendar') as any;
+    if (!calendar) {
+        throw new Error('No weather data loaded. Ensure the wind overlay is active.');
     }
 
-    const results = await runWithConcurrency(tasks, CONCURRENCY);
+    // Build list of timestamps to sample (every 3 hours over the forecast range)
+    const timestamps: number[] = [];
+    const startTs = calendar.start as number;
+    const endTs = calendar.end as number;
+    const STEP_MS = 3 * 3600_000; // 3 hours
+    for (let t = startTs; t <= endTs; t += STEP_MS) {
+        timestamps.push(t);
+    }
 
-    // Get timestamps from first result
-    const timestamps = results[0].timestamps;
+    if (timestamps.length === 0) {
+        throw new Error('No forecast timestamps available.');
+    }
 
-    // Build 3D arrays: [latIdx][lonIdx][timeIdx]
+    // Pre-allocate 3D arrays: [latIdx][lonIdx][timeIdx]
     const windU: number[][][] = lats.map(() =>
         lons.map(() => new Array(timestamps.length).fill(0)),
     );
@@ -95,14 +63,60 @@ export async function fetchWindGrid(
         lons.map(() => new Array(timestamps.length).fill(0)),
     );
 
-    for (const r of results) {
-        for (let t = 0; t < timestamps.length; t++) {
-            windU[r.latIdx][r.lonIdx][t] = r.windU[t] ?? 0;
-            windV[r.latIdx][r.lonIdx][t] = r.windV[t] ?? 0;
+    // Save current timestamp to restore later
+    const originalTimestamp = store.get('timestamp');
+
+    // For each timestamp, scrub Windy's timeline and sample the interpolator
+    for (let ti = 0; ti < timestamps.length; ti++) {
+        const ts = timestamps[ti];
+
+        // Set the timeline to this timestamp and wait for tiles to load
+        store.set('timestamp', ts);
+        await waitForRedraw();
+
+        // Get the interpolator for the current view
+        const interpolate = await getLatLonInterpolator();
+        if (!interpolate) {
+            continue; // Skip this timestep if no interpolator available
+        }
+
+        // Sample wind at each grid point
+        for (let li = 0; li < lats.length; li++) {
+            for (let lo = 0; lo < lons.length; lo++) {
+                try {
+                    const result = await interpolate({ lat: lats[li], lon: lons[lo] });
+                    // Wind interpolator returns [u, v, ...] in m/s
+                    if (result && typeof result === 'object' && result.length >= 2) {
+                        windU[li][lo][ti] = result[0];
+                        windV[li][lo][ti] = result[1];
+                    }
+                } catch {
+                    // Point outside loaded tiles — leave as 0
+                }
+            }
         }
     }
 
+    // Restore original timestamp
+    store.set('timestamp', originalTimestamp);
+
     return { lats, lons, timestamps, windU, windV };
+}
+
+/**
+ * Wait for Windy to finish redrawing after a timestamp change.
+ */
+function waitForRedraw(): Promise<void> {
+    return new Promise(resolve => {
+        const timeout = setTimeout(() => {
+            resolve(); // Don't hang forever — proceed after 3s even without redraw
+        }, 3000);
+
+        bcast.once('redrawFinished', () => {
+            clearTimeout(timeout);
+            resolve();
+        });
+    });
 }
 
 /**
@@ -119,26 +133,4 @@ export function computeBounds(
         west: Math.min(start.lon, end.lon) - marginDeg,
         east: Math.max(start.lon, end.lon) + marginDeg,
     };
-}
-
-/**
- * Run async tasks with a concurrency limit.
- */
-async function runWithConcurrency<T>(
-    tasks: (() => Promise<T>)[],
-    limit: number,
-): Promise<T[]> {
-    const results: T[] = new Array(tasks.length);
-    let nextIndex = 0;
-
-    async function runNext(): Promise<void> {
-        while (nextIndex < tasks.length) {
-            const index = nextIndex++;
-            results[index] = await tasks[index]();
-        }
-    }
-
-    const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => runNext());
-    await Promise.all(workers);
-    return results;
 }
