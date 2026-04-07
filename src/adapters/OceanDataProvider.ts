@@ -1,25 +1,10 @@
 import store from '@windy/store';
-import bcast from '@windy/broadcast';
 import { getLatLonInterpolator } from '@windy/interpolator';
 import type { LatLonBounds, SwellGridData, CurrentGridData } from '../routing/types';
+import { waitForRedraw } from './windyHelpers';
 
 const GRID_STEP = 1.0; // degrees — same as WindProvider
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
-
-/**
- * Wait for Windy to finish redrawing.
- * Resolves immediately on `redrawFinished`; small safety timeout
- * prevents hanging if the event never fires (e.g. tiles already current).
- */
-function waitForRedraw(): Promise<void> {
-    return new Promise(resolve => {
-        const safety = setTimeout(resolve, 150);
-        bcast.once('redrawFinished', () => {
-            clearTimeout(safety);
-            resolve();
-        });
-    });
-}
 
 /**
  * Build lat/lon arrays and timestamps for the given bounds and time range.

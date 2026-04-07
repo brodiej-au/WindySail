@@ -219,6 +219,52 @@ function trilinearInterpolate(
 }
 
 /**
+ * Interpolate an angular (degree) grid correctly across the 0/360 boundary.
+ * Decomposes each grid value to sin/cos, interpolates those linearly, then
+ * recombines with atan2.
+ */
+function interpolateAngle(
+    grid3d: number[][][],
+    lats: number[],
+    lons: number[],
+    timestamps: number[],
+    lat: number,
+    lon: number,
+    time: number,
+): number {
+    const latB = findBracket(lats, lat);
+    const lonB = findBracket(lons, lon);
+    const timeB = findBracket(timestamps, time);
+
+    // Collect the 8 corner values
+    const corners = [
+        [latB.lo, lonB.lo, timeB.lo], [latB.lo, lonB.lo, timeB.hi],
+        [latB.lo, lonB.hi, timeB.lo], [latB.lo, lonB.hi, timeB.hi],
+        [latB.hi, lonB.lo, timeB.lo], [latB.hi, lonB.lo, timeB.hi],
+        [latB.hi, lonB.hi, timeB.lo], [latB.hi, lonB.hi, timeB.hi],
+    ] as const;
+
+    const toRad = Math.PI / 180;
+    const sins = corners.map(([li, lo, ti]) => Math.sin(grid3d[li][lo][ti] * toRad));
+    const coss = corners.map(([li, lo, ti]) => Math.cos(grid3d[li][lo][ti] * toRad));
+
+    // Trilinear interpolation on sin and cos separately
+    function trilerp(vals: number[]): number {
+        const t00 = lerp(vals[0], vals[1], timeB.frac);
+        const t01 = lerp(vals[2], vals[3], timeB.frac);
+        const t10 = lerp(vals[4], vals[5], timeB.frac);
+        const t11 = lerp(vals[6], vals[7], timeB.frac);
+        const la = lerp(t00, t01, lonB.frac);
+        const lb = lerp(t10, t11, lonB.frac);
+        return lerp(la, lb, latB.frac);
+    }
+
+    const sinVal = trilerp(sins);
+    const cosVal = trilerp(coss);
+    return (Math.atan2(sinVal, cosVal) * 180 / Math.PI + 360) % 360;
+}
+
+/**
  * Post-process each RoutePoint, annotating it with interpolated swell and
  * current values at its (lat, lon, time) position.  Grids that are absent
  * are silently skipped so callers need not guard against undefined.
@@ -235,7 +281,7 @@ function enrichRoutePoints(
             const { lats, lons, timestamps, swellHeight, swellDir, swellPeriod } = swellGrid;
             point.swell = {
                 height: trilinearInterpolate(swellHeight, lats, lons, timestamps, lat, lon, time),
-                direction: trilinearInterpolate(swellDir, lats, lons, timestamps, lat, lon, time),
+                direction: interpolateAngle(swellDir, lats, lons, timestamps, lat, lon, time),
                 period: trilinearInterpolate(swellPeriod, lats, lons, timestamps, lat, lon, time),
             };
         }

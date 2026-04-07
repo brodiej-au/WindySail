@@ -4,7 +4,7 @@
 </div>
 
 <script lang="ts">
-    import { onDestroy, afterUpdate } from 'svelte';
+    import { onDestroy } from 'svelte';
     import {
         Chart,
         LineController,

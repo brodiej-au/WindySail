@@ -1,8 +1,8 @@
 import store from '@windy/store';
-import bcast from '@windy/broadcast';
 import { getLatLonInterpolator } from '@windy/interpolator';
 import type { LatLonBounds, WindGridData, WindModelId } from '../routing/types';
 import * as WindCache from './WindCache';
+import { waitForRedraw } from './windyHelpers';
 
 const GRID_STEP = 1.0; // degrees — coarser grid for speed, router interpolates
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
@@ -105,21 +105,6 @@ export async function fetchWindGrid(
     const grid: WindGridData = { lats, lons, timestamps, windU, windV };
     WindCache.set(cacheKey, grid);
     return grid;
-}
-
-/**
- * Wait for Windy to finish redrawing.
- * Resolves immediately on `redrawFinished`; small safety timeout
- * prevents hanging if the event never fires (e.g. tiles already current).
- */
-function waitForRedraw(): Promise<void> {
-    return new Promise(resolve => {
-        const safety = setTimeout(resolve, 150);
-        bcast.once('redrawFinished', () => {
-            clearTimeout(safety);
-            resolve();
-        });
-    });
 }
 
 /**
