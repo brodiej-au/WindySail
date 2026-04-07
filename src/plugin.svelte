@@ -31,6 +31,7 @@
 <script lang="ts">
     import bcast from '@windy/broadcast';
     import store from '@windy/store';
+    import { map } from '@windy/map';
     import { onDestroy } from 'svelte';
 
     import config from './pluginConfig';
@@ -39,6 +40,7 @@
     import { RouteRenderer } from './map/RouteRenderer';
     import { BoatMarkerManager } from './map/BoatMarkerManager';
     import { RoutingOrchestrator } from './adapters/RoutingOrchestrator';
+    import { computeBounds } from './adapters/WindProvider';
     import { settingsStore } from './stores/SettingsStore';
     import { getPolarByName } from './data/polarRegistry';
     import { interpolateAtTime } from './routing/RouteInterpolator';
@@ -101,6 +103,18 @@
                 numSectors: settings.numSectors,
                 arrivalRadius: settings.arrivalRadius,
             };
+
+            // Zoom map to route area before fetching wind data so Windy tiles
+            // are loaded for the correct region before sampling begins.
+            const routeBounds = computeBounds(start, end, 1.0);
+            map.fitBounds(
+                [
+                    [routeBounds.south, routeBounds.west],
+                    [routeBounds.north, routeBounds.east],
+                ],
+                { padding: [40, 40] },
+            );
+            await new Promise<void>(resolve => setTimeout(resolve, 500));
 
             const routeResults = await orchestrator.computeRoutes(
                 start,
