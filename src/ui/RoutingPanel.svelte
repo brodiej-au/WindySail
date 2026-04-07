@@ -11,14 +11,17 @@
         {/if}
     </div>
 
-    <!-- Boat -->
+    <!-- Boat / polar -->
     <div class="section mb-10">
         <span class="size-xs label">Boat:</span>
-        <span class="size-s">Bavaria 38</span>
+        <span class="size-s">{polarName}</span>
     </div>
 
+    <!-- Settings panel (collapsible) -->
+    <SettingsPanel />
+
     <!-- Departure time -->
-    <div class="section mb-15">
+    <div class="section mb-15 mt-10">
         <label class="size-xs label" for="departure">Departure:</label>
         <input
             id="departure"
@@ -51,41 +54,90 @@
     {/if}
 
     <!-- Results -->
-    {#if result}
+    {#if results.length === 1}
+        {@const r = results[0].route}
         <div class="section results">
             <h3 class="size-m mb-10">Route Summary</h3>
             <div class="result-grid">
                 <div class="result-item">
                     <span class="size-xs label">ETA</span>
-                    <span class="size-s">{formatEta(result.eta)}</span>
+                    <span class="size-s">{formatEta(r.eta)}</span>
                 </div>
                 <div class="result-item">
                     <span class="size-xs label">Distance</span>
-                    <span class="size-s">{result.totalDistanceNm.toFixed(1)} nm</span>
+                    <span class="size-s">{r.totalDistanceNm.toFixed(1)} nm</span>
                 </div>
                 <div class="result-item">
                     <span class="size-xs label">Avg SOG</span>
-                    <span class="size-s">{result.avgSpeedKt.toFixed(1)} kt</span>
+                    <span class="size-s">{r.avgSpeedKt.toFixed(1)} kt</span>
                 </div>
                 <div class="result-item">
                     <span class="size-xs label">Max TWS</span>
-                    <span class="size-s">{result.maxTws.toFixed(0)} kt</span>
+                    <span class="size-s">{r.maxTws.toFixed(0)} kt</span>
                 </div>
                 <div class="result-item">
                     <span class="size-xs label">Duration</span>
-                    <span class="size-s">{formatDuration(result.durationHours)}</span>
+                    <span class="size-s">{formatDuration(r.durationHours)}</span>
                 </div>
             </div>
 
-            <button
-                class="button size-s mt-15"
-                style="width:100%"
-                on:click={handleClear}
-            >
+            <button class="button size-s mt-15" style="width:100%" on:click={handleClear}>
+                Clear Route
+            </button>
+        </div>
+    {:else if results.length > 1}
+        <div class="section results">
+            <h3 class="size-m mb-10">Route Comparison</h3>
+            <table class="comparison-table size-xs">
+                <thead>
+                    <tr>
+                        <th>Model</th>
+                        <th>ETA</th>
+                        <th>Dist</th>
+                        <th>SOG</th>
+                        <th>TWS</th>
+                        <th>Duration</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {#each results as mr (mr.model)}
+                        {@const fastest = mr.route.durationHours === fastestDuration}
+                        <tr class:fastest-row={fastest}>
+                            <td class="model-cell">
+                                <span class="model-dot" style:background={mr.color}></span>
+                                <span class={fastest ? 'fastest-label' : ''}
+                                    >{MODEL_LABELS[mr.model]}</span
+                                >
+                            </td>
+                            <td>{formatEta(mr.route.eta)}</td>
+                            <td>{mr.route.totalDistanceNm.toFixed(0)} nm</td>
+                            <td>{mr.route.avgSpeedKt.toFixed(1)}</td>
+                            <td>{mr.route.maxTws.toFixed(0)}</td>
+                            <td>{formatDuration(mr.route.durationHours)}</td>
+                        </tr>
+                    {/each}
+                </tbody>
+            </table>
+
+            <!-- Failed model warnings -->
+            {#if failedModels.length > 0}
+                <div class="failed-list mt-10">
+                    {#each failedModels as fm}
+                        <div class="failed-item size-xs">
+                            ⚠ {MODEL_LABELS[fm.model]}: {fm.reason}
+                        </div>
+                    {/each}
+                </div>
+            {/if}
+
+            <button class="button size-s mt-15" style="width:100%" on:click={handleClear}>
                 Clear Route
             </button>
         </div>
     {/if}
+
+    <!-- Player controls slot -->
+    <slot name="player" />
 
     <!-- Disclaimer -->
     <div class="disclaimer size-xs mt-15">
@@ -95,9 +147,11 @@
 
 <script lang="ts">
     import ProgressBar from './ProgressBar.svelte';
+    import SettingsPanel from './SettingsPanel.svelte';
 
-    import type { LatLon, RouteResult } from '../routing/types';
+    import type { LatLon, ModelRouteResult, WindModelId } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
+    import { MODEL_LABELS } from '../map/modelColors';
 
     export let waypointState: WaypointState = 'WAITING_START';
     export let start: LatLon | null = null;
@@ -105,7 +159,9 @@
     export let isRouting: boolean = false;
     export let progressPercent: number = 0;
     export let progressStatus: string = '';
-    export let result: RouteResult | null = null;
+    export let results: ModelRouteResult[] = [];
+    export let failedModels: { model: WindModelId; reason: string }[] = [];
+    export let polarName: string = 'Bavaria 38';
     export let error: string | null = null;
 
     export let onCalculate: () => void = () => {};
@@ -120,6 +176,9 @@
     }
 
     $: canCalculate = waypointState === 'READY' && !isRouting;
+
+    $: fastestDuration =
+        results.length > 1 ? Math.min(...results.map((r) => r.route.durationHours)) : Infinity;
 
     function handleCalculate(): void {
         if (isRouting) {
@@ -218,6 +277,63 @@
             margin-bottom: 0;
         }
     }
+
+    /* Comparison table */
+    .comparison-table {
+        width: 100%;
+        border-collapse: collapse;
+        line-height: 1.5;
+
+        th {
+            opacity: 0.5;
+            font-weight: normal;
+            text-align: left;
+            padding: 0 4px 4px 0;
+            white-space: nowrap;
+        }
+
+        td {
+            padding: 3px 4px 3px 0;
+            white-space: nowrap;
+        }
+
+        tr.fastest-row {
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 3px;
+        }
+    }
+
+    .model-cell {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+
+    .model-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
+    }
+
+    .fastest-label {
+        font-weight: 600;
+    }
+
+    /* Failed models */
+    .failed-list {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .failed-item {
+        color: #e9c46a;
+        opacity: 0.85;
+        line-height: 1.4;
+    }
+
     .disclaimer {
         opacity: 0.4;
         line-height: 1.4;
