@@ -79,3 +79,34 @@ export interface IsochronePoint {
     heading: number;
     time: number;
 }
+
+export type WindModelId = 'gfs' | 'ecmwf' | 'icon' | 'bomAccess'
+
+export interface ModelRouteResult {
+    model: WindModelId;
+    route: RouteResult;
+    color: string;
+    windGrid: WindGridData;
+}
+
+export interface UserSettings {
+    timeStep: number; // hours
+    maxDuration: number; // hours
+    headingStep: number; // degrees
+    numSectors: number; // pruning sectors
+    arrivalRadius: number; // nautical miles
+    landMarginNm: number; // nautical miles
+    selectedModels: WindModelId[];
+    selectedPolarName: string;
+}
+
+export const DEFAULT_SETTINGS: UserSettings = {
+    timeStep: 1.0,
+    maxDuration: 168,
+    headingStep: 5,
+    numSectors: 72,
+    arrivalRadius: 1.0,
+    landMarginNm: 1,
+    selectedModels: ['gfs'],
+    selectedPolarName: 'Bavaria 38',
+}
