@@ -177,6 +177,8 @@
         const next = selectedModels.includes(model)
             ? selectedModels.filter((m) => m !== model)
             : [...selectedModels, model];
+        // Prevent deselecting all models
+        if (next.length === 0) return;
         selectedModels = next;
         settingsStore.set('selectedModels', next);
     }
@@ -256,10 +258,14 @@
 
     function handleEditorSave(): void {
         showEditor = false;
-        // Refresh polars list
+        const previousPolars = allPolars.map(p => p.name);
         allPolars = getAllPolars();
-        // Update selection to the newly saved polar if it's a new one
-        // (For edits, selectedPolarName already matches)
+        // Auto-select newly created polar
+        const newPolar = allPolars.find(p => !previousPolars.includes(p.name));
+        if (newPolar) {
+            selectedPolarName = newPolar.name;
+            settingsStore.set('selectedPolarName', newPolar.name);
+        }
     }
 
     function handleEditorCancel(): void {

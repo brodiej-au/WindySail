@@ -21,7 +21,7 @@ export class BoatMarkerManager {
     updateMarker(model: WindModelId, point: BoatMarkerPoint, color: string): void {
         const tooltipContent = `SOG: ${point.boatSpeed.toFixed(1)} kt | TWS: ${point.tws.toFixed(
             1,
-        )} kt\nTWD: ${Math.round(point.twd)}° | TWA: ${Math.round(point.twa)}°`;
+        )} kt<br>TWD: ${Math.round(point.twd)}\u00B0 | TWA: ${Math.round(point.twa)}\u00B0`;
 
         const existingMarker = this.markers.get(model);
 

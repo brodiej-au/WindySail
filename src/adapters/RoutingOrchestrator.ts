@@ -8,10 +8,9 @@ export type StatusCallback = (status: string, percent: number) => void;
 
 export class RoutingOrchestrator {
     private bridges: WorkerBridge[] = [];
-    private pluginName: string;
 
-    constructor(pluginName: string) {
-        this.pluginName = pluginName;
+    constructor(_pluginName?: string) {
+        // pluginName reserved for future use (e.g., worker naming)
     }
 
     /**

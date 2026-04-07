@@ -66,39 +66,41 @@ export async function fetchWindGrid(
     const originalTimestamp = store.get('timestamp');
     const originalProduct = store.get('product');
 
-    // Switch to the requested weather model
-    store.set('product', model);
-    await waitForRedraw();
-
-    for (let ti = 0; ti < timestamps.length; ti++) {
-        onProgress?.(
-            `Sampling wind ${ti + 1}/${timestamps.length}...`,
-            Math.round((ti / timestamps.length) * 100),
-        );
-
-        store.set('timestamp', timestamps[ti]);
+    try {
+        // Switch to the requested weather model
+        store.set('product', model);
         await waitForRedraw();
 
-        const interpolate = await getLatLonInterpolator();
-        if (!interpolate) continue;
+        for (let ti = 0; ti < timestamps.length; ti++) {
+            onProgress?.(
+                `Sampling wind ${ti + 1}/${timestamps.length}...`,
+                Math.round((ti / timestamps.length) * 100),
+            );
 
-        for (let li = 0; li < lats.length; li++) {
-            for (let lo = 0; lo < lons.length; lo++) {
-                try {
-                    const result = await interpolate({ lat: lats[li], lon: lons[lo] });
-                    if (result && typeof result === 'object' && result.length >= 2) {
-                        windU[li][lo][ti] = result[0];
-                        windV[li][lo][ti] = result[1];
+            store.set('timestamp', timestamps[ti]);
+            await waitForRedraw();
+
+            const interpolate = await getLatLonInterpolator();
+            if (!interpolate) continue;
+
+            for (let li = 0; li < lats.length; li++) {
+                for (let lo = 0; lo < lons.length; lo++) {
+                    try {
+                        const result = await interpolate({ lat: lats[li], lon: lons[lo] });
+                        if (result && typeof result === 'object' && result.length >= 2) {
+                            windU[li][lo][ti] = result[0];
+                            windV[li][lo][ti] = result[1];
+                        }
+                    } catch {
+                        // Outside loaded tiles — leave as 0
                     }
-                } catch {
-                    // Outside loaded tiles — leave as 0
                 }
             }
         }
+    } finally {
+        store.set('timestamp', originalTimestamp);
+        store.set('product', originalProduct);
     }
-
-    store.set('timestamp', originalTimestamp);
-    store.set('product', originalProduct);
 
     const grid: WindGridData = { lats, lons, timestamps, windU, windV };
     WindCache.set(cacheKey, grid);
