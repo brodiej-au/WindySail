@@ -15,27 +15,44 @@
         {isRouting}
         {progressPercent}
         {progressStatus}
-        {result}
+        {results}
+        {failedModels}
+        polarName={settingsStore.get('selectedPolarName')}
         {error}
         onCalculate={handleCalculate}
         onCancel={handleCancel}
         onClear={handleClear}
         bind:this={routingPanel}
-    />
+    >
+        {#if results.length > 0}
+            <div slot="player">
+                <PlayerControls
+                    {results}
+                    onTimeChange={handlePlayerTimeChange}
+                    onModelSwitch={handleModelSwitch}
+                />
+            </div>
+        {/if}
+    </RoutingPanel>
 </section>
 
 <script lang="ts">
     import bcast from '@windy/broadcast';
+    import store from '@windy/store';
     import { onDestroy } from 'svelte';
 
     import config from './pluginConfig';
     import RoutingPanel from './ui/RoutingPanel.svelte';
+    import PlayerControls from './ui/PlayerControls.svelte';
     import { WaypointManager } from './map/WaypointManager';
     import { RouteRenderer } from './map/RouteRenderer';
+    import { BoatMarkerManager } from './map/BoatMarkerManager';
     import { RoutingOrchestrator } from './adapters/RoutingOrchestrator';
-    import bavaria38Polar from './data/polars/bavaria38.json';
+    import { settingsStore } from './stores/SettingsStore';
+    import { getPolarByName } from './data/polarRegistry';
+    import { interpolateAtTime } from './routing/RouteInterpolator';
 
-    import type { LatLon, RouteResult } from './routing/types';
+    import type { LatLon, ModelRouteResult, WindModelId } from './routing/types';
     import type { WaypointState } from './map/WaypointManager';
 
     const { title, name } = config;
@@ -46,12 +63,17 @@
     let isRouting = false;
     let progressPercent = 0;
     let progressStatus = '';
-    let result: RouteResult | null = null;
+    let results: ModelRouteResult[] = [];
+    let failedModels: { model: WindModelId; reason: string }[] = [];
     let error: string | null = null;
 
     let routingPanel: RoutingPanel;
 
+    let originalTimestamp: number | null = null;
+    let originalProduct: string | null = null;
+
     const renderer = new RouteRenderer();
+    const boatMarkers = new BoatMarkerManager();
     const orchestrator = new RoutingOrchestrator(name);
     let waypointMgr: WaypointManager;
 
@@ -66,32 +88,34 @@
     }
 
     async function handleCalculate(): Promise<void> {
-        if (!start || !end) {
-            return;
-        }
+        if (!start || !end) return;
 
         error = null;
-        result = null;
+        results = [];
+        failedModels = [];
         isRouting = true;
         progressPercent = 0;
         progressStatus = 'Starting...';
 
         try {
             const departureTime = routingPanel.getDepartureTime();
+            const settings = settingsStore.getAll();
+            const polar = getPolarByName(settings.selectedPolarName);
 
             const options = {
                 startTime: departureTime,
-                timeStep: 1.0,
-                maxDuration: 168,
-                headingStep: 5,
-                numSectors: 72,
-                arrivalRadius: 1.0,
+                timeStep: settings.timeStep,
+                maxDuration: settings.maxDuration,
+                headingStep: settings.headingStep,
+                numSectors: settings.numSectors,
+                arrivalRadius: settings.arrivalRadius,
             };
 
-            const routeResult = await orchestrator.computeRoute(
+            const routeResults = await orchestrator.computeRoutes(
                 start,
                 end,
-                bavaria38Polar,
+                polar,
+                settings.selectedModels,
                 options,
                 (status, percent) => {
                     progressStatus = status;
@@ -99,8 +123,8 @@
                 },
             );
 
-            result = routeResult;
-            renderer.renderRoute(routeResult);
+            results = routeResults;
+            renderer.renderRoutes(routeResults);
         } catch (err) {
             error = err instanceof Error ? err.message : 'Routing computation failed.';
         } finally {
@@ -116,12 +140,30 @@
     }
 
     function handleClear(): void {
-        result = null;
+        results = [];
+        failedModels = [];
         error = null;
         renderer.clear();
+        boatMarkers.clear();
+    }
+
+    function handlePlayerTimeChange(time: number): void {
+        for (const result of results) {
+            const point = interpolateAtTime(result.route.path, time);
+            if (point) {
+                boatMarkers.updateMarker(result.model, point, result.color);
+            }
+        }
+        store.set('timestamp', time);
+    }
+
+    function handleModelSwitch(model: WindModelId): void {
+        store.set('product', model);
     }
 
     export const onopen = (_params: unknown) => {
+        originalTimestamp = store.get('timestamp');
+        originalProduct = store.get('product');
         waypointMgr = new WaypointManager(name, handleWaypointChange);
         waypointMgr.activate();
     };
@@ -129,7 +171,14 @@
     onDestroy(() => {
         waypointMgr?.destroy();
         renderer.clear();
+        boatMarkers.clear();
         orchestrator.destroy();
+        if (originalTimestamp !== null) {
+            store.set('timestamp', originalTimestamp);
+        }
+        if (originalProduct !== null) {
+            store.set('product', originalProduct);
+        }
     });
 </script>
 

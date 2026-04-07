@@ -6,122 +6,137 @@
     </button>
 
     {#if isOpen}
-        <div class="settings-body">
-            <!-- Wind Models -->
-            <div class="section mb-10">
-                <span class="size-xs label">Wind Models:</span>
-                <div class="model-list">
-                    {#each ALL_MODELS as model}
-                        <label class="model-row size-s">
-                            <input
-                                type="checkbox"
-                                checked={selectedModels.includes(model)}
-                                on:change={() => toggleModel(model)}
-                            />
-                            <span
-                                class="model-dot"
-                                style:background={MODEL_COLORS[model]}
-                            ></span>
-                            <span>{MODEL_LABELS[model]}</span>
-                        </label>
-                    {/each}
+        {#if showEditor}
+            <div class="settings-body">
+                <PolarEditor polar={editingPolar} onSave={handleEditorSave} onCancel={handleEditorCancel} />
+            </div>
+        {:else}
+            <div class="settings-body">
+                <!-- Wind Models -->
+                <div class="section mb-10">
+                    <span class="size-xs label">Wind Models:</span>
+                    <div class="model-list">
+                        {#each ALL_MODELS as model}
+                            <label class="model-row size-s">
+                                <input
+                                    type="checkbox"
+                                    checked={selectedModels.includes(model)}
+                                    on:change={() => toggleModel(model)}
+                                />
+                                <span
+                                    class="model-dot"
+                                    style:background={MODEL_COLORS[model]}
+                                ></span>
+                                <span>{MODEL_LABELS[model]}</span>
+                            </label>
+                        {/each}
+                    </div>
+                </div>
+
+                <!-- Routing Parameters -->
+                <div class="section mb-10">
+                    <span class="size-xs label">Routing Parameters:</span>
+
+                    <div class="param-grid">
+                        <label class="size-xs param-label" for="timeStep">Time Step (h)</label>
+                        <input
+                            id="timeStep"
+                            type="number"
+                            class="input size-s"
+                            min="0.5"
+                            max="3"
+                            step="0.5"
+                            value={timeStep}
+                            on:change={(e) => handleNumberChange('timeStep', e)}
+                        />
+
+                        <label class="size-xs param-label" for="maxDuration">Max Duration (h)</label>
+                        <input
+                            id="maxDuration"
+                            type="number"
+                            class="input size-s"
+                            min="24"
+                            max="336"
+                            step="24"
+                            value={maxDuration}
+                            on:change={(e) => handleNumberChange('maxDuration', e)}
+                        />
+
+                        <label class="size-xs param-label" for="headingStep">Heading Step (°)</label>
+                        <input
+                            id="headingStep"
+                            type="number"
+                            class="input size-s"
+                            min="3"
+                            max="15"
+                            step="1"
+                            value={headingStep}
+                            on:change={(e) => handleNumberChange('headingStep', e)}
+                        />
+
+                        <label class="size-xs param-label" for="numSectors">Sectors</label>
+                        <input
+                            id="numSectors"
+                            type="number"
+                            class="input size-s"
+                            min="36"
+                            max="144"
+                            step="12"
+                            value={numSectors}
+                            on:change={(e) => handleNumberChange('numSectors', e)}
+                        />
+
+                        <label class="size-xs param-label" for="arrivalRadius">Arrival Radius (nm)</label>
+                        <input
+                            id="arrivalRadius"
+                            type="number"
+                            class="input size-s"
+                            min="0.1"
+                            max="5"
+                            step="0.1"
+                            value={arrivalRadius}
+                            on:change={(e) => handleNumberChange('arrivalRadius', e)}
+                        />
+
+                        <label class="size-xs param-label" for="landMarginNm">Land Margin (nm)</label>
+                        <input
+                            id="landMarginNm"
+                            type="number"
+                            class="input size-s"
+                            min="0"
+                            max="5"
+                            step="0.5"
+                            value={landMarginNm}
+                            on:change={(e) => handleNumberChange('landMarginNm', e)}
+                        />
+                    </div>
+                </div>
+
+                <!-- Polar Selector -->
+                <div class="section">
+                    <label class="size-xs label" for="polarSelect">Polar:</label>
+                    <div class="polar-controls">
+                        <select
+                            id="polarSelect"
+                            class="input size-s"
+                            value={selectedPolarName}
+                            on:change={handlePolarChange}
+                        >
+                            {#each allPolars as polar}
+                                <option value={polar.name}>{polar.name}</option>
+                            {/each}
+                        </select>
+                        <div class="polar-buttons">
+                            <button class="button size-s" on:click={handleNewPolar}>New</button>
+                            {#if isCurrentPolarCustom()}
+                                <button class="button size-s" on:click={handleEditPolar}>Edit</button>
+                                <button class="button size-s" on:click={handleDeletePolar}>Delete</button>
+                            {/if}
+                        </div>
+                    </div>
                 </div>
             </div>
-
-            <!-- Routing Parameters -->
-            <div class="section mb-10">
-                <span class="size-xs label">Routing Parameters:</span>
-
-                <div class="param-grid">
-                    <label class="size-xs param-label" for="timeStep">Time Step (h)</label>
-                    <input
-                        id="timeStep"
-                        type="number"
-                        class="input size-s"
-                        min="0.5"
-                        max="3"
-                        step="0.5"
-                        value={timeStep}
-                        on:change={(e) => handleNumberChange('timeStep', e)}
-                    />
-
-                    <label class="size-xs param-label" for="maxDuration">Max Duration (h)</label>
-                    <input
-                        id="maxDuration"
-                        type="number"
-                        class="input size-s"
-                        min="24"
-                        max="336"
-                        step="24"
-                        value={maxDuration}
-                        on:change={(e) => handleNumberChange('maxDuration', e)}
-                    />
-
-                    <label class="size-xs param-label" for="headingStep">Heading Step (°)</label>
-                    <input
-                        id="headingStep"
-                        type="number"
-                        class="input size-s"
-                        min="3"
-                        max="15"
-                        step="1"
-                        value={headingStep}
-                        on:change={(e) => handleNumberChange('headingStep', e)}
-                    />
-
-                    <label class="size-xs param-label" for="numSectors">Sectors</label>
-                    <input
-                        id="numSectors"
-                        type="number"
-                        class="input size-s"
-                        min="36"
-                        max="144"
-                        step="12"
-                        value={numSectors}
-                        on:change={(e) => handleNumberChange('numSectors', e)}
-                    />
-
-                    <label class="size-xs param-label" for="arrivalRadius">Arrival Radius (nm)</label>
-                    <input
-                        id="arrivalRadius"
-                        type="number"
-                        class="input size-s"
-                        min="0.1"
-                        max="5"
-                        step="0.1"
-                        value={arrivalRadius}
-                        on:change={(e) => handleNumberChange('arrivalRadius', e)}
-                    />
-
-                    <label class="size-xs param-label" for="landMarginNm">Land Margin (nm)</label>
-                    <input
-                        id="landMarginNm"
-                        type="number"
-                        class="input size-s"
-                        min="0"
-                        max="5"
-                        step="0.5"
-                        value={landMarginNm}
-                        on:change={(e) => handleNumberChange('landMarginNm', e)}
-                    />
-                </div>
-            </div>
-
-            <!-- Polar Selector -->
-            <div class="section">
-                <label class="size-xs label" for="polarSelect">Polar:</label>
-                <select
-                    id="polarSelect"
-                    class="input size-s"
-                    value={selectedPolarName}
-                    on:change={handlePolarChange}
-                >
-                    {#each allPolars as polar}
-                        <option value={polar.name}>{polar.name}</option>
-                    {/each}
-                </select>
-            </div>
-        </div>
+        {/if}
     {/if}
 </div>
 
@@ -130,12 +145,17 @@
 
     import { settingsStore } from '../stores/SettingsStore';
     import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
-    import { getAllPolars } from '../data/polarRegistry';
-    import type { WindModelId, UserSettings } from '../routing/types';
+    import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
+    import PolarEditor from './PolarEditor.svelte';
+    import type { WindModelId, UserSettings, PolarData } from '../routing/types';
 
     const ALL_MODELS: WindModelId[] = ['gfs', 'ecmwf', 'icon', 'bomAccess'];
 
     let isOpen = false;
+
+    // Editor state
+    let showEditor = false;
+    let editingPolar: PolarData | null = null;
 
     // Local reactive state — initialised from store
     let selectedModels: WindModelId[] = settingsStore.get('selectedModels');
@@ -147,7 +167,7 @@
     let landMarginNm: number = settingsStore.get('landMarginNm');
     let selectedPolarName: string = settingsStore.get('selectedPolarName');
 
-    const allPolars = getAllPolars();
+    let allPolars = getAllPolars();
 
     function toggleOpen(): void {
         isOpen = !isOpen;
@@ -200,6 +220,50 @@
         const value = (e.target as HTMLSelectElement).value;
         selectedPolarName = value;
         settingsStore.set('selectedPolarName', value);
+    }
+
+    function isCurrentPolarCustom(): boolean {
+        const customPolars = getCustomPolars();
+        return customPolars.some(p => p.name === selectedPolarName);
+    }
+
+    function handleNewPolar(): void {
+        editingPolar = null;
+        showEditor = true;
+    }
+
+    function handleEditPolar(): void {
+        const polar = allPolars.find(p => p.name === selectedPolarName);
+        if (polar) {
+            editingPolar = polar;
+            showEditor = true;
+        }
+    }
+
+    function handleDeletePolar(): void {
+        if (confirm(`Delete polar "${selectedPolarName}"?`)) {
+            deleteCustomPolar(selectedPolarName);
+            // Refresh polars list
+            allPolars = getAllPolars();
+            // Reset selection to first polar
+            const firstPolar = allPolars[0];
+            if (firstPolar) {
+                selectedPolarName = firstPolar.name;
+                settingsStore.set('selectedPolarName', firstPolar.name);
+            }
+        }
+    }
+
+    function handleEditorSave(): void {
+        showEditor = false;
+        // Refresh polars list
+        allPolars = getAllPolars();
+        // Update selection to the newly saved polar if it's a new one
+        // (For edits, selectedPolarName already matches)
+    }
+
+    function handleEditorCancel(): void {
+        showEditor = false;
     }
 
     // Keep local state in sync when store changes externally
@@ -326,5 +390,47 @@
     select.input {
         width: 100%;
         cursor: pointer;
+    }
+
+    .polar-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .polar-buttons {
+        display: flex;
+        gap: 6px;
+    }
+
+    .button {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+        color: inherit;
+        padding: 5px 10px;
+        font-size: 13px;
+        cursor: pointer;
+        opacity: 0.9;
+        transition: all 0.2s ease;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.12);
+            opacity: 1;
+        }
+
+        &:active {
+            transform: scale(0.98);
+        }
+    }
+
+    .button--variant-orange {
+        background: rgba(255, 140, 0, 0.2);
+        border-color: rgba(255, 140, 0, 0.4);
+
+        &:hover {
+            background: rgba(255, 140, 0, 0.3);
+            border-color: rgba(255, 140, 0, 0.6);
+        }
     }
 </style>
