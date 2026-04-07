@@ -1,11 +1,17 @@
 import type { PolarData } from '../routing/types';
 import bavaria38 from './polars/bavaria38.json';
+import jeanneauSO440 from './polars/jeanneau-so440.json';
+import beneteuFirst40 from './polars/beneteau-first40.json';
 
 /**
  * Bundled polars (immutable).
  * More polars will be added in Task 16.
  */
-const BUNDLED_POLARS: PolarData[] = [bavaria38 as PolarData];
+const BUNDLED_POLARS: PolarData[] = [
+    bavaria38 as PolarData,
+    jeanneauSO440 as PolarData,
+    beneteuFirst40 as PolarData,
+];
 
 const CUSTOM_POLARS_STORAGE_KEY = 'windysail-custom-polars';
 
