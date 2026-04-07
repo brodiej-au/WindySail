@@ -1,6 +1,6 @@
 import { map } from '@windy/map';
 import type { RouteResult, ModelRouteResult } from '../routing/types';
-import { MODEL_COLORS } from './modelColors';
+import { MODEL_COLORS, MODEL_LABELS } from './modelColors';
 
 export class RouteRenderer {
     private routeLines: Map<string, L.Polyline> = new Map();
@@ -25,6 +25,10 @@ export class RouteRenderer {
                 weight: 3,
                 opacity: 0.9,
             }).addTo(map);
+
+            polyline.bindTooltip(MODEL_LABELS[result.model], { sticky: true, direction: 'top' });
+            polyline.on('mouseover', () => polyline.setStyle({ weight: 5 }));
+            polyline.on('mouseout', () => polyline.setStyle({ weight: 3 }));
 
             this.routeLines.set(result.model, polyline);
             allBounds.push(...latlngs);
