@@ -11,7 +11,14 @@ export class RouteRenderer {
     renderRoutes(results: ModelRouteResult[]): void {
         this.clear();
 
+        const modelNames = results.map(r => r.model).join(', ');
+        console.log(`[RouteRenderer] Rendering ${results.length} route(s): ${modelNames}`);
+
+        // Dash patterns by render order: first solid, second dashed, third dotted
+        const dashPatterns: (string | undefined)[] = [undefined, '10 6', '4 4'];
+
         const allBounds: [number, number][] = [];
+        let renderIndex = 0;
 
         for (const result of results) {
             const latlngs: [number, number][] = result.route.path.map(p => [p.lat, p.lon]);
@@ -20,18 +27,22 @@ export class RouteRenderer {
                 continue;
             }
 
+            const dashArray = dashPatterns[renderIndex] ?? '4 4';
+
             const polyline = new L.Polyline(latlngs, {
                 color: result.color,
-                weight: 3,
+                weight: 4,
                 opacity: 0.9,
+                ...(renderIndex > 0 ? { dashArray } : {}),
             }).addTo(map);
 
             polyline.bindTooltip(MODEL_LABELS[result.model], { sticky: true, direction: 'top' });
-            polyline.on('mouseover', () => polyline.setStyle({ weight: 5 }));
-            polyline.on('mouseout', () => polyline.setStyle({ weight: 3 }));
+            polyline.on('mouseover', () => polyline.setStyle({ weight: 6 }));
+            polyline.on('mouseout', () => polyline.setStyle({ weight: 4 }));
 
             this.routeLines.set(result.model, polyline);
             allBounds.push(...latlngs);
+            renderIndex++;
         }
 
         // Fit map to show all routes

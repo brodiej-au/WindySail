@@ -62,6 +62,17 @@ export class RoutingOrchestrator {
                     },
                 );
                 windGrids.set(model, grid);
+
+                // Warn if all wind U/V values are zero — this typically indicates
+                // a silent data failure where the model returned empty wind data.
+                const allZero =
+                    grid.windU.every(lat => lat.every(lon => lon.every(val => val === 0))) &&
+                    grid.windV.every(lat => lat.every(lon => lon.every(val => val === 0)));
+                if (allZero) {
+                    console.warn(
+                        `[RoutingOrchestrator] Wind grid for model "${model}" has all-zero values — data may have failed silently.`,
+                    );
+                }
             } catch (err) {
                 console.warn(`[RoutingOrchestrator] Wind sampling failed for model "${model}":`, err);
             }
