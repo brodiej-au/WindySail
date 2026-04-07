@@ -44,6 +44,7 @@
     import { settingsStore } from './stores/SettingsStore';
     import { getPolarByName } from './data/polarRegistry';
     import { interpolateAtTime } from './routing/RouteInterpolator';
+    import { distance } from './routing/geo';
 
     import type { LatLon, ModelRouteResult, WindModelId } from './routing/types';
     import type { WaypointState } from './map/WaypointManager';
@@ -95,10 +96,16 @@
             const settings = settingsStore.getAll();
             const polar = getPolarByName(settings.selectedPolarName);
 
+            const distNm = distance(start, end);
+            const estimatedHours = Math.ceil(distNm / settings.estimatedVmgKt) * 1.3;
+            const actualHours = Math.min(estimatedHours, settings.maxDuration);
+
+            progressStatus = `Estimated passage: ~${Math.round(estimatedHours)}h, fetching ${Math.round(actualHours)}h of forecast`;
+
             const options = {
                 startTime: departureTime,
                 timeStep: settings.timeStep,
-                maxDuration: settings.maxDuration,
+                maxDuration: actualHours,
                 headingStep: settings.headingStep,
                 numSectors: settings.numSectors,
                 arrivalRadius: settings.arrivalRadius,

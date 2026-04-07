@@ -109,6 +109,18 @@
                             value={landMarginNm}
                             on:change={(e) => handleNumberChange('landMarginNm', e)}
                         />
+
+                        <label class="size-xs param-label" for="estimatedVmgKt">Est. VMG (kt)</label>
+                        <input
+                            id="estimatedVmgKt"
+                            type="number"
+                            class="input size-s"
+                            min="1"
+                            max="10"
+                            step="0.5"
+                            value={estimatedVmgKt}
+                            on:change={(e) => handleNumberChange('estimatedVmgKt', e)}
+                        />
                     </div>
                 </div>
 
@@ -165,6 +177,7 @@
     let numSectors: number = settingsStore.get('numSectors');
     let arrivalRadius: number = settingsStore.get('arrivalRadius');
     let landMarginNm: number = settingsStore.get('landMarginNm');
+    let estimatedVmgKt: number = settingsStore.get('estimatedVmgKt');
     let selectedPolarName: string = settingsStore.get('selectedPolarName');
 
     let allPolars = getAllPolars();
@@ -186,7 +199,7 @@
     function handleNumberChange(
         key: keyof Pick<
             UserSettings,
-            'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm'
+            'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'estimatedVmgKt'
         >,
         e: Event,
     ): void {
@@ -213,6 +226,9 @@
                     break;
                 case 'landMarginNm':
                     landMarginNm = value;
+                    break;
+                case 'estimatedVmgKt':
+                    estimatedVmgKt = value;
                     break;
             }
         }
@@ -281,6 +297,7 @@
         numSectors = settings.numSectors;
         arrivalRadius = settings.arrivalRadius;
         landMarginNm = settings.landMarginNm;
+        estimatedVmgKt = settings.estimatedVmgKt;
         selectedPolarName = settings.selectedPolarName;
     }
 
