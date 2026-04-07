@@ -23,7 +23,10 @@
     "author": "Brodie (appd.com.au)",
     "license": "GPL-3.0",
     "dependencies": {
-        "@windycom/plugin-devtools": "^3.0.3"
+        "@windycom/plugin-devtools": "^3.0.3",
+        "chart.js": "^4.5.1",
+        "chartjs-adapter-date-fns": "^3.0.0",
+        "date-fns": "^4.1.0"
     },
     "devDependencies": {
         "@rollup/plugin-json": "^6.1.0",
