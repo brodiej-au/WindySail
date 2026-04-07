@@ -136,8 +136,14 @@
         </div>
     {/if}
 
-    <!-- Player controls slot -->
-    <slot name="player" />
+    <!-- Player controls -->
+    {#if results.length > 0}
+        <PlayerControls
+            {results}
+            {onTimeChange}
+            {onModelSwitch}
+        />
+    {/if}
 
     <!-- Disclaimer -->
     <div class="disclaimer size-xs mt-15">
@@ -148,6 +154,7 @@
 <script lang="ts">
     import ProgressBar from './ProgressBar.svelte';
     import SettingsPanel from './SettingsPanel.svelte';
+    import PlayerControls from './PlayerControls.svelte';
 
     import type { LatLon, ModelRouteResult, WindModelId } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
@@ -167,6 +174,8 @@
     export let onCalculate: () => void = () => {};
     export let onCancel: () => void = () => {};
     export let onClear: () => void = () => {};
+    export let onTimeChange: (time: number) => void = () => {};
+    export let onModelSwitch: (model: WindModelId) => void = () => {};
 
     // Default departure to now, formatted for datetime-local input
     let departureStr = formatDateForInput(new Date());

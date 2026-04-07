@@ -22,18 +22,10 @@
         onCalculate={handleCalculate}
         onCancel={handleCancel}
         onClear={handleClear}
+        onTimeChange={handlePlayerTimeChange}
+        onModelSwitch={handleModelSwitch}
         bind:this={routingPanel}
-    >
-        {#if results.length > 0}
-            <div slot="player">
-                <PlayerControls
-                    {results}
-                    onTimeChange={handlePlayerTimeChange}
-                    onModelSwitch={handleModelSwitch}
-                />
-            </div>
-        {/if}
-    </RoutingPanel>
+    />
 </section>
 
 <script lang="ts">
@@ -43,7 +35,6 @@
 
     import config from './pluginConfig';
     import RoutingPanel from './ui/RoutingPanel.svelte';
-    import PlayerControls from './ui/PlayerControls.svelte';
     import { WaypointManager } from './map/WaypointManager';
     import { RouteRenderer } from './map/RouteRenderer';
     import { BoatMarkerManager } from './map/BoatMarkerManager';
@@ -125,6 +116,12 @@
 
             results = routeResults;
             renderer.renderRoutes(routeResults);
+
+            // Identify models that were selected but didn't return results
+            const succeededModels = routeResults.map(r => r.model);
+            failedModels = settings.selectedModels
+                .filter(m => !succeededModels.includes(m))
+                .map(m => ({ model: m, reason: 'No data available or routing failed' }));
         } catch (err) {
             error = err instanceof Error ? err.message : 'Routing computation failed.';
         } finally {
