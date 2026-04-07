@@ -141,7 +141,7 @@ export class RoutingOrchestrator {
                         maxRoutingProgress = scaled;
                         onStatus?.(`Computing routes... ${maxRoutingProgress}%`, maxRoutingProgress);
                     }
-                })
+                }, swellGrid, currentGrid ?? undefined)
                 .then((route): ModelRouteResult => ({
                     model,
                     route,
