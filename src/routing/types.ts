@@ -24,6 +24,8 @@ export interface RoutePoint {
     twd: number; // degrees
     boatSpeed: number; // knots
     heading: number; // degrees 0-360
+    swell?: SwellPoint;
+    current?: CurrentPoint;
 }
 
 export interface RouteResult {
@@ -68,6 +70,34 @@ export interface WindGridData {
     windV: number[][][]; // windV[latIdx][lonIdx][timeIdx] in m/s
 }
 
+export interface SwellGridData {
+    lats: number[];
+    lons: number[];
+    timestamps: number[];
+    swellHeight: number[][][]; // [latIdx][lonIdx][timeIdx] in meters
+    swellDir: number[][][];    // [latIdx][lonIdx][timeIdx] in degrees
+    swellPeriod: number[][][]; // [latIdx][lonIdx][timeIdx] in seconds
+}
+
+export interface CurrentGridData {
+    lats: number[];
+    lons: number[];
+    timestamps: number[];
+    currentU: number[][][]; // [latIdx][lonIdx][timeIdx] in m/s
+    currentV: number[][][]; // [latIdx][lonIdx][timeIdx] in m/s
+}
+
+export interface SwellPoint {
+    height: number;  // meters
+    direction: number; // degrees
+    period: number;  // seconds
+}
+
+export interface CurrentPoint {
+    speed: number;     // knots
+    direction: number; // degrees
+}
+
 export interface IsochronePoint {
     lat: number;
     lon: number;
@@ -87,6 +117,8 @@ export interface ModelRouteResult {
     route: RouteResult;
     color: string;
     windGrid: WindGridData;
+    swellGrid?: SwellGridData;
+    currentGrid?: CurrentGridData;
 }
 
 export interface UserSettings {
@@ -96,6 +128,7 @@ export interface UserSettings {
     numSectors: number; // pruning sectors
     arrivalRadius: number; // nautical miles
     landMarginNm: number; // nautical miles
+    estimatedVmgKt: number; // knots, used to auto-estimate forecast duration
     selectedModels: WindModelId[];
     selectedPolarName: string;
 }
@@ -107,6 +140,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     numSectors: 72,
     arrivalRadius: 1.0,
     landMarginNm: 1,
+    estimatedVmgKt: 3,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',
 }
