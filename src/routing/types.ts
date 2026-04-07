@@ -80,7 +80,7 @@ export interface IsochronePoint {
     time: number;
 }
 
-export type WindModelId = 'gfs' | 'ecmwf' | 'icon' | 'bomAccess'
+export type WindModelId = 'gfs' | 'ecmwf' | 'icon' | 'bomAccess';
 
 export interface ModelRouteResult {
     model: WindModelId;
