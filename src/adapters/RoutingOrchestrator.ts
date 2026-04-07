@@ -1,5 +1,6 @@
-import type { LatLon, PolarData, RouteResult, RoutingOptions, WindModelId, ModelRouteResult, WindGridData } from '../routing/types';
+import type { LatLon, PolarData, RouteResult, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData } from '../routing/types';
 import { fetchWindGrid, computeBounds } from './WindProvider';
+import { fetchSwellGrid, fetchCurrentGrid } from './OceanDataProvider';
 import { clearCache as clearLandCache } from './LandChecker';
 import { WorkerBridge } from './WorkerBridge';
 import { MODEL_COLORS } from '../map/modelColors';
@@ -19,7 +20,10 @@ export class RoutingOrchestrator {
      * Wind sampling (0-40%): models are queried SEQUENTIALLY because only one
      * Windy product can be active at a time.
      *
-     * Routing (40-100%): one WorkerBridge per model, all run in PARALLEL via
+     * Ocean data (40-55%): swell (40-48%) and currents (48-55%) are sampled
+     * ONCE — they are model-independent. Failures are warned but non-fatal.
+     *
+     * Routing (55-100%): one WorkerBridge per model, all run in PARALLEL via
      * Promise.allSettled. Per-model failures are warned but do not abort.
      *
      * Throws only when every model fails.
@@ -78,7 +82,45 @@ export class RoutingOrchestrator {
             }
         }
 
-        // --- Routing phase (40–100%) ---
+        // --- Ocean data phase (40–55%) ---
+        // Swell and currents are model-independent — sample once after wind.
+        // Both are optional: failures warn and continue without ocean data.
+        let swellGrid: SwellGridData | undefined;
+        let currentGrid: CurrentGridData | null | undefined;
+
+        onStatus?.('Sampling swell data...', 40);
+        try {
+            swellGrid = await fetchSwellGrid(
+                bounds,
+                options.startTime,
+                options.maxDuration,
+                (msg, pct) => {
+                    // Scale swell provider progress (0-100) into the 40-48% window
+                    const scaled = Math.round(40 + pct * 0.08);
+                    onStatus?.(msg, scaled);
+                },
+            );
+        } catch (err) {
+            console.warn('[RoutingOrchestrator] Swell sampling failed, continuing without swell data:', err);
+        }
+
+        onStatus?.('Sampling current data...', 48);
+        try {
+            currentGrid = await fetchCurrentGrid(
+                bounds,
+                options.startTime,
+                options.maxDuration,
+                (msg, pct) => {
+                    // Scale currents provider progress (0-100) into the 48-55% window
+                    const scaled = Math.round(48 + pct * 0.07);
+                    onStatus?.(msg, scaled);
+                },
+            );
+        } catch (err) {
+            console.warn('[RoutingOrchestrator] Current sampling failed, continuing without current data:', err);
+        }
+
+        // --- Routing phase (55–100%) ---
         // Track the maximum progress reported across all parallel workers so the
         // status bar always moves forward, never backward.
         let maxRoutingProgress = 0;
@@ -93,8 +135,8 @@ export class RoutingOrchestrator {
 
             return bridge
                 .computeRoute(grid, polar, start, end, options, (percent) => {
-                    // Scale worker progress (0-100) into the 40-100% window
-                    const scaled = Math.round(40 + percent * 0.6);
+                    // Scale worker progress (0-100) into the 55-100% window
+                    const scaled = Math.round(55 + percent * 0.45);
                     if (scaled > maxRoutingProgress) {
                         maxRoutingProgress = scaled;
                         onStatus?.(`Computing routes... ${maxRoutingProgress}%`, maxRoutingProgress);
@@ -105,6 +147,8 @@ export class RoutingOrchestrator {
                     route,
                     color: MODEL_COLORS[model],
                     windGrid: grid,
+                    swellGrid,
+                    currentGrid: currentGrid ?? undefined,
                 }));
         });
 
