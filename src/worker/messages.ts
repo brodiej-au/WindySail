@@ -4,6 +4,8 @@ import type {
     RoutingOptions,
     RouteResult,
     WindGridData,
+    SwellGridData,
+    CurrentGridData,
 } from '../routing/types';
 
 // Main thread -> Worker
@@ -15,6 +17,8 @@ export interface StartRoutingMessage {
         start: LatLon;
         end: LatLon;
         options: RoutingOptions;
+        swellGrid?: SwellGridData;
+        currentGrid?: CurrentGridData;
     };
 }
 

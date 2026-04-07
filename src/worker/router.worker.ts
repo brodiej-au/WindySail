@@ -3,6 +3,9 @@ import type {
     RoutingOptions,
     PolarData,
     WindGridData,
+    SwellGridData,
+    CurrentGridData,
+    RoutePoint,
     LatLon,
     RouteResult,
 } from '../routing/types';
@@ -47,8 +50,10 @@ async function runRouting(payload: {
     start: LatLon;
     end: LatLon;
     options: RoutingOptions;
+    swellGrid?: SwellGridData;
+    currentGrid?: CurrentGridData;
 }): Promise<void> {
-    const { windGrid, polar, start, end, options } = payload;
+    const { windGrid, polar, start, end, options, swellGrid, currentGrid } = payload;
     const { timeStep, maxDuration, numSectors, arrivalRadius } = options;
     const maxSteps = Math.floor(maxDuration / timeStep);
 
@@ -114,6 +119,7 @@ async function runRouting(payload: {
 
             const path = traceRoute(isochrones, arrivalIdx);
             const result = buildRouteResult(path, start);
+            enrichRoutePoints(result.path, swellGrid, currentGrid);
 
             postMsg({ type: 'ROUTE_COMPLETE', payload: result });
             return;
@@ -143,7 +149,7 @@ async function runRouting(payload: {
     });
 }
 
-function buildRouteResult(path: import('../routing/types').RoutePoint[], start: LatLon): RouteResult {
+function buildRouteResult(path: RoutePoint[], start: LatLon): RouteResult {
     let totalDistanceNm = 0;
     let maxTws = 0;
     let totalSpeed = 0;
@@ -166,4 +172,81 @@ function buildRouteResult(path: import('../routing/types').RoutePoint[], start: 
         maxTws,
         durationHours,
     };
+}
+
+// --- Ocean data enrichment ---
+
+interface Bracket { lo: number; hi: number; frac: number; }
+
+function findBracket(arr: number[], value: number): Bracket {
+    if (arr.length === 1 || value <= arr[0]) return { lo: 0, hi: 0, frac: 0 };
+    if (value >= arr[arr.length - 1]) return { lo: arr.length - 1, hi: arr.length - 1, frac: 0 };
+    for (let i = 0; i < arr.length - 1; i++) {
+        if (value >= arr[i] && value <= arr[i + 1]) {
+            return { lo: i, hi: i + 1, frac: (value - arr[i]) / (arr[i + 1] - arr[i]) };
+        }
+    }
+    return { lo: arr.length - 1, hi: arr.length - 1, frac: 0 };
+}
+
+function lerp(a: number, b: number, t: number): number { return a + t * (b - a); }
+
+/**
+ * Trilinear interpolation of a [latIdx][lonIdx][timeIdx] grid at the given
+ * (lat, lon, time) coordinates.
+ */
+function trilinearInterpolate(
+    grid3d: number[][][],
+    lats: number[],
+    lons: number[],
+    timestamps: number[],
+    lat: number,
+    lon: number,
+    time: number,
+): number {
+    const latB = findBracket(lats, lat);
+    const lonB = findBracket(lons, lon);
+    const timeB = findBracket(timestamps, time);
+
+    const v00 = lerp(grid3d[latB.lo][lonB.lo][timeB.lo], grid3d[latB.lo][lonB.lo][timeB.hi], timeB.frac);
+    const v01 = lerp(grid3d[latB.lo][lonB.hi][timeB.lo], grid3d[latB.lo][lonB.hi][timeB.hi], timeB.frac);
+    const v10 = lerp(grid3d[latB.hi][lonB.lo][timeB.lo], grid3d[latB.hi][lonB.lo][timeB.hi], timeB.frac);
+    const v11 = lerp(grid3d[latB.hi][lonB.hi][timeB.lo], grid3d[latB.hi][lonB.hi][timeB.hi], timeB.frac);
+
+    const va = lerp(v00, v01, lonB.frac);
+    const vb = lerp(v10, v11, lonB.frac);
+    return lerp(va, vb, latB.frac);
+}
+
+/**
+ * Post-process each RoutePoint, annotating it with interpolated swell and
+ * current values at its (lat, lon, time) position.  Grids that are absent
+ * are silently skipped so callers need not guard against undefined.
+ */
+function enrichRoutePoints(
+    path: RoutePoint[],
+    swellGrid: SwellGridData | undefined,
+    currentGrid: CurrentGridData | undefined,
+): void {
+    for (const point of path) {
+        const { lat, lon, time } = point;
+
+        if (swellGrid) {
+            const { lats, lons, timestamps, swellHeight, swellDir, swellPeriod } = swellGrid;
+            point.swell = {
+                height: trilinearInterpolate(swellHeight, lats, lons, timestamps, lat, lon, time),
+                direction: trilinearInterpolate(swellDir, lats, lons, timestamps, lat, lon, time),
+                period: trilinearInterpolate(swellPeriod, lats, lons, timestamps, lat, lon, time),
+            };
+        }
+
+        if (currentGrid) {
+            const { lats, lons, timestamps, currentU, currentV } = currentGrid;
+            const u = trilinearInterpolate(currentU, lats, lons, timestamps, lat, lon, time);
+            const v = trilinearInterpolate(currentV, lats, lons, timestamps, lat, lon, time);
+            const speed = Math.sqrt(u * u + v * v) * 1.94384; // m/s -> knots
+            const direction = (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
+            point.current = { speed, direction };
+        }
+    }
 }

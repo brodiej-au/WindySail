@@ -1,4 +1,4 @@
-import type { LatLon, PolarData, RouteResult, RoutingOptions, WindGridData } from '../routing/types';
+import type { LatLon, PolarData, RouteResult, RoutingOptions, WindGridData, SwellGridData, CurrentGridData } from '../routing/types';
 import type { WorkerToMainMessage } from '../worker/messages';
 import { checkPoints, checkSegments } from './LandChecker';
 
@@ -18,6 +18,8 @@ export class WorkerBridge {
         end: LatLon,
         options: RoutingOptions,
         onProgress?: ProgressCallback,
+        swellGrid?: SwellGridData,
+        currentGrid?: CurrentGridData,
     ): Promise<RouteResult> {
         // Fetch worker script and create blob URL to bypass cross-origin restriction
         // (plugin JS is served from localhost but runs on windy.com)
@@ -81,7 +83,7 @@ export class WorkerBridge {
             // Start routing
             this.worker.postMessage({
                 type: 'START_ROUTING',
-                payload: { windGrid, polar, start, end, options },
+                payload: { windGrid, polar, start, end, options, swellGrid, currentGrid },
             });
         });
     }
