@@ -1,7 +1,8 @@
 import store from '@windy/store';
 import bcast from '@windy/broadcast';
 import { getLatLonInterpolator } from '@windy/interpolator';
-import type { LatLonBounds, WindGridData } from '../routing/types';
+import type { LatLonBounds, WindGridData, WindModelId } from '../routing/types';
+import * as WindCache from './WindCache';
 
 const GRID_STEP = 1.0; // degrees — coarser grid for speed, router interpolates
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
@@ -13,11 +14,19 @@ const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
  * Only samples timestamps from departureTime to departureTime + maxDurationHours.
  */
 export async function fetchWindGrid(
+    model: WindModelId,
     bounds: LatLonBounds,
     departureTime: number,
     maxDurationHours: number,
     onProgress?: (msg: string, pct: number) => void,
 ): Promise<WindGridData> {
+    // Check cache first — return immediately if fresh
+    const cacheKey = WindCache.buildCacheKey(model, bounds, departureTime, maxDurationHours);
+    const cached = WindCache.get(cacheKey);
+    if (cached) {
+        return cached;
+    }
+
     const lats: number[] = [];
     const lons: number[] = [];
 
@@ -55,6 +64,11 @@ export async function fetchWindGrid(
     );
 
     const originalTimestamp = store.get('timestamp');
+    const originalProduct = store.get('product');
+
+    // Switch to the requested weather model
+    store.set('product', model);
+    await waitForRedraw();
 
     for (let ti = 0; ti < timestamps.length; ti++) {
         onProgress?.(
@@ -84,18 +98,23 @@ export async function fetchWindGrid(
     }
 
     store.set('timestamp', originalTimestamp);
-    return { lats, lons, timestamps, windU, windV };
+    store.set('product', originalProduct);
+
+    const grid: WindGridData = { lats, lons, timestamps, windU, windV };
+    WindCache.set(cacheKey, grid);
+    return grid;
 }
 
 /**
- * Wait for Windy to finish redrawing. Short timeout since tiles
- * are often already cached from nearby timesteps.
+ * Wait for Windy to finish redrawing.
+ * Resolves immediately on `redrawFinished`; small safety timeout
+ * prevents hanging if the event never fires (e.g. tiles already current).
  */
 function waitForRedraw(): Promise<void> {
     return new Promise(resolve => {
-        const timeout = setTimeout(resolve, 800);
+        const safety = setTimeout(resolve, 150);
         bcast.once('redrawFinished', () => {
-            clearTimeout(timeout);
+            clearTimeout(safety);
             resolve();
         });
     });
