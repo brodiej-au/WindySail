@@ -6,11 +6,6 @@
     </button>
 
     {#if isOpen}
-        {#if showEditor}
-            <div class="settings-body">
-                <PolarGraphEditor polar={editingPolar} onSave={handleEditorSave} onCancel={handleEditorCancel} />
-            </div>
-        {:else}
             <div class="settings-body">
                 <!-- Wind Models -->
                 <div class="section mb-10">
@@ -181,17 +176,20 @@
                         <div class="polar-buttons">
                             <button class="button size-s" on:click={handleNewPolar}>New</button>
                             {#if isCurrentPolarCustom()}
-                                <button class="button size-s" on:click={handleEditPolar}>Edit</button>
                                 <button class="button size-s" on:click={handleDeletePolar}>Delete</button>
                             {/if}
                         </div>
                     </div>
                     {#if currentPolar}
-                        <PolarDiagramModal polar={currentPolar} />
+                        <PolarViewEditModal
+                            polar={currentPolar}
+                            isCustom={isCurrentPolarCustom()}
+                            onSave={handlePolarSave}
+                            bind:this={polarModal}
+                        />
                     {/if}
                 </div>
             </div>
-        {/if}
     {/if}
 </div>
 
@@ -201,17 +199,13 @@
     import { settingsStore } from '../stores/SettingsStore';
     import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
     import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
-    import PolarGraphEditor from './PolarGraphEditor.svelte';
-    import PolarDiagramModal from './PolarDiagramModal.svelte';
+    import PolarViewEditModal from './PolarViewEditModal.svelte';
     import type { WindModelId, UserSettings, PolarData } from '../routing/types';
 
     const ALL_MODELS: WindModelId[] = ['gfs', 'ecmwf', 'icon', 'bomAccess'];
 
     let isOpen = false;
-
-    // Editor state
-    let showEditor = false;
-    let editingPolar: PolarData | null = null;
+    let polarModal: PolarViewEditModal;
 
     // Local reactive state — initialised from store
     let selectedModels: WindModelId[] = settingsStore.get('selectedModels');
@@ -306,15 +300,15 @@
     }
 
     function handleNewPolar(): void {
-        editingPolar = null;
-        showEditor = true;
-    }
-
-    function handleEditPolar(): void {
-        const polar = allPolars.find(p => p.name === selectedPolarName);
-        if (polar) {
-            editingPolar = polar;
-            showEditor = true;
+        if (currentPolar && polarModal) {
+            const cloned: PolarData = {
+                ...currentPolar,
+                name: '',
+                twaAngles: [...currentPolar.twaAngles],
+                twsSpeeds: [...currentPolar.twsSpeeds],
+                speeds: currentPolar.speeds.map(row => [...row]),
+            };
+            polarModal.openInEditMode(cloned);
         }
     }
 
@@ -332,8 +326,7 @@
         }
     }
 
-    function handleEditorSave(): void {
-        showEditor = false;
+    function handlePolarSave(): void {
         const previousPolars = allPolars.map(p => p.name);
         allPolars = getAllPolars();
         // Auto-select newly created polar
@@ -342,10 +335,6 @@
             selectedPolarName = newPolar.name;
             settingsStore.set('selectedPolarName', newPolar.name);
         }
-    }
-
-    function handleEditorCancel(): void {
-        showEditor = false;
     }
 
     // Keep local state in sync when store changes externally
