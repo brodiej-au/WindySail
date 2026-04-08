@@ -1,4 +1,6 @@
 import type { WindGridData, WindVector } from './types';
+import { findBracket, lerp } from './interpolate';
+import type { Bracket } from './interpolate';
 
 const MS_TO_KNOTS = 1.94384;
 
@@ -26,19 +28,6 @@ export function getWindAt(grid: WindGridData, time: number, lat: number, lon: nu
     return windComponentsToSpeedDir(u, v);
 }
 
-interface Bracket { lo: number; hi: number; frac: number; }
-
-function findBracket(arr: number[], value: number): Bracket {
-    if (arr.length === 1 || value <= arr[0]) return { lo: 0, hi: 0, frac: 0 };
-    if (value >= arr[arr.length - 1]) return { lo: arr.length - 1, hi: arr.length - 1, frac: 0 };
-    for (let i = 0; i < arr.length - 1; i++) {
-        if (value >= arr[i] && value <= arr[i + 1]) {
-            return { lo: i, hi: i + 1, frac: (value - arr[i]) / (arr[i + 1] - arr[i]) };
-        }
-    }
-    return { lo: arr.length - 1, hi: arr.length - 1, frac: 0 };
-}
-
 function trilinearInterp(data: number[][][], latB: Bracket, lonB: Bracket, timeB: Bracket): number {
     const v00 = lerp(data[latB.lo][lonB.lo][timeB.lo], data[latB.lo][lonB.lo][timeB.hi], timeB.frac);
     const v01 = lerp(data[latB.lo][lonB.hi][timeB.lo], data[latB.lo][lonB.hi][timeB.hi], timeB.frac);
@@ -49,4 +38,3 @@ function trilinearInterp(data: number[][][], latB: Bracket, lonB: Bracket, timeB
     return lerp(va, vb, latB.frac);
 }
 
-function lerp(a: number, b: number, t: number): number { return a + t * (b - a); }
