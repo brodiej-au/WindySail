@@ -1,5 +1,5 @@
 import type { IsochronePoint, LatLon, PolarData, RoutePoint, WindGridData } from './types';
-import { advancePosition, bearing, computeTWA, distance, normaliseAngle } from './geo';
+import { advancePosition, bearing, computeTWA, distance, normaliseAngle, segmentClosestApproach } from './geo';
 import { getWindAt } from './WindGrid';
 import { getSpeed } from './Polar';
 
@@ -9,6 +9,7 @@ export function expandFrontier(
     polar: PolarData,
     timeStepHours: number,
     parentIsoIndex: number,
+    motorOptions?: { enabled: boolean; threshold: number; speed: number },
 ): IsochronePoint[] {
     const candidates: IsochronePoint[] = [];
     const headingStep = 5;
@@ -23,14 +24,22 @@ export function expandFrontier(
         for (let hi = 0; hi < numHeadings; hi++) {
             const hdg = hi * headingStep;
             const twa = computeTWA(hdg, wind.direction);
-            const boatSpeed = getSpeed(polar, twa, wind.speed);
+            let boatSpeed = getSpeed(polar, twa, wind.speed);
+            let isMotoring = false;
+
+            // Motor if sail speed is below threshold
+            if (motorOptions?.enabled && boatSpeed < motorOptions.threshold) {
+                boatSpeed = motorOptions.speed;
+                isMotoring = true;
+            }
+
             const distNm = boatSpeed * timeStepHours;
 
             if (distNm <= 0) {
                 candidates.push({
                     lat: point.lat, lon: point.lon, parent: fi,
                     twa, tws: wind.speed, twd: wind.direction,
-                    boatSpeed, heading: hdg, time: nextTime,
+                    boatSpeed, heading: hdg, time: nextTime, isMotoring,
                 });
                 continue;
             }
@@ -39,7 +48,7 @@ export function expandFrontier(
             candidates.push({
                 lat: newPos.lat, lon: newPos.lon, parent: fi,
                 twa, tws: wind.speed, twd: wind.direction,
-                boatSpeed, heading: hdg, time: nextTime,
+                boatSpeed, heading: hdg, time: nextTime, isMotoring,
             });
         }
     }
@@ -57,6 +66,10 @@ export function pruneToSectors(
     const sectors: (IsochronePoint | null)[] = new Array(numSectors).fill(null);
     const sectorDistances: number[] = new Array(numSectors).fill(0);
 
+    // Track the single candidate closest to the destination
+    let closestToEnd: IsochronePoint | null = null;
+    let closestToEndDist = Infinity;
+
     for (const candidate of candidates) {
         const candidateBearing = bearing(start, candidate);
         const relativeAngle = normaliseAngle(candidateBearing - refBearing);
@@ -67,8 +80,23 @@ export function pruneToSectors(
             sectors[sectorIndex] = candidate;
             sectorDistances[sectorIndex] = dist;
         }
+
+        const distToEnd = distance(candidate, end);
+        if (distToEnd < closestToEndDist) {
+            closestToEndDist = distToEnd;
+            closestToEnd = candidate;
+        }
     }
-    return sectors.filter((s): s is IsochronePoint => s !== null);
+
+    const result = sectors.filter((s): s is IsochronePoint => s !== null);
+
+    // Ensure the closest-to-destination candidate survives pruning.
+    // If it was discarded by sector selection, add it back.
+    if (closestToEnd && !result.includes(closestToEnd)) {
+        result.push(closestToEnd);
+    }
+
+    return result;
 }
 
 export function traceRoute(isochrones: IsochronePoint[][], finalPointIndex: number): RoutePoint[] {
@@ -82,6 +110,7 @@ export function traceRoute(isochrones: IsochronePoint[][], finalPointIndex: numb
             lat: point.lat, lon: point.lon, time: point.time,
             twa: point.twa, tws: point.tws, twd: point.twd,
             boatSpeed: point.boatSpeed, heading: point.heading,
+            isMotoring: point.isMotoring,
         });
         if (point.parent === null) break;
         pointIdx = point.parent;
@@ -90,15 +119,46 @@ export function traceRoute(isochrones: IsochronePoint[][], finalPointIndex: numb
     return path;
 }
 
+/**
+ * Check if any candidate has arrived at the destination.
+ *
+ * Two checks per candidate:
+ * 1. Endpoint within arrivalRadius (original).
+ * 2. Track segment (parent→candidate) passes within arrivalRadius,
+ *    which catches the overshoot case where a fast boat jumps past
+ *    the destination in a single time step.
+ */
 export function checkArrival(
     candidates: IsochronePoint[],
     destination: LatLon,
     arrivalRadius: number,
+    previousFrontier?: IsochronePoint[],
 ): number {
+    let bestIdx = -1;
+    let bestDist = Infinity;
+
     for (let i = 0; i < candidates.length; i++) {
-        if (distance(candidates[i], destination) <= arrivalRadius) {
-            return i;
+        const endDist = distance(candidates[i], destination);
+
+        // Endpoint check
+        if (endDist <= arrivalRadius) {
+            if (endDist < bestDist) {
+                bestDist = endDist;
+                bestIdx = i;
+            }
+            continue;
+        }
+
+        // Segment check — did the track from parent to candidate cross
+        // through the arrival circle?
+        if (previousFrontier && candidates[i].parent !== null) {
+            const parent = previousFrontier[candidates[i].parent!];
+            const approach = segmentClosestApproach(parent, candidates[i], destination);
+            if (approach <= arrivalRadius && approach < bestDist) {
+                bestDist = approach;
+                bestIdx = i;
+            }
         }
     }
-    return -1;
+    return bestIdx;
 }

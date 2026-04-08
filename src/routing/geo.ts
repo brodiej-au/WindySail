@@ -48,3 +48,28 @@ export function computeTWA(boatHeading: number, windDirection: number): number {
     const diff = Math.abs(normaliseAngle(boatHeading) - normaliseAngle(windDirection));
     return diff > 180 ? 360 - diff : diff;
 }
+
+/**
+ * Closest approach distance from a point to a great-circle segment.
+ * Uses planar approximation (valid for segments < ~50nm).
+ */
+export function segmentClosestApproach(
+    segStart: LatLon, segEnd: LatLon, point: LatLon,
+): number {
+    const segLen = distance(segStart, segEnd);
+    if (segLen < 0.01) return distance(segStart, point);
+
+    // Project onto segment in approximate planar coordinates
+    const cosLat = Math.cos(toRadians((segStart.lat + segEnd.lat) / 2));
+    const dx = (segEnd.lon - segStart.lon) * cosLat;
+    const dy = segEnd.lat - segStart.lat;
+    const px = (point.lon - segStart.lon) * cosLat;
+    const py = point.lat - segStart.lat;
+
+    const t = Math.max(0, Math.min(1, (px * dx + py * dy) / (dx * dx + dy * dy)));
+
+    const closestLat = segStart.lat + t * dy;
+    const closestLon = segStart.lon + t * (dx / cosLat);
+
+    return distance({ lat: closestLat, lon: closestLon }, point);
+}

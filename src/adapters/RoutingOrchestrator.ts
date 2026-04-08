@@ -2,8 +2,10 @@ import type { LatLon, PolarData, RouteResult, RoutingOptions, WindModelId, Model
 import { fetchWindGrid, computeBounds } from './WindProvider';
 import { fetchSwellGrid, fetchCurrentGrid } from './OceanDataProvider';
 import { clearCache as clearLandCache } from './LandChecker';
+import { clear as clearWindCache } from './WindCache';
 import { WorkerBridge } from './WorkerBridge';
 import { MODEL_COLORS } from '../map/modelColors';
+import { enrichRoutePoints } from '../routing/RouteEnricher';
 
 export type StatusCallback = (status: string, percent: number) => void;
 
@@ -40,11 +42,25 @@ export class RoutingOrchestrator {
             throw new Error('Start and end points must be set.');
         }
 
+        // Clear stale wind cache to avoid reusing bad data from earlier failed runs.
+        clearWindCache();
+
         const bounds = computeBounds(start, end, 1.0);
+
+        console.log('[RoutingOrchestrator] Starting routing pipeline', {
+            models,
+            bounds,
+            startTime: new Date(options.startTime).toISOString(),
+            maxDuration: options.maxDuration,
+            timeStep: options.timeStep,
+            maxSteps: Math.floor(options.maxDuration / options.timeStep),
+        });
 
         // --- Wind sampling phase (0–40%) ---
         // Must run sequentially: switching Windy products one at a time.
         const windGrids = new Map<WindModelId, WindGridData>();
+
+        let lastGrid: WindGridData | undefined;
 
         for (let i = 0; i < models.length; i++) {
             const model = models[i];
@@ -64,15 +80,32 @@ export class RoutingOrchestrator {
                         const scaled = Math.round(baseProgress + pct * (sliceSize / 100));
                         onStatus?.(msg, scaled);
                     },
+                    lastGrid,
                 );
                 windGrids.set(model, grid);
+                lastGrid = grid;
 
-                // Warn if all wind U/V values are zero — this typically indicates
-                // a silent data failure where the model returned empty wind data.
-                const allZero =
-                    grid.windU.every(lat => lat.every(lon => lon.every(val => val === 0))) &&
-                    grid.windV.every(lat => lat.every(lon => lon.every(val => val === 0)));
-                if (allZero) {
+                // Count non-zero values for diagnostics
+                let nonZeroCount = 0;
+                let totalCount = 0;
+                for (const lat of grid.windU) {
+                    for (const lon of lat) {
+                        for (const val of lon) {
+                            totalCount++;
+                            if (val !== 0) nonZeroCount++;
+                        }
+                    }
+                }
+
+                console.log(`[RoutingOrchestrator] Wind grid for "${model}":`, {
+                    lats: grid.lats.length,
+                    lons: grid.lons.length,
+                    timestamps: grid.timestamps.length,
+                    nonZeroValues: `${nonZeroCount}/${totalCount}`,
+                    timeRange: `${new Date(grid.timestamps[0]).toISOString()} → ${new Date(grid.timestamps[grid.timestamps.length - 1]).toISOString()}`,
+                });
+
+                if (nonZeroCount === 0) {
                     console.warn(
                         `[RoutingOrchestrator] Wind grid for model "${model}" has all-zero values — data may have failed silently.`,
                     );
@@ -82,47 +115,36 @@ export class RoutingOrchestrator {
             }
         }
 
-        // --- Ocean data phase (40–55%) ---
-        // Swell and currents are model-independent — sample once after wind.
-        // Both are optional: failures warn and continue without ocean data.
-        let swellGrid: SwellGridData | undefined;
-        let currentGrid: CurrentGridData | null | undefined;
-
-        onStatus?.('Sampling swell data...', 40);
-        try {
-            swellGrid = await fetchSwellGrid(
-                bounds,
-                options.startTime,
-                options.maxDuration,
-                (msg, pct) => {
-                    // Scale swell provider progress (0-100) into the 40-48% window
-                    const scaled = Math.round(40 + pct * 0.08);
-                    onStatus?.(msg, scaled);
-                },
-            );
-        } catch (err) {
-            console.warn('[RoutingOrchestrator] Swell sampling failed, continuing without swell data:', err);
+        // Verify wind grids are actually different between models
+        if (windGrids.size >= 2) {
+            const grids = [...windGrids.entries()];
+            for (let i = 1; i < grids.length; i++) {
+                const [modelA, gridA] = grids[0];
+                const [modelB, gridB] = grids[i];
+                let diffCount = 0;
+                let totalCount = 0;
+                for (let li = 0; li < Math.min(gridA.windU.length, gridB.windU.length); li++) {
+                    for (let lo = 0; lo < Math.min(gridA.windU[li].length, gridB.windU[li].length); lo++) {
+                        for (let ti = 0; ti < Math.min(gridA.windU[li][lo].length, gridB.windU[li][lo].length); ti++) {
+                            totalCount++;
+                            if (gridA.windU[li][lo][ti] !== gridB.windU[li][lo][ti] ||
+                                gridA.windV[li][lo][ti] !== gridB.windV[li][lo][ti]) {
+                                diffCount++;
+                            }
+                        }
+                    }
+                }
+                if (diffCount === 0) {
+                    console.error(`[RoutingOrchestrator] WARNING: Wind grids for "${modelA}" and "${modelB}" are IDENTICAL (${totalCount} values). Product switch likely failed.`);
+                } else {
+                    console.log(`[RoutingOrchestrator] Wind grids "${modelA}" vs "${modelB}": ${diffCount}/${totalCount} values differ ✓`);
+                }
+            }
         }
 
-        onStatus?.('Sampling current data...', 48);
-        try {
-            currentGrid = await fetchCurrentGrid(
-                bounds,
-                options.startTime,
-                options.maxDuration,
-                (msg, pct) => {
-                    // Scale currents provider progress (0-100) into the 48-55% window
-                    const scaled = Math.round(48 + pct * 0.07);
-                    onStatus?.(msg, scaled);
-                },
-            );
-        } catch (err) {
-            console.warn('[RoutingOrchestrator] Current sampling failed, continuing without current data:', err);
-        }
-
-        // --- Routing phase (55–100%) ---
-        // Track the maximum progress reported across all parallel workers so the
-        // status bar always moves forward, never backward.
+        // --- Routing phase (40–85%) ---
+        // Run routing BEFORE ocean data sampling to avoid overlay/product
+        // switching (waves, currents) corrupting Windy's tile cache.
         let maxRoutingProgress = 0;
 
         // Create one bridge per model that successfully returned a wind grid.
@@ -135,20 +157,18 @@ export class RoutingOrchestrator {
 
             return bridge
                 .computeRoute(grid, polar, start, end, options, (percent) => {
-                    // Scale worker progress (0-100) into the 55-100% window
-                    const scaled = Math.round(55 + percent * 0.45);
+                    // Scale worker progress (0-100) into the 40-85% window
+                    const scaled = Math.round(40 + percent * 0.45);
                     if (scaled > maxRoutingProgress) {
                         maxRoutingProgress = scaled;
                         onStatus?.(`Computing routes... ${maxRoutingProgress}%`, maxRoutingProgress);
                     }
-                }, swellGrid, currentGrid ?? undefined)
+                })
                 .then((route): ModelRouteResult => ({
                     model,
                     route,
                     color: MODEL_COLORS[model],
                     windGrid: grid,
-                    swellGrid,
-                    currentGrid: currentGrid ?? undefined,
                 }));
         });
 
@@ -171,6 +191,50 @@ export class RoutingOrchestrator {
 
         if (results.length === 0) {
             throw new Error('All models failed to produce a route.');
+        }
+
+        // --- Ocean data phase (85–98%) ---
+        // Swell and currents are sampled AFTER routing completes to avoid
+        // overlay/product switching (waves/ecmwfWaves, currents/cmems) corrupting
+        // Windy's SwitchableTileCache and causing all-zero wind grids.
+        let swellGrid: SwellGridData | undefined;
+        let currentGrid: CurrentGridData | null | undefined;
+
+        onStatus?.('Sampling swell data...', 85);
+        try {
+            swellGrid = await fetchSwellGrid(
+                bounds,
+                options.startTime,
+                options.maxDuration,
+                (msg, pct) => {
+                    const scaled = Math.round(85 + pct * 0.06);
+                    onStatus?.(msg, scaled);
+                },
+            );
+        } catch (err) {
+            console.warn('[RoutingOrchestrator] Swell sampling failed, continuing without swell data:', err);
+        }
+
+        onStatus?.('Sampling current data...', 91);
+        try {
+            currentGrid = await fetchCurrentGrid(
+                bounds,
+                options.startTime,
+                options.maxDuration,
+                (msg, pct) => {
+                    const scaled = Math.round(91 + pct * 0.07);
+                    onStatus?.(msg, scaled);
+                },
+            );
+        } catch (err) {
+            console.warn('[RoutingOrchestrator] Current sampling failed, continuing without current data:', err);
+        }
+
+        // Attach ocean data to results and enrich route points for charting
+        for (const result of results) {
+            result.swellGrid = swellGrid;
+            result.currentGrid = currentGrid ?? undefined;
+            enrichRoutePoints(result.route.path, swellGrid, currentGrid ?? undefined);
         }
 
         onStatus?.('Route complete!', 100);

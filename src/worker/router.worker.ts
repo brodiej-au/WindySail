@@ -57,6 +57,10 @@ async function runRouting(payload: {
     const { timeStep, maxDuration, numSectors, arrivalRadius } = options;
     const maxSteps = Math.floor(maxDuration / timeStep);
 
+    const motorOptions = options.motorEnabled
+        ? { enabled: true, threshold: options.motorThreshold ?? 2, speed: options.motorSpeed ?? 4 }
+        : undefined;
+
     const startPoint: IsochronePoint = {
         lat: start.lat,
         lon: start.lon,
@@ -69,12 +73,53 @@ async function runRouting(payload: {
         time: options.startTime,
     };
 
+    // --- Wind grid diagnostics ---
+    let nonZero = 0;
+    let total = 0;
+    let minU = Infinity, maxU = -Infinity, minV = Infinity, maxV = -Infinity;
+    for (const latArr of windGrid.windU) {
+        for (const lonArr of latArr) {
+            for (const val of lonArr) {
+                total++;
+                if (val !== 0) nonZero++;
+                if (val < minU) minU = val;
+                if (val > maxU) maxU = val;
+            }
+        }
+    }
+    for (const latArr of windGrid.windV) {
+        for (const lonArr of latArr) {
+            for (const val of lonArr) {
+                if (val < minV) minV = val;
+                if (val > maxV) maxV = val;
+            }
+        }
+    }
+
+    const totalDist = distance(start, end);
+    console.log('[Worker] Starting routing', {
+        start, end,
+        totalDistNm: totalDist.toFixed(1),
+        maxSteps,
+        timeStep,
+        maxDuration,
+        arrivalRadius,
+        motorEnabled: motorOptions?.enabled ?? false,
+        motorSpeed: motorOptions?.speed ?? 'n/a',
+        gridLats: windGrid.lats.length,
+        gridLons: windGrid.lons.length,
+        gridTimestamps: windGrid.timestamps.length,
+        windNonZero: `${nonZero}/${total}`,
+        windU: `[${minU.toFixed(2)}, ${maxU.toFixed(2)}]`,
+        windV: `[${minV.toFixed(2)}, ${maxV.toFixed(2)}]`,
+    });
+
     const isochrones: IsochronePoint[][] = [[startPoint]];
     let frontier: IsochronePoint[] = [startPoint];
 
     for (let step = 0; step < maxSteps; step++) {
         // Expand frontier
-        const candidates = expandFrontier(frontier, windGrid, polar, timeStep, step);
+        const candidates = expandFrontier(frontier, windGrid, polar, timeStep, step, motorOptions);
 
         // Filter out zero-speed candidates (becalmed at same position)
         const movingCandidates = candidates.filter(c => c.boatSpeed > 0);
@@ -110,10 +155,14 @@ async function runRouting(payload: {
             return;
         }
 
-        // Check arrival before pruning
-        const arrivalIdx = checkArrival(validCandidates, end, arrivalRadius);
+        // Check arrival before pruning — pass previous frontier for segment-based
+        // overshoot detection (boat jumping past destination in one step).
+        const arrivalIdx = checkArrival(validCandidates, end, arrivalRadius, frontier);
         if (arrivalIdx >= 0) {
             // Route found! Trace back.
+            const arrivalDist = distance(validCandidates[arrivalIdx], end);
+            console.log(`[Worker] Arrival at step ${step + 1}: dist=${arrivalDist.toFixed(2)}nm`);
+
             const finalIsochrone = validCandidates;
             isochrones.push(finalIsochrone);
 
@@ -125,9 +174,21 @@ async function runRouting(payload: {
             return;
         }
 
+        // Log pre-prune closest when frontier is near destination
+        const prePruneClosest = Math.min(...validCandidates.map(p => distance(p, end)));
+
         // Prune to sectors
         frontier = pruneToSectors(validCandidates, start, end, numSectors);
         isochrones.push(frontier);
+
+        // Log progress every 10 steps, or every step when within 10nm
+        const postPruneClosest = Math.min(...frontier.map(p => distance(p, end)));
+        if (step % 10 === 0 || step === maxSteps - 1 || prePruneClosest < 10) {
+            const avgSpeed = (frontier.reduce((s, p) => s + p.boatSpeed, 0) / frontier.length).toFixed(1);
+            const motorCount = frontier.filter(p => p.isMotoring).length;
+            const extra = motorCount > 0 ? `, motoring=${motorCount}/${frontier.length}` : '';
+            console.log(`[Worker] Step ${step + 1}/${maxSteps}: frontier=${frontier.length}, closest=${postPruneClosest.toFixed(1)}nm, avgSpeed=${avgSpeed}kt${extra}`);
+        }
 
         // Report progress
         postMsg({

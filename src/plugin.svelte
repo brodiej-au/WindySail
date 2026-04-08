@@ -31,7 +31,6 @@
 <script lang="ts">
     import bcast from '@windy/broadcast';
     import store from '@windy/store';
-    import { map } from '@windy/map';
     import { onDestroy } from 'svelte';
 
     import config from './pluginConfig';
@@ -40,7 +39,6 @@
     import { RouteRenderer } from './map/RouteRenderer';
     import { BoatMarkerManager } from './map/BoatMarkerManager';
     import { RoutingOrchestrator } from './adapters/RoutingOrchestrator';
-    import { computeBounds } from './adapters/WindProvider';
     import { settingsStore } from './stores/SettingsStore';
     import { getPolarByName } from './data/polarRegistry';
     import { interpolateAtTime } from './routing/RouteInterpolator';
@@ -97,31 +95,21 @@
             const polar = getPolarByName(settings.selectedPolarName);
 
             const distNm = distance(start, end);
-            const estimatedHours = Math.ceil(distNm / settings.estimatedVmgKt) * 1.3;
-            const actualHours = Math.min(estimatedHours, settings.maxDuration);
+            const estimatedHours = Math.max(24, Math.ceil(distNm / settings.estimatedVmgKt) * 2.0);
 
-            progressStatus = `Estimated passage: ~${Math.round(estimatedHours)}h, fetching ${Math.round(actualHours)}h of forecast`;
+            progressStatus = `Estimated passage: ~${Math.round(estimatedHours)}h, using ${Math.round(settings.maxDuration)}h forecast window`;
 
             const options = {
                 startTime: departureTime,
                 timeStep: settings.timeStep,
-                maxDuration: actualHours,
+                maxDuration: settings.maxDuration,
                 headingStep: settings.headingStep,
                 numSectors: settings.numSectors,
                 arrivalRadius: settings.arrivalRadius,
+                motorEnabled: settings.motorEnabled,
+                motorThreshold: settings.motorThreshold,
+                motorSpeed: settings.motorSpeed,
             };
-
-            // Zoom map to route area before fetching wind data so Windy tiles
-            // are loaded for the correct region before sampling begins.
-            const routeBounds = computeBounds(start, end, 1.0);
-            map.fitBounds(
-                [
-                    [routeBounds.south, routeBounds.west],
-                    [routeBounds.north, routeBounds.east],
-                ],
-                { padding: [40, 40] },
-            );
-            await new Promise<void>(resolve => setTimeout(resolve, 500));
 
             const routeResults = await orchestrator.computeRoutes(
                 start,

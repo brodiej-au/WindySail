@@ -136,9 +136,9 @@
         </div>
     {/if}
 
-    <!-- Route Conditions Chart -->
+    <!-- Route Detail Modal -->
     {#if results.length > 0}
-        <RouteConditionsChart path={chartPath} />
+        <RouteDetailModal {results} />
     {/if}
 
     <!-- Player controls -->
@@ -160,7 +160,7 @@
     import ProgressBar from './ProgressBar.svelte';
     import SettingsPanel from './SettingsPanel.svelte';
     import PlayerControls from './PlayerControls.svelte';
-    import RouteConditionsChart from './RouteConditionsChart.svelte';
+    import RouteDetailModal from './RouteDetailModal.svelte';
 
     import type { LatLon, ModelRouteResult, WindModelId } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
@@ -194,13 +194,6 @@
 
     $: fastestDuration =
         results.length > 1 ? Math.min(...results.map((r) => r.route.durationHours)) : Infinity;
-
-    // For conditions chart: show fastest route if multi-model, or the single route
-    $: chartPath = results.length === 1
-        ? results[0].route.path
-        : results.length > 1
-            ? (results.find(r => r.route.durationHours === fastestDuration) ?? results[0]).route.path
-            : [];
 
     function handleCalculate(): void {
         if (isRouting) {

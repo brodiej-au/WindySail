@@ -8,7 +8,7 @@
     {#if isOpen}
         {#if showEditor}
             <div class="settings-body">
-                <PolarEditor polar={editingPolar} onSave={handleEditorSave} onCancel={handleEditorCancel} />
+                <PolarGraphEditor polar={editingPolar} onSave={handleEditorSave} onCancel={handleEditorCancel} />
             </div>
         {:else}
             <div class="settings-body">
@@ -124,6 +124,46 @@
                     </div>
                 </div>
 
+                <!-- Motor Settings -->
+                <div class="section mb-10">
+                    <label class="model-row size-s">
+                        <input
+                            type="checkbox"
+                            checked={motorEnabled}
+                            on:change={toggleMotor}
+                        />
+                        <span>Motor when wind speed &lt; threshold</span>
+                    </label>
+
+                    {#if motorEnabled}
+                        <div class="param-grid" style="margin-top: 6px;">
+                            <label class="size-xs param-label" for="motorThreshold">Threshold (kt)</label>
+                            <input
+                                id="motorThreshold"
+                                type="number"
+                                class="input size-s"
+                                min="0.5"
+                                max="8"
+                                step="0.5"
+                                value={motorThreshold}
+                                on:change={(e) => handleNumberChange('motorThreshold', e)}
+                            />
+
+                            <label class="size-xs param-label" for="motorSpeed">Motor Speed (kt)</label>
+                            <input
+                                id="motorSpeed"
+                                type="number"
+                                class="input size-s"
+                                min="1"
+                                max="10"
+                                step="0.5"
+                                value={motorSpeed}
+                                on:change={(e) => handleNumberChange('motorSpeed', e)}
+                            />
+                        </div>
+                    {/if}
+                </div>
+
                 <!-- Polar Selector -->
                 <div class="section">
                     <label class="size-xs label" for="polarSelect">Polar:</label>
@@ -146,6 +186,9 @@
                             {/if}
                         </div>
                     </div>
+                    {#if currentPolar}
+                        <PolarDiagramModal polar={currentPolar} />
+                    {/if}
                 </div>
             </div>
         {/if}
@@ -158,7 +201,8 @@
     import { settingsStore } from '../stores/SettingsStore';
     import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
     import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
-    import PolarEditor from './PolarEditor.svelte';
+    import PolarGraphEditor from './PolarGraphEditor.svelte';
+    import PolarDiagramModal from './PolarDiagramModal.svelte';
     import type { WindModelId, UserSettings, PolarData } from '../routing/types';
 
     const ALL_MODELS: WindModelId[] = ['gfs', 'ecmwf', 'icon', 'bomAccess'];
@@ -178,9 +222,14 @@
     let arrivalRadius: number = settingsStore.get('arrivalRadius');
     let landMarginNm: number = settingsStore.get('landMarginNm');
     let estimatedVmgKt: number = settingsStore.get('estimatedVmgKt');
+    let motorEnabled: boolean = settingsStore.get('motorEnabled');
+    let motorThreshold: number = settingsStore.get('motorThreshold');
+    let motorSpeed: number = settingsStore.get('motorSpeed');
     let selectedPolarName: string = settingsStore.get('selectedPolarName');
 
     let allPolars = getAllPolars();
+
+    $: currentPolar = allPolars.find(p => p.name === selectedPolarName) ?? allPolars[0];
 
     function toggleOpen(): void {
         isOpen = !isOpen;
@@ -196,10 +245,15 @@
         settingsStore.set('selectedModels', next);
     }
 
+    function toggleMotor(): void {
+        motorEnabled = !motorEnabled;
+        settingsStore.set('motorEnabled', motorEnabled);
+    }
+
     function handleNumberChange(
         key: keyof Pick<
             UserSettings,
-            'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'estimatedVmgKt'
+            'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'estimatedVmgKt' | 'motorThreshold' | 'motorSpeed'
         >,
         e: Event,
     ): void {
@@ -229,6 +283,12 @@
                     break;
                 case 'estimatedVmgKt':
                     estimatedVmgKt = value;
+                    break;
+                case 'motorThreshold':
+                    motorThreshold = value;
+                    break;
+                case 'motorSpeed':
+                    motorSpeed = value;
                     break;
             }
         }
@@ -298,6 +358,9 @@
         arrivalRadius = settings.arrivalRadius;
         landMarginNm = settings.landMarginNm;
         estimatedVmgKt = settings.estimatedVmgKt;
+        motorEnabled = settings.motorEnabled;
+        motorThreshold = settings.motorThreshold;
+        motorSpeed = settings.motorSpeed;
         selectedPolarName = settings.selectedPolarName;
     }
 

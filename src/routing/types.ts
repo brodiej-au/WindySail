@@ -24,6 +24,7 @@ export interface RoutePoint {
     twd: number; // degrees
     boatSpeed: number; // knots
     heading: number; // degrees 0-360
+    isMotoring?: boolean; // true if motoring instead of sailing
     swell?: SwellPoint;
     current?: CurrentPoint;
 }
@@ -44,6 +45,9 @@ export interface RoutingOptions {
     headingStep: number; // degrees, default 5
     numSectors: number; // pruning sectors, default 72
     arrivalRadius: number; // nautical miles, default 1.0
+    motorEnabled?: boolean; // allow motoring below threshold
+    motorThreshold?: number; // knots — motor if sail speed below this
+    motorSpeed?: number; // knots — speed when motoring
 }
 
 export const DEFAULT_OPTIONS: RoutingOptions = {
@@ -108,6 +112,7 @@ export interface IsochronePoint {
     boatSpeed: number;
     heading: number;
     time: number;
+    isMotoring?: boolean;
 }
 
 export type WindModelId = 'gfs' | 'ecmwf' | 'icon' | 'bomAccess';
@@ -129,6 +134,9 @@ export interface UserSettings {
     arrivalRadius: number; // nautical miles
     landMarginNm: number; // nautical miles
     estimatedVmgKt: number; // knots, used to auto-estimate forecast duration
+    motorEnabled: boolean; // allow motoring when boat speed is below threshold
+    motorThreshold: number; // knots — motor if sail speed is below this
+    motorSpeed: number; // knots — speed when motoring
     selectedModels: WindModelId[];
     selectedPolarName: string;
 }
@@ -141,6 +149,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     arrivalRadius: 1.0,
     landMarginNm: 1,
     estimatedVmgKt: 3,
+    motorEnabled: false,
+    motorThreshold: 2,
+    motorSpeed: 4,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',
 }

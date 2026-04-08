@@ -88,7 +88,7 @@ export async function fetchSwellGrid(
             );
 
             store.set('timestamp', timestamps[ti]);
-            await waitForRedraw();
+            await waitForRedraw(150); // Timestamp-only scrub: tiles already loaded
 
             const interpolate = await getLatLonInterpolator();
             if (!interpolate) continue;
@@ -173,7 +173,7 @@ export async function fetchCurrentGrid(
             );
 
             store.set('timestamp', timestamps[ti]);
-            await waitForRedraw();
+            await waitForRedraw(150); // Timestamp-only scrub: tiles already loaded
 
             const interpolate = await getLatLonInterpolator();
             if (!interpolate) continue;

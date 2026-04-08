@@ -2,16 +2,57 @@ import store from '@windy/store';
 import { getLatLonInterpolator } from '@windy/interpolator';
 import type { LatLonBounds, WindGridData, WindModelId } from '../routing/types';
 import * as WindCache from './WindCache';
-import { waitForRedraw } from './windyHelpers';
 
 const GRID_STEP = 1.0; // degrees — coarser grid for speed, router interpolates
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
+
+/**
+ * Wait for Windy to finish a product switch.
+ *
+ * After setting the product via `store.set('product', model)`, Windy needs
+ * to load tiles for the new model.  We poll `getLatLonInterpolator()` at a
+ * reference point until it returns a value different from the baseline, or
+ * until the timeout expires.  This is far more reliable than waiting for
+ * `redrawFinished` which can fire before tiles are actually loaded.
+ */
+async function waitForProductReady(
+    refLat: number,
+    refLon: number,
+    baseline: number[] | null,
+    timeoutMs: number = 5000,
+): Promise<void> {
+    const start = Date.now();
+    const checkInterval = 200;
+
+    while (Date.now() - start < timeoutMs) {
+        await new Promise(r => setTimeout(r, checkInterval));
+        try {
+            const interp = await getLatLonInterpolator();
+            if (!interp) continue;
+            const result = await interp({ lat: refLat, lon: refLon });
+            if (result && result.length >= 2) {
+                // If we have no baseline to compare against (first model), accept immediately
+                if (!baseline) return;
+                // If the values differ from the baseline, the product switch took effect
+                if (result[0] !== baseline[0] || result[1] !== baseline[1]) {
+                    return;
+                }
+            }
+        } catch {
+            // Interpolator not ready yet — keep waiting
+        }
+    }
+    console.warn('[WindProvider] Product switch timed out — interpolator may still have stale data');
+}
 
 /**
  * Build a wind grid by scrubbing Windy's timeline and sampling the interpolator.
  * Zero API calls — reads directly from loaded map tiles.
  *
  * Only samples timestamps from departureTime to departureTime + maxDurationHours.
+ *
+ * @param previousGrid  If provided, used to verify the product switch returned
+ *                      different data (avoids sampling stale tiles).
  */
 export async function fetchWindGrid(
     model: WindModelId,
@@ -19,6 +60,7 @@ export async function fetchWindGrid(
     departureTime: number,
     maxDurationHours: number,
     onProgress?: (msg: string, pct: number) => void,
+    previousGrid?: WindGridData,
 ): Promise<WindGridData> {
     // Check cache first — return immediately if fresh
     const cacheKey = WindCache.buildCacheKey(model, bounds, departureTime, maxDurationHours);
@@ -64,12 +106,31 @@ export async function fetchWindGrid(
     );
 
     const originalTimestamp = store.get('timestamp');
+    const originalOverlay = store.get('overlay');
     const originalProduct = store.get('product');
 
+    // Reference point for verifying product switch (centre of bounds)
+    const refLat = (bounds.south + bounds.north) / 2;
+    const refLon = (bounds.west + bounds.east) / 2;
+
+    // Build a baseline from the previous grid so we can detect when
+    // the interpolator has actually switched to the new product's data.
+    let baseline: number[] | null = null;
+    if (previousGrid && previousGrid.windU.length > 0 && previousGrid.windU[0].length > 0) {
+        baseline = [previousGrid.windU[0][0][0], previousGrid.windV[0][0][0]];
+    }
+
     try {
-        // Switch to the requested weather model
+        // Ensure wind overlay is active and switch to the requested model.
+        store.set('overlay', 'wind');
         store.set('product', model);
-        await waitForRedraw();
+
+        // Set timestamp to the first sampling time so tiles for that time load
+        store.set('timestamp', timestamps[0]);
+
+        // Wait until the interpolator returns data that differs from the
+        // previous model's grid, confirming the product switch took effect.
+        await waitForProductReady(refLat, refLon, baseline);
 
         for (let ti = 0; ti < timestamps.length; ti++) {
             onProgress?.(
@@ -77,8 +138,11 @@ export async function fetchWindGrid(
                 Math.round((ti / timestamps.length) * 100),
             );
 
-            store.set('timestamp', timestamps[ti]);
-            await waitForRedraw();
+            // Only switch timestamp if not already set (first iteration handled above)
+            if (ti > 0) {
+                store.set('timestamp', timestamps[ti]);
+                await new Promise(r => setTimeout(r, 150));
+            }
 
             const interpolate = await getLatLonInterpolator();
             if (!interpolate) continue;
@@ -99,6 +163,7 @@ export async function fetchWindGrid(
         }
     } finally {
         store.set('timestamp', originalTimestamp);
+        store.set('overlay', originalOverlay);
         store.set('product', originalProduct);
     }
 
