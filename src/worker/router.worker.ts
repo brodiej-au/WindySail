@@ -119,8 +119,11 @@ async function runRouting(payload: {
     let frontier: IsochronePoint[] = [startPoint];
 
     for (let step = 0; step < maxSteps; step++) {
-        // Expand frontier
-        const candidates = expandFrontier(frontier, windGrid, polar, timeStep, step, motorOptions);
+        // Expand frontier (with ocean data for current/swell-aware routing)
+        const candidates = expandFrontier(
+            frontier, windGrid, polar, timeStep, step, motorOptions,
+            currentGrid, swellGrid, options.comfortWeight,
+        );
 
         // Filter out zero-speed candidates (becalmed at same position)
         const movingCandidates = candidates.filter(c => c.boatSpeed > 0);

@@ -114,6 +114,7 @@ export interface IsochronePoint {
     heading: number;
     time: number;
     isMotoring?: boolean;
+    sog?: number; // speed over ground (after current), knots
 }
 
 export type StepStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';

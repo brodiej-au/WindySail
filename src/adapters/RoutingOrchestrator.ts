@@ -227,7 +227,7 @@ export class RoutingOrchestrator {
                         routingStep.detail = `${percent}%`;
                         emitStatus(`Computing routes... ${percent}%`, maxRoutingProgress);
                     }
-                })
+                }, swellGrid, currentGrid ?? undefined)
                 .then((route): ModelRouteResult => ({
                     model,
                     route,

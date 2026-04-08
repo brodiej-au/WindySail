@@ -1,7 +1,8 @@
-import type { IsochronePoint, LatLon, PolarData, RoutePoint, WindGridData } from './types';
+import type { IsochronePoint, LatLon, PolarData, RoutePoint, WindGridData, SwellGridData, CurrentGridData } from './types';
 import { advancePosition, bearing, computeTWA, distance, normaliseAngle, segmentClosestApproach } from './geo';
 import { getWindAt } from './WindGrid';
 import { getSpeed } from './Polar';
+import { trilinearInterpolate, interpolateAngle } from './interpolate';
 
 export function expandFrontier(
     frontier: IsochronePoint[],
@@ -10,16 +11,38 @@ export function expandFrontier(
     timeStepHours: number,
     parentIsoIndex: number,
     motorOptions?: { enabled: boolean; threshold: number; speed: number },
+    currentGrid?: CurrentGridData,
+    swellGrid?: SwellGridData,
+    comfortWeight?: number,
 ): IsochronePoint[] {
     const candidates: IsochronePoint[] = [];
     const headingStep = 5;
     const numHeadings = 360 / headingStep;
     const dtMs = timeStepHours * 3600000;
+    const cw = comfortWeight ?? 0.3;
 
     for (let fi = 0; fi < frontier.length; fi++) {
         const point = frontier[fi];
         const nextTime = point.time + dtMs;
         const wind = getWindAt(windGrid, nextTime, point.lat, point.lon);
+
+        // Pre-compute swell at this position (shared across headings)
+        let swellHeight = 0;
+        let swellDir = 0;
+        if (swellGrid) {
+            const { lats, lons, timestamps } = swellGrid;
+            swellHeight = trilinearInterpolate(swellGrid.swellHeight, lats, lons, timestamps, point.lat, point.lon, nextTime);
+            swellDir = interpolateAngle(swellGrid.swellDir, lats, lons, timestamps, point.lat, point.lon, nextTime);
+        }
+
+        // Pre-compute current at this position (shared across headings)
+        let curU = 0;
+        let curV = 0;
+        if (currentGrid) {
+            const { lats, lons, timestamps } = currentGrid;
+            curU = trilinearInterpolate(currentGrid.currentU, lats, lons, timestamps, point.lat, point.lon, nextTime);
+            curV = trilinearInterpolate(currentGrid.currentV, lats, lons, timestamps, point.lat, point.lon, nextTime);
+        }
 
         for (let hi = 0; hi < numHeadings; hi++) {
             const hdg = hi * headingStep;
@@ -27,28 +50,52 @@ export function expandFrontier(
             let boatSpeed = getSpeed(polar, twa, wind.speed);
             let isMotoring = false;
 
+            // Swell speed reduction (before motor check)
+            if (swellGrid && swellHeight > 0 && !isMotoring) {
+                const relSwellAngle = computeTWA(hdg, swellDir);
+                const beamFactor = Math.sin(relSwellAngle * Math.PI / 180);
+                const penaltyPerMeter = 0.025 + cw * 0.05;
+                const penalty = Math.min(0.5, swellHeight * beamFactor * penaltyPerMeter);
+                boatSpeed *= (1 - penalty);
+            }
+
             // Motor if sail speed is below threshold
             if (motorOptions?.enabled && boatSpeed < motorOptions.threshold) {
                 boatSpeed = motorOptions.speed;
                 isMotoring = true;
             }
 
-            const distNm = boatSpeed * timeStepHours;
+            // Apply current as vector addition
+            let sog = boatSpeed;
+            let effectiveHdg = hdg;
+
+            if (currentGrid && (curU !== 0 || curV !== 0)) {
+                const hdgRad = hdg * Math.PI / 180;
+                const boatN = boatSpeed * Math.cos(hdgRad);
+                const boatE = boatSpeed * Math.sin(hdgRad);
+                // Current U = east component, V = north component, in m/s
+                const sogN = boatN + curV * 1.94384;
+                const sogE = boatE + curU * 1.94384;
+                sog = Math.sqrt(sogN * sogN + sogE * sogE);
+                effectiveHdg = (Math.atan2(sogE, sogN) * 180 / Math.PI + 360) % 360;
+            }
+
+            const distNm = sog * timeStepHours;
 
             if (distNm <= 0) {
                 candidates.push({
                     lat: point.lat, lon: point.lon, parent: fi,
                     twa, tws: wind.speed, twd: wind.direction,
-                    boatSpeed, heading: hdg, time: nextTime, isMotoring,
+                    boatSpeed, heading: hdg, time: nextTime, isMotoring, sog,
                 });
                 continue;
             }
 
-            const newPos = advancePosition(point.lat, point.lon, hdg, distNm);
+            const newPos = advancePosition(point.lat, point.lon, effectiveHdg, distNm);
             candidates.push({
                 lat: newPos.lat, lon: newPos.lon, parent: fi,
                 twa, tws: wind.speed, twd: wind.direction,
-                boatSpeed, heading: hdg, time: nextTime, isMotoring,
+                boatSpeed, heading: hdg, time: nextTime, isMotoring, sog,
             });
         }
     }
