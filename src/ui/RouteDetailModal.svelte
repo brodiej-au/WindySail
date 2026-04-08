@@ -57,6 +57,39 @@
                 </div>
             </div>
 
+            <!-- Dataset toggles -->
+            <div class="dataset-toggles">
+                <label class="dataset-toggle size-xs">
+                    <input type="checkbox" bind:checked={visibleDatasets.wind} on:change={rebuildChart} />
+                    <span class="toggle-dot" style="background: rgba(255, 165, 0, 0.9)"></span>
+                    Wind
+                </label>
+                <label class="dataset-toggle size-xs">
+                    <input type="checkbox" bind:checked={visibleDatasets.sog} on:change={rebuildChart} />
+                    <span class="toggle-dot" style="background: rgba(255, 255, 255, 0.8)"></span>
+                    SOG
+                </label>
+                <label class="dataset-toggle size-xs">
+                    <input type="checkbox" bind:checked={visibleDatasets.twa} on:change={rebuildChart} />
+                    <span class="toggle-dot" style="background: rgba(233, 196, 106, 0.9)"></span>
+                    TWA
+                </label>
+                {#if hasSwell}
+                <label class="dataset-toggle size-xs">
+                    <input type="checkbox" bind:checked={visibleDatasets.swell} on:change={rebuildChart} />
+                    <span class="toggle-dot" style="background: rgba(100, 149, 237, 0.9)"></span>
+                    Swell
+                </label>
+                {/if}
+                {#if hasCurrents}
+                <label class="dataset-toggle size-xs">
+                    <input type="checkbox" bind:checked={visibleDatasets.current} on:change={rebuildChart} />
+                    <span class="toggle-dot" style="background: rgba(75, 192, 130, 0.9)"></span>
+                    Current
+                </label>
+                {/if}
+            </div>
+
             <!-- Chart -->
             <div class="modal-body">
                 <canvas bind:this={canvasEl}></canvas>
@@ -130,6 +163,16 @@
     let chart: Chart | null = null;
     let showModal = false;
     let selectedIndex = 0;
+    let visibleDatasets: Record<string, boolean> = {
+        wind: true,
+        sog: true,
+        twa: true,
+        swell: true,
+        current: true,
+    };
+
+    // Module-level route points for the motoring bands plugin
+    let chartRoutePoints: RoutePoint[] = [];
 
     $: selectedPath = results[selectedIndex]?.route.path ?? [];
     $: hasSwell = selectedPath.some(p => p.swell != null);
@@ -175,6 +218,10 @@
         }
     }
 
+    function rebuildChart(): void {
+        if (canvasEl && showModal) buildChart(selectedPath);
+    }
+
     function destroyChart(): void {
         if (chart) {
             chart.destroy();
@@ -182,41 +229,103 @@
         }
     }
 
+    // Motoring bands plugin - draws subtle background bands for motoring segments
+    const motoringBandsPlugin = {
+        id: 'motoringBands',
+        beforeDraw(chart: Chart) {
+            const pts = chartRoutePoints;
+            if (!pts || pts.length < 2) return;
+
+            const { ctx } = chart;
+            const xScale = chart.scales['x'];
+            const { top, bottom } = chart.chartArea;
+            if (!xScale) return;
+
+            ctx.save();
+            ctx.fillStyle = 'rgba(233, 196, 106, 0.06)';
+
+            let bandStart: number | null = null;
+            for (let i = 0; i < pts.length; i++) {
+                if (pts[i].isMotoring) {
+                    if (bandStart === null) bandStart = i;
+                } else {
+                    if (bandStart !== null) {
+                        const x0 = xScale.getPixelForValue(pts[bandStart].time);
+                        const x1 = xScale.getPixelForValue(pts[i - 1].time);
+                        ctx.fillRect(x0, top, x1 - x0, bottom - top);
+                        bandStart = null;
+                    }
+                }
+            }
+            // Close any trailing motoring band
+            if (bandStart !== null) {
+                const x0 = xScale.getPixelForValue(pts[bandStart].time);
+                const x1 = xScale.getPixelForValue(pts[pts.length - 1].time);
+                ctx.fillRect(x0, top, x1 - x0, bottom - top);
+            }
+
+            ctx.restore();
+        },
+    };
+
     function buildChart(pts: RoutePoint[]): void {
         destroyChart();
         if (!canvasEl || pts.length < 2) return;
+
+        // Store route points for the motoring bands plugin and tooltip access
+        chartRoutePoints = pts;
 
         const labels = pts.map(p => p.time);
         const datasets: any[] = [];
 
         // Wind speed (always available)
-        datasets.push({
-            label: 'Wind (kt)',
-            data: pts.map(p => p.tws),
-            borderColor: 'rgba(255, 165, 0, 0.9)',
-            backgroundColor: 'rgba(255, 165, 0, 0.08)',
-            fill: true,
-            tension: 0.3,
-            pointRadius: 0,
-            borderWidth: 2,
-            yAxisID: 'y',
-        });
+        if (visibleDatasets.wind) {
+            datasets.push({
+                label: 'Wind (kt)',
+                data: pts.map(p => p.tws),
+                borderColor: 'rgba(255, 165, 0, 0.9)',
+                backgroundColor: 'rgba(255, 165, 0, 0.08)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 2,
+                yAxisID: 'y',
+            });
+        }
 
         // Boat speed (always available)
-        datasets.push({
-            label: 'SOG (kt)',
-            data: pts.map(p => p.boatSpeed),
-            borderColor: 'rgba(255, 255, 255, 0.8)',
-            backgroundColor: 'transparent',
-            fill: false,
-            tension: 0.3,
-            pointRadius: 0,
-            borderWidth: 1.5,
-            borderDash: [5, 3],
-            yAxisID: 'y',
-        });
+        if (visibleDatasets.sog) {
+            datasets.push({
+                label: 'SOG (kt)',
+                data: pts.map(p => p.boatSpeed),
+                borderColor: 'rgba(255, 255, 255, 0.8)',
+                backgroundColor: 'transparent',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                borderDash: [5, 3],
+                yAxisID: 'y',
+            });
+        }
 
-        if (hasSwell) {
+        // TWA trace
+        if (visibleDatasets.twa) {
+            datasets.push({
+                label: 'TWA (deg)',
+                data: pts.map(p => p.twa),
+                borderColor: 'rgba(233, 196, 106, 0.9)',
+                backgroundColor: 'transparent',
+                fill: false,
+                tension: 0.3,
+                pointRadius: 0,
+                borderWidth: 1.5,
+                borderDash: [4, 4],
+                yAxisID: 'y2',
+            });
+        }
+
+        if (hasSwell && visibleDatasets.swell) {
             datasets.push({
                 label: 'Swell (m)',
                 data: pts.map(p => p.swell?.height ?? null),
@@ -230,7 +339,7 @@
             });
         }
 
-        if (hasCurrents) {
+        if (hasCurrents && visibleDatasets.current) {
             datasets.push({
                 label: 'Current (kt)',
                 data: pts.map(p => p.current?.speed ?? null),
@@ -244,7 +353,15 @@
             });
         }
 
-        const hasRightAxis = hasSwell || hasCurrents;
+        const showY1 = (hasSwell && visibleDatasets.swell) || (hasCurrents && visibleDatasets.current);
+        const showY2 = visibleDatasets.twa;
+
+        // Determine y1 title text
+        const showSwellAxis = hasSwell && visibleDatasets.swell;
+        const showCurrentAxis = hasCurrents && visibleDatasets.current;
+        const y1Title = showSwellAxis && showCurrentAxis
+            ? 'Swell (m) / Current (kt)'
+            : showSwellAxis ? 'Swell (m)' : 'Current (kt)';
 
         chart = new Chart(canvasEl, {
             type: 'line',
@@ -281,7 +398,15 @@
                                 });
                             },
                             label(item) {
-                                return `${item.dataset.label}: ${item.parsed.y.toFixed(2)}`;
+                                return `${item.dataset.label}: ${item.parsed.y.toFixed(1)}`;
+                            },
+                            afterBody(items) {
+                                if (!items.length) return '';
+                                const idx = items[0].dataIndex;
+                                const pt = chartRoutePoints[idx];
+                                if (!pt) return '';
+                                const mode = pt.isMotoring ? 'Motoring \u2699' : 'Sailing';
+                                return `Mode: ${mode}\nHeading: ${pt.heading.toFixed(0)}\u00B0`;
                             },
                         },
                     },
@@ -306,11 +431,11 @@
                         beginAtZero: true,
                     },
                     y1: {
-                        display: hasRightAxis,
+                        display: showY1,
                         position: 'right',
                         title: {
                             display: true,
-                            text: hasSwell && hasCurrents ? 'Swell (m) / Current (kt)' : hasSwell ? 'Swell (m)' : 'Current (kt)',
+                            text: y1Title,
                             color: 'rgba(100, 149, 237, 0.8)',
                             font: { size: 11 },
                         },
@@ -318,8 +443,23 @@
                         grid: { drawOnChartArea: false },
                         beginAtZero: true,
                     },
+                    y2: {
+                        display: showY2,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'TWA (deg)',
+                            color: 'rgba(233, 196, 106, 0.8)',
+                            font: { size: 11 },
+                        },
+                        min: 0,
+                        max: 180,
+                        ticks: { color: 'rgba(255, 255, 255, 0.6)', font: { size: 11 } },
+                        grid: { drawOnChartArea: false },
+                    },
                 },
             },
+            plugins: [motoringBandsPlugin],
         });
     }
 
@@ -485,6 +625,43 @@
     .summary-value {
         font-weight: 500;
         opacity: 0.9;
+    }
+
+    .dataset-toggles {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 14px;
+        padding: 6px 16px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .dataset-toggle {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        cursor: pointer;
+        color: rgba(255, 255, 255, 0.7);
+        user-select: none;
+
+        input[type='checkbox'] {
+            width: 13px;
+            height: 13px;
+            margin: 0;
+            accent-color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+        }
+
+        &:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+    }
+
+    .toggle-dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        flex-shrink: 0;
     }
 
     .modal-body {
