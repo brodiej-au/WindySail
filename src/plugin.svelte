@@ -19,6 +19,7 @@
         {failedModels}
         polarName={settingsStore.get('selectedPolarName')}
         {error}
+        {warning}
         onCalculate={handleCalculate}
         onCancel={handleCancel}
         onClear={handleClear}
@@ -58,6 +59,8 @@
     let results: ModelRouteResult[] = [];
     let failedModels: { model: WindModelId; reason: string }[] = [];
     let error: string | null = null;
+    let warning: string | null = null;
+    let warningTimeout: ReturnType<typeof setTimeout> | null = null;
 
     let routingPanel: RoutingPanel;
 
@@ -167,6 +170,12 @@
         store.set('timestamp', time);
     }
 
+    function handleWarning(msg: string): void {
+        warning = msg;
+        if (warningTimeout) clearTimeout(warningTimeout);
+        warningTimeout = setTimeout(() => { warning = null; }, 3000);
+    }
+
     function handleModelSwitch(model: WindModelId): void {
         store.set('product', model);
     }
@@ -174,7 +183,7 @@
     export const onopen = (_params: unknown) => {
         originalTimestamp = store.get('timestamp');
         originalProduct = store.get('product');
-        waypointMgr = new WaypointManager(name, handleWaypointChange);
+        waypointMgr = new WaypointManager(name, handleWaypointChange, handleWarning);
         waypointMgr.activate();
     };
 

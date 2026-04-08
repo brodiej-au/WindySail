@@ -11,6 +11,11 @@
         {/if}
     </div>
 
+    <!-- Land warning -->
+    {#if warning}
+        <div class="section mb-10 warning-text size-s">{warning}</div>
+    {/if}
+
     <!-- Boat / polar -->
     <div class="section mb-10">
         <span class="size-xs label">Boat:</span>
@@ -176,6 +181,7 @@
     export let failedModels: { model: WindModelId; reason: string }[] = [];
     export let polarName: string = 'Bavaria 38';
     export let error: string | null = null;
+    export let warning: string | null = null;
 
     export let onCalculate: () => void = () => {};
     export let onCancel: () => void = () => {};
@@ -275,6 +281,10 @@
     }
     .error-text {
         color: #e74c3c;
+        line-height: 1.4;
+    }
+    .warning-text {
+        color: #e9c46a;
         line-height: 1.4;
     }
     .results {

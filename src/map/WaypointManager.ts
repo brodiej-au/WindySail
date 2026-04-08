@@ -1,5 +1,6 @@
 import { map } from '@windy/map';
 import { singleclick } from '@windy/singleclick';
+import { checkPoints } from '../adapters/LandChecker';
 
 import type { LatLon } from '../routing/types';
 
@@ -18,6 +19,7 @@ export class WaypointManager {
     private endPos: LatLon | null = null;
     private pluginName: string;
     private onChange: StateChangeCallback;
+    private onWarning?: (msg: string) => void;
 
     private static startIcon = L.divIcon({
         html: '<div style="background:#2ecc71;color:#fff;border-radius:50%;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:16px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">S</div>',
@@ -33,9 +35,10 @@ export class WaypointManager {
         className: '',
     });
 
-    constructor(pluginName: string, onChange: StateChangeCallback) {
+    constructor(pluginName: string, onChange: StateChangeCallback, onWarning?: (msg: string) => void) {
         this.pluginName = pluginName;
         this.onChange = onChange;
+        this.onWarning = onWarning;
     }
 
     /**
@@ -47,7 +50,14 @@ export class WaypointManager {
         this.notifyChange();
     }
 
-    private handleClick = (latLon: LatLon) => {
+    private handleClick = async (latLon: LatLon) => {
+        // Validate point is on water before placing
+        const [isSea] = await checkPoints([[latLon.lat, latLon.lon]]);
+        if (!isSea) {
+            this.onWarning?.('Please click on water');
+            return;
+        }
+
         if (this.state === 'WAITING_START') {
             this.setStart(latLon);
         } else if (this.state === 'WAITING_END') {
@@ -66,8 +76,15 @@ export class WaypointManager {
                 draggable: true,
             }).addTo(map);
 
-            this.startMarker.on('dragend', () => {
+            this.startMarker.on('dragend', async () => {
                 const pos = this.startMarker!.getLatLng();
+                const [isSea] = await checkPoints([[pos.lat, pos.lng]]);
+                if (!isSea) {
+                    // Revert to previous position
+                    this.startMarker!.setLatLng([this.startPos!.lat, this.startPos!.lon]);
+                    this.onWarning?.('Please place marker on water');
+                    return;
+                }
                 this.startPos = { lat: pos.lat, lon: pos.lng };
                 this.notifyChange();
             });
@@ -88,8 +105,15 @@ export class WaypointManager {
                 draggable: true,
             }).addTo(map);
 
-            this.endMarker.on('dragend', () => {
+            this.endMarker.on('dragend', async () => {
                 const pos = this.endMarker!.getLatLng();
+                const [isSea] = await checkPoints([[pos.lat, pos.lng]]);
+                if (!isSea) {
+                    // Revert to previous position
+                    this.endMarker!.setLatLng([this.endPos!.lat, this.endPos!.lon]);
+                    this.onWarning?.('Please place marker on water');
+                    return;
+                }
                 this.endPos = { lat: pos.lat, lon: pos.lng };
                 this.notifyChange();
             });
