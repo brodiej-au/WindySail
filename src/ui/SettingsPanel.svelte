@@ -159,6 +159,24 @@
                     {/if}
                 </div>
 
+                <!-- Comfort vs Speed -->
+                <div class="section mb-10">
+                    <span class="size-xs label">Optimize for:</span>
+                    <div class="slider-row">
+                        <span class="size-xs slider-label">Speed</span>
+                        <input
+                            type="range"
+                            class="comfort-slider"
+                            min="0"
+                            max="1"
+                            step="0.1"
+                            value={comfortWeight}
+                            on:input={(e) => handleComfortChange(e)}
+                        />
+                        <span class="size-xs slider-label">Comfort</span>
+                    </div>
+                </div>
+
                 <!-- Polar Selector -->
                 <div class="section">
                     <label class="size-xs label" for="polarSelect">Polar:</label>
@@ -219,6 +237,7 @@
     let motorEnabled: boolean = settingsStore.get('motorEnabled');
     let motorThreshold: number = settingsStore.get('motorThreshold');
     let motorSpeed: number = settingsStore.get('motorSpeed');
+    let comfortWeight: number = settingsStore.get('comfortWeight');
     let selectedPolarName: string = settingsStore.get('selectedPolarName');
 
     let allPolars = getAllPolars();
@@ -288,6 +307,14 @@
         }
     }
 
+    function handleComfortChange(e: Event): void {
+        const val = parseFloat((e.target as HTMLInputElement).value);
+        if (!isNaN(val)) {
+            comfortWeight = val;
+            settingsStore.set('comfortWeight', val);
+        }
+    }
+
     function handlePolarChange(e: Event): void {
         const value = (e.target as HTMLSelectElement).value;
         selectedPolarName = value;
@@ -350,6 +377,7 @@
         motorEnabled = settings.motorEnabled;
         motorThreshold = settings.motorThreshold;
         motorSpeed = settings.motorSpeed;
+        comfortWeight = settings.comfortWeight;
         selectedPolarName = settings.selectedPolarName;
     }
 
@@ -497,6 +525,23 @@
         &:active {
             transform: scale(0.98);
         }
+    }
+
+    .slider-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .slider-label {
+        opacity: 0.6;
+        white-space: nowrap;
+    }
+
+    .comfort-slider {
+        flex: 1;
+        accent-color: #457b9d;
+        cursor: pointer;
     }
 
     .button--variant-orange {

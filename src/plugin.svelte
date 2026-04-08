@@ -118,6 +118,7 @@
                 motorEnabled: settings.motorEnabled,
                 motorThreshold: settings.motorThreshold,
                 motorSpeed: settings.motorSpeed,
+                comfortWeight: settings.comfortWeight,
             };
 
             const routeResults = await orchestrator.computeRoutes(

@@ -48,6 +48,7 @@ export interface RoutingOptions {
     motorEnabled?: boolean; // allow motoring below threshold
     motorThreshold?: number; // knots — motor if sail speed below this
     motorSpeed?: number; // knots — speed when motoring
+    comfortWeight?: number; // 0-1, modulates swell speed penalty
 }
 
 export const DEFAULT_OPTIONS: RoutingOptions = {
@@ -145,6 +146,7 @@ export interface UserSettings {
     motorEnabled: boolean; // allow motoring when boat speed is below threshold
     motorThreshold: number; // knots — motor if sail speed is below this
     motorSpeed: number; // knots — speed when motoring
+    comfortWeight: number; // 0-1, modulates swell speed penalty
     selectedModels: WindModelId[];
     selectedPolarName: string;
 }
@@ -160,6 +162,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     motorEnabled: false,
     motorThreshold: 2,
     motorSpeed: 4,
+    comfortWeight: 0.3,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',
 }
