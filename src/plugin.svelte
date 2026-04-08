@@ -95,14 +95,18 @@
             const polar = getPolarByName(settings.selectedPolarName);
 
             const distNm = distance(start, end);
-            const estimatedHours = Math.max(24, Math.ceil(distNm / settings.estimatedVmgKt) * 2.0);
+            const worstCaseVmg = settings.motorEnabled
+                ? Math.min(settings.estimatedVmgKt, settings.motorSpeed)
+                : settings.estimatedVmgKt;
+            const estimatedHours = Math.max(24, Math.ceil(distNm / worstCaseVmg) * 2.0);
+            const effectiveMaxDuration = Math.min(estimatedHours, settings.maxDuration);
 
-            progressStatus = `Estimated passage: ~${Math.round(estimatedHours)}h, using ${Math.round(settings.maxDuration)}h forecast window`;
+            progressStatus = `Fetching ${effectiveMaxDuration}h of forecast data (~${distNm.toFixed(0)}nm)`;
 
             const options = {
                 startTime: departureTime,
                 timeStep: settings.timeStep,
-                maxDuration: settings.maxDuration,
+                maxDuration: effectiveMaxDuration,
                 headingStep: settings.headingStep,
                 numSectors: settings.numSectors,
                 arrivalRadius: settings.arrivalRadius,
