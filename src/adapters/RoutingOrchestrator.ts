@@ -1,11 +1,12 @@
-import type { LatLon, PolarData, RouteResult, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData, PipelineStep } from '../routing/types';
-import { fetchWindGrid, computeBounds } from './WindProvider';
+import type { LatLon, PolarData, RouteResult, RoutePoint, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData, PipelineStep } from '../routing/types';
+import { fetchWindGrid, computeBoundsFromPoints } from './WindProvider';
 import { fetchSwellGrid, fetchCurrentGrid } from './OceanDataProvider';
 import { clearCache as clearLandCache } from './LandChecker';
 import { clear as clearWindCache } from './WindCache';
 import { WorkerBridge } from './WorkerBridge';
 import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
 import { enrichRoutePoints } from '../routing/RouteEnricher';
+import { distance } from '../routing/geo';
 
 export type StatusCallback = (status: string, percent: number, steps?: PipelineStep[]) => void;
 
@@ -25,8 +26,9 @@ export class RoutingOrchestrator {
      * Ocean data (40-55%): swell (40-48%) and currents (48-55%) are sampled
      * ONCE — they are model-independent. Failures are warned but non-fatal.
      *
-     * Routing (55-100%): one WorkerBridge per model, all run in PARALLEL via
-     * Promise.allSettled. Per-model failures are warned but do not abort.
+     * Routing (55-100%): one WorkerBridge per model per leg, all models run
+     * in PARALLEL via Promise.allSettled. Legs within a model run sequentially
+     * (each leg's arrival time becomes the next leg's departure).
      *
      * Throws only when every model fails.
      */
@@ -35,6 +37,7 @@ export class RoutingOrchestrator {
         end: LatLon,
         polar: PolarData,
         models: WindModelId[],
+        waypoints: LatLon[] | undefined,
         options: RoutingOptions,
         onStatus?: StatusCallback,
     ): Promise<ModelRouteResult[]> {
@@ -45,7 +48,8 @@ export class RoutingOrchestrator {
         // Clear stale wind cache to avoid reusing bad data from earlier failed runs.
         clearWindCache();
 
-        const bounds = computeBounds(start, end, 1.0);
+        const allPoints = [start, ...(waypoints ?? []), end];
+        const bounds = computeBoundsFromPoints(allPoints, 1.0);
 
         // Build structured pipeline steps
         const steps: PipelineStep[] = [
@@ -62,6 +66,7 @@ export class RoutingOrchestrator {
         console.log('[RoutingOrchestrator] Starting routing pipeline', {
             models,
             bounds,
+            waypointCount: waypoints?.length ?? 0,
             startTime: new Date(options.startTime).toISOString(),
             maxDuration: options.maxDuration,
             timeStep: options.timeStep,
@@ -211,29 +216,91 @@ export class RoutingOrchestrator {
         routingStep.status = 'active';
         let maxRoutingProgress = 0;
 
-        // Create one bridge per model that successfully returned a wind grid.
-        const modelsWithGrids = models.filter(m => windGrids.has(m));
-        this.bridges = modelsWithGrids.map(() => new WorkerBridge());
+        // Build leg pairs from all points
+        const legs: [LatLon, LatLon][] = [];
+        for (let i = 0; i < allPoints.length - 1; i++) {
+            legs.push([allPoints[i], allPoints[i + 1]]);
+        }
 
-        const routingPromises = modelsWithGrids.map((model, idx) => {
-            const bridge = this.bridges[idx];
+        // Bridges will be created dynamically per model per leg
+        this.bridges = [];
+
+        const modelsWithGrids = models.filter(m => windGrids.has(m));
+
+        const routingPromises = modelsWithGrids.map(async (model) => {
             const grid = windGrids.get(model)!;
 
-            return bridge
-                .computeRoute(grid, polar, start, end, options, (percent) => {
-                    const scaled = Math.round(55 + percent * 0.45);
-                    if (scaled > maxRoutingProgress) {
-                        maxRoutingProgress = scaled;
-                        routingStep.detail = `${percent}%`;
-                        emitStatus(`Computing routes... ${percent}%`, maxRoutingProgress);
-                    }
-                }, swellGrid, currentGrid ?? undefined)
-                .then((route): ModelRouteResult => ({
-                    model,
-                    route,
-                    color: MODEL_COLORS[model],
-                    windGrid: grid,
-                }));
+            const fullPath: RoutePoint[] = [];
+            let legStartTime = options.startTime;
+
+            for (let legIdx = 0; legIdx < legs.length; legIdx++) {
+                const [legStart, legEnd] = legs[legIdx];
+                const legOptions = { ...options, startTime: legStartTime };
+
+                const bridge = new WorkerBridge();
+                this.bridges.push(bridge);
+
+                const route = await bridge.computeRoute(
+                    grid, polar, legStart, legEnd, legOptions,
+                    (percent) => {
+                        const legFraction = 1 / legs.length;
+                        const overallPercent = Math.round((legIdx + percent / 100) * legFraction * 100);
+                        const scaled = Math.round(55 + overallPercent * 0.45);
+                        if (scaled > maxRoutingProgress) {
+                            maxRoutingProgress = scaled;
+                            routingStep.detail = legs.length > 1
+                                ? `Leg ${legIdx + 1}/${legs.length}: ${percent}%`
+                                : `${percent}%`;
+                            emitStatus(
+                                legs.length > 1
+                                    ? `Computing routes... Leg ${legIdx + 1}/${legs.length}`
+                                    : `Computing routes... ${percent}%`,
+                                maxRoutingProgress,
+                            );
+                        }
+                    },
+                    swellGrid, currentGrid ?? undefined,
+                );
+
+                // Tag with leg index and concatenate (skip first point of subsequent legs to avoid duplicates)
+                const startIdx = legIdx === 0 ? 0 : 1;
+                for (let i = startIdx; i < route.path.length; i++) {
+                    route.path[i].legIndex = legIdx;
+                    fullPath.push(route.path[i]);
+                }
+
+                // Next leg starts from where this one ended
+                legStartTime = route.path[route.path.length - 1].time;
+            }
+
+            // Build composite RouteResult from concatenated path
+            let totalDistanceNm = 0;
+            let maxTws = 0;
+            let totalSpeed = 0;
+            for (let i = 1; i < fullPath.length; i++) {
+                totalDistanceNm += distance(fullPath[i - 1], fullPath[i]);
+                maxTws = Math.max(maxTws, fullPath[i].tws);
+                totalSpeed += fullPath[i].boatSpeed;
+            }
+            const avgSpeedKt = fullPath.length > 1 ? totalSpeed / (fullPath.length - 1) : 0;
+            const durationMs = fullPath[fullPath.length - 1].time - fullPath[0].time;
+            const durationHours = durationMs / 3600000;
+
+            const compositeRoute: RouteResult = {
+                path: fullPath,
+                eta: fullPath[fullPath.length - 1].time,
+                totalDistanceNm,
+                avgSpeedKt,
+                maxTws,
+                durationHours,
+            };
+
+            return {
+                model,
+                route: compositeRoute,
+                color: MODEL_COLORS[model],
+                windGrid: grid,
+            } as ModelRouteResult;
         });
 
         // Run all routing workers in parallel; collect both successes and failures.
@@ -284,7 +351,7 @@ export class RoutingOrchestrator {
         options: RoutingOptions,
         onStatus?: StatusCallback,
     ): Promise<RouteResult> {
-        const results = await this.computeRoutes(start, end, polar, ['gfs'], options, onStatus);
+        const results = await this.computeRoutes(start, end, polar, ['gfs'], undefined, options, onStatus);
         return results[0].route;
     }
 

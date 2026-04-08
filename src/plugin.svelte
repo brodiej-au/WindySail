@@ -12,6 +12,7 @@
         {waypointState}
         {start}
         {end}
+        {waypoints}
         {isRouting}
         {progressPercent}
         {progressStatus}
@@ -26,6 +27,9 @@
         onClear={handleClear}
         onTimeChange={handlePlayerTimeChange}
         onModelSwitch={handleModelSwitch}
+        onAddWaypoint={handleAddWaypoint}
+        onStopAddingWaypoints={handleStopAddingWaypoints}
+        onRemoveWaypoint={handleRemoveWaypoint}
         bind:this={routingPanel}
     />
 </section>
@@ -54,6 +58,7 @@
     let waypointState: WaypointState = 'WAITING_START';
     let start: LatLon | null = null;
     let end: LatLon | null = null;
+    let waypoints: LatLon[] = [];
     let isRouting = false;
     let progressPercent = 0;
     let progressStatus = '';
@@ -78,10 +83,12 @@
         state: WaypointState,
         newStart: LatLon | null,
         newEnd: LatLon | null,
+        newWaypoints: LatLon[],
     ): void {
         waypointState = state;
         start = newStart;
         end = newEnd;
+        waypoints = newWaypoints;
     }
 
     async function handleCalculate(): Promise<void> {
@@ -126,6 +133,7 @@
                 end,
                 polar,
                 settings.selectedModels,
+                waypoints.length > 0 ? waypoints : undefined,
                 options,
                 (status, percent, steps) => {
                     progressStatus = status;
@@ -182,6 +190,18 @@
 
     function handleModelSwitch(model: WindModelId): void {
         store.set('product', model);
+    }
+
+    function handleAddWaypoint(): void {
+        waypointMgr?.startAddingWaypoints();
+    }
+
+    function handleStopAddingWaypoints(): void {
+        waypointMgr?.stopAddingWaypoints();
+    }
+
+    function handleRemoveWaypoint(index: number): void {
+        waypointMgr?.removeWaypoint(index);
     }
 
     export const onopen = (_params: unknown) => {

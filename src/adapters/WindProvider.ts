@@ -1,6 +1,6 @@
 import store from '@windy/store';
 import { getLatLonInterpolator } from '@windy/interpolator';
-import type { LatLonBounds, WindGridData, WindModelId } from '../routing/types';
+import type { LatLon, LatLonBounds, WindGridData, WindModelId } from '../routing/types';
 import * as WindCache from './WindCache';
 
 const GRID_STEP = 1.0; // degrees — coarser grid for speed, router interpolates
@@ -185,5 +185,23 @@ export function computeBounds(
         north: Math.max(start.lat, end.lat) + marginDeg,
         west: Math.min(start.lon, end.lon) - marginDeg,
         east: Math.max(start.lon, end.lon) + marginDeg,
+    };
+}
+
+/**
+ * Compute a bounding box around an arbitrary set of points with a margin.
+ * Useful for multi-leg routes with intermediate waypoints.
+ */
+export function computeBoundsFromPoints(
+    points: LatLon[],
+    marginDeg: number = 1.0,
+): LatLonBounds {
+    const lats = points.map(p => p.lat);
+    const lons = points.map(p => p.lon);
+    return {
+        south: Math.min(...lats) - marginDeg,
+        north: Math.max(...lats) + marginDeg,
+        west: Math.min(...lons) - marginDeg,
+        east: Math.max(...lons) + marginDeg,
     };
 }

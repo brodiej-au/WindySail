@@ -5,9 +5,22 @@
             <p class="size-m instruction">Click the map to set your <strong>start point</strong>.</p>
         {:else if waypointState === 'WAITING_END'}
             <p class="size-m instruction">Click the map to set your <strong>end point</strong>.</p>
-        {:else if waypointState === 'READY'}
+        {:else if waypointState === 'READY' || waypointState === 'ADDING_WAYPOINTS'}
             <p class="size-xs coords">Start: {formatLatLon(start)}</p>
+            {#each waypoints as wp, i}
+                <div class="waypoint-row size-xs">
+                    <span class="wp-dot">{i + 1}</span>
+                    <span class="coords">{formatLatLon(wp)}</span>
+                    <button class="wp-remove" on:click={() => onRemoveWaypoint(i)}>&#215;</button>
+                </div>
+            {/each}
             <p class="size-xs coords">End: {formatLatLon(end)}</p>
+            {#if waypointState === 'ADDING_WAYPOINTS'}
+                <p class="size-xs instruction">Click the map to add a waypoint.</p>
+                <button class="button size-xs" on:click={onStopAddingWaypoints}>Done</button>
+            {:else}
+                <button class="button size-xs" on:click={onAddWaypoint}>+ Add Waypoint</button>
+            {/if}
         {/if}
     </div>
 
@@ -179,6 +192,7 @@
     export let waypointState: WaypointState = 'WAITING_START';
     export let start: LatLon | null = null;
     export let end: LatLon | null = null;
+    export let waypoints: LatLon[] = [];
     export let isRouting: boolean = false;
     export let progressPercent: number = 0;
     export let progressStatus: string = '';
@@ -194,6 +208,9 @@
     export let onClear: () => void = () => {};
     export let onTimeChange: (time: number) => void = () => {};
     export let onModelSwitch: (model: WindModelId) => void = () => {};
+    export let onAddWaypoint: () => void = () => {};
+    export let onStopAddingWaypoints: () => void = () => {};
+    export let onRemoveWaypoint: (index: number) => void = () => {};
 
     // Default departure to now, formatted for datetime-local input
     let departureStr = formatDateForInput(new Date());
@@ -370,5 +387,40 @@
         opacity: 0.4;
         line-height: 1.4;
         font-style: italic;
+    }
+
+    .waypoint-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        line-height: 1.6;
+        opacity: 0.7;
+    }
+
+    .wp-dot {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background: #3498db;
+        color: #fff;
+        font-size: 10px;
+        flex-shrink: 0;
+    }
+
+    .wp-remove {
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        cursor: pointer;
+        font-size: 14px;
+        padding: 0 4px;
+        line-height: 1;
+    }
+
+    .wp-remove:hover {
+        color: #e74c3c;
     }
 </style>

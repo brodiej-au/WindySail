@@ -110,7 +110,12 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {#each legPoints as pt}
+                        {#each legPoints as pt, i}
+                            {#if i > 0 && pt.legIndex != null && legPoints[i - 1].legIndex != null && pt.legIndex !== legPoints[i - 1].legIndex}
+                                <tr class="leg-divider-row">
+                                    <td colspan={columnCount}>Leg {(pt.legIndex ?? 0) + 1}</td>
+                                </tr>
+                            {/if}
                             <tr class:motoring-row={pt.isMotoring}>
                                 <td>{formatTime(pt.time)}</td>
                                 <td>{pt.tws.toFixed(1)}</td>
@@ -177,6 +182,7 @@
     $: selectedPath = results[selectedIndex]?.route.path ?? [];
     $: hasSwell = selectedPath.some(p => p.swell != null);
     $: hasCurrents = selectedPath.some(p => p.current != null);
+    $: columnCount = 5 + (hasSwell ? 1 : 0) + (hasCurrents ? 1 : 0);
 
     // Sample every Nth point for leg table (max ~20 rows)
     $: legPoints = samplePoints(selectedPath, 20);
@@ -707,6 +713,13 @@
 
         tr.motoring-row td {
             color: #e9c46a;
+        }
+
+        tr.leg-divider-row td {
+            padding: 6px 0 3px 0;
+            opacity: 0.5;
+            font-style: italic;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
     }
 </style>

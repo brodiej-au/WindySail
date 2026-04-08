@@ -27,6 +27,7 @@ export interface RoutePoint {
     isMotoring?: boolean; // true if motoring instead of sailing
     swell?: SwellPoint;
     current?: CurrentPoint;
+    legIndex?: number;
 }
 
 export interface RouteResult {
