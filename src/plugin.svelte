@@ -20,6 +20,7 @@
         polarName={settingsStore.get('selectedPolarName')}
         {error}
         {warning}
+        {pipelineSteps}
         onCalculate={handleCalculate}
         onCancel={handleCancel}
         onClear={handleClear}
@@ -45,7 +46,7 @@
     import { interpolateAtTime } from './routing/RouteInterpolator';
     import { distance } from './routing/geo';
 
-    import type { LatLon, ModelRouteResult, WindModelId } from './routing/types';
+    import type { LatLon, ModelRouteResult, WindModelId, PipelineStep } from './routing/types';
     import type { WaypointState } from './map/WaypointManager';
 
     const { title, name } = config;
@@ -60,6 +61,7 @@
     let failedModels: { model: WindModelId; reason: string }[] = [];
     let error: string | null = null;
     let warning: string | null = null;
+    let pipelineSteps: PipelineStep[] = [];
     let warningTimeout: ReturnType<typeof setTimeout> | null = null;
 
     let routingPanel: RoutingPanel;
@@ -124,9 +126,10 @@
                 polar,
                 settings.selectedModels,
                 options,
-                (status, percent) => {
+                (status, percent, steps) => {
                     progressStatus = status;
                     progressPercent = percent;
+                    if (steps) pipelineSteps = steps;
                 },
             );
 

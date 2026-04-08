@@ -1,13 +1,13 @@
-import type { LatLon, PolarData, RouteResult, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData } from '../routing/types';
+import type { LatLon, PolarData, RouteResult, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData, PipelineStep } from '../routing/types';
 import { fetchWindGrid, computeBounds } from './WindProvider';
 import { fetchSwellGrid, fetchCurrentGrid } from './OceanDataProvider';
 import { clearCache as clearLandCache } from './LandChecker';
 import { clear as clearWindCache } from './WindCache';
 import { WorkerBridge } from './WorkerBridge';
-import { MODEL_COLORS } from '../map/modelColors';
+import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
 import { enrichRoutePoints } from '../routing/RouteEnricher';
 
-export type StatusCallback = (status: string, percent: number) => void;
+export type StatusCallback = (status: string, percent: number, steps?: PipelineStep[]) => void;
 
 export class RoutingOrchestrator {
     private bridges: WorkerBridge[] = [];
@@ -47,6 +47,18 @@ export class RoutingOrchestrator {
 
         const bounds = computeBounds(start, end, 1.0);
 
+        // Build structured pipeline steps
+        const steps: PipelineStep[] = [
+            ...models.map(m => ({ id: `wind-${m}`, label: `Wind: ${MODEL_LABELS[m]}`, status: 'pending' as const })),
+            { id: 'swell', label: 'Swell data', status: 'pending' },
+            { id: 'currents', label: 'Current data', status: 'pending' },
+            { id: 'routing', label: 'Computing routes', status: 'pending' },
+        ];
+
+        const emitStatus = (status: string, percent: number) => {
+            onStatus?.(status, percent, [...steps.map(s => ({ ...s }))]);
+        };
+
         console.log('[RoutingOrchestrator] Starting routing pipeline', {
             models,
             bounds,
@@ -64,9 +76,12 @@ export class RoutingOrchestrator {
 
         for (let i = 0; i < models.length; i++) {
             const model = models[i];
+            const stepId = `wind-${model}`;
+            const step = steps.find(s => s.id === stepId)!;
+            step.status = 'active';
             const baseProgress = Math.round((i / models.length) * 40);
 
-            onStatus?.(`Sampling wind data (${model})...`, baseProgress);
+            emitStatus(`Sampling wind data (${MODEL_LABELS[model]})...`, baseProgress);
 
             try {
                 const grid = await fetchWindGrid(
@@ -75,15 +90,16 @@ export class RoutingOrchestrator {
                     options.startTime,
                     options.maxDuration,
                     (msg, pct) => {
-                        // Scale each model's internal progress into its slice of 0-40%
                         const sliceSize = 40 / models.length;
                         const scaled = Math.round(baseProgress + pct * (sliceSize / 100));
-                        onStatus?.(msg, scaled);
+                        step.detail = msg;
+                        emitStatus(msg, scaled);
                     },
                     lastGrid,
                 );
                 windGrids.set(model, grid);
                 lastGrid = grid;
+                step.status = 'done';
 
                 // Count non-zero values for diagnostics
                 let nonZeroCount = 0;
@@ -111,6 +127,8 @@ export class RoutingOrchestrator {
                     );
                 }
             } catch (err) {
+                step.status = 'failed';
+                step.detail = 'Sampling failed';
                 console.warn(`[RoutingOrchestrator] Wind sampling failed for model "${model}":`, err);
             }
         }
@@ -142,9 +160,55 @@ export class RoutingOrchestrator {
             }
         }
 
-        // --- Routing phase (40–85%) ---
-        // Run routing BEFORE ocean data sampling to avoid overlay/product
-        // switching (waves, currents) corrupting Windy's tile cache.
+        // --- Ocean data phase (40–55%) ---
+        let swellGrid: SwellGridData | undefined;
+        let currentGrid: CurrentGridData | null | undefined;
+
+        const swellStep = steps.find(s => s.id === 'swell')!;
+        swellStep.status = 'active';
+        emitStatus('Sampling swell data...', 40);
+        try {
+            swellGrid = await fetchSwellGrid(
+                bounds,
+                options.startTime,
+                options.maxDuration,
+                (msg, pct) => {
+                    const scaled = Math.round(40 + pct * 0.08);
+                    swellStep.detail = msg;
+                    emitStatus(msg, scaled);
+                },
+            );
+            swellStep.status = 'done';
+        } catch (err) {
+            swellStep.status = 'failed';
+            swellStep.detail = 'Sampling failed';
+            console.warn('[RoutingOrchestrator] Swell sampling failed, continuing without swell data:', err);
+        }
+
+        const currentStep = steps.find(s => s.id === 'currents')!;
+        currentStep.status = 'active';
+        emitStatus('Sampling current data...', 48);
+        try {
+            currentGrid = await fetchCurrentGrid(
+                bounds,
+                options.startTime,
+                options.maxDuration,
+                (msg, pct) => {
+                    const scaled = Math.round(48 + pct * 0.07);
+                    currentStep.detail = msg;
+                    emitStatus(msg, scaled);
+                },
+            );
+            currentStep.status = 'done';
+        } catch (err) {
+            currentStep.status = 'failed';
+            currentStep.detail = 'Sampling failed';
+            console.warn('[RoutingOrchestrator] Current sampling failed, continuing without current data:', err);
+        }
+
+        // --- Routing phase (55–100%) ---
+        const routingStep = steps.find(s => s.id === 'routing')!;
+        routingStep.status = 'active';
         let maxRoutingProgress = 0;
 
         // Create one bridge per model that successfully returned a wind grid.
@@ -157,11 +221,11 @@ export class RoutingOrchestrator {
 
             return bridge
                 .computeRoute(grid, polar, start, end, options, (percent) => {
-                    // Scale worker progress (0-100) into the 40-85% window
-                    const scaled = Math.round(40 + percent * 0.45);
+                    const scaled = Math.round(55 + percent * 0.45);
                     if (scaled > maxRoutingProgress) {
                         maxRoutingProgress = scaled;
-                        onStatus?.(`Computing routes... ${maxRoutingProgress}%`, maxRoutingProgress);
+                        routingStep.detail = `${percent}%`;
+                        emitStatus(`Computing routes... ${percent}%`, maxRoutingProgress);
                     }
                 })
                 .then((route): ModelRouteResult => ({
@@ -190,45 +254,13 @@ export class RoutingOrchestrator {
         }
 
         if (results.length === 0) {
+            routingStep.status = 'failed';
+            routingStep.detail = 'All models failed';
+            emitStatus('All models failed', 100);
             throw new Error('All models failed to produce a route.');
         }
 
-        // --- Ocean data phase (85–98%) ---
-        // Swell and currents are sampled AFTER routing completes to avoid
-        // overlay/product switching (waves/ecmwfWaves, currents/cmems) corrupting
-        // Windy's SwitchableTileCache and causing all-zero wind grids.
-        let swellGrid: SwellGridData | undefined;
-        let currentGrid: CurrentGridData | null | undefined;
-
-        onStatus?.('Sampling swell data...', 85);
-        try {
-            swellGrid = await fetchSwellGrid(
-                bounds,
-                options.startTime,
-                options.maxDuration,
-                (msg, pct) => {
-                    const scaled = Math.round(85 + pct * 0.06);
-                    onStatus?.(msg, scaled);
-                },
-            );
-        } catch (err) {
-            console.warn('[RoutingOrchestrator] Swell sampling failed, continuing without swell data:', err);
-        }
-
-        onStatus?.('Sampling current data...', 91);
-        try {
-            currentGrid = await fetchCurrentGrid(
-                bounds,
-                options.startTime,
-                options.maxDuration,
-                (msg, pct) => {
-                    const scaled = Math.round(91 + pct * 0.07);
-                    onStatus?.(msg, scaled);
-                },
-            );
-        } catch (err) {
-            console.warn('[RoutingOrchestrator] Current sampling failed, continuing without current data:', err);
-        }
+        routingStep.status = 'done';
 
         // Attach ocean data to results and enrich route points for charting
         for (const result of results) {
@@ -237,7 +269,7 @@ export class RoutingOrchestrator {
             enrichRoutePoints(result.route.path, swellGrid, currentGrid ?? undefined);
         }
 
-        onStatus?.('Route complete!', 100);
+        emitStatus('Route complete!', 100);
         return results;
     }
 

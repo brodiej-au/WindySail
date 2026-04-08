@@ -50,7 +50,11 @@
 
     <!-- Progress -->
     {#if isRouting}
-        <ProgressBar percent={progressPercent} statusText={progressStatus} />
+        {#if pipelineSteps.length > 0}
+            <TaskChecklist steps={pipelineSteps} percent={progressPercent} />
+        {:else}
+            <ProgressBar percent={progressPercent} statusText={progressStatus} />
+        {/if}
     {/if}
 
     <!-- Error -->
@@ -163,11 +167,12 @@
 
 <script lang="ts">
     import ProgressBar from './ProgressBar.svelte';
+    import TaskChecklist from './TaskChecklist.svelte';
     import SettingsPanel from './SettingsPanel.svelte';
     import PlayerControls from './PlayerControls.svelte';
     import RouteDetailModal from './RouteDetailModal.svelte';
 
-    import type { LatLon, ModelRouteResult, WindModelId } from '../routing/types';
+    import type { LatLon, ModelRouteResult, WindModelId, PipelineStep } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
     import { MODEL_LABELS } from '../map/modelColors';
 
@@ -182,6 +187,7 @@
     export let polarName: string = 'Bavaria 38';
     export let error: string | null = null;
     export let warning: string | null = null;
+    export let pipelineSteps: PipelineStep[] = [];
 
     export let onCalculate: () => void = () => {};
     export let onCancel: () => void = () => {};

@@ -115,6 +115,14 @@ export interface IsochronePoint {
     isMotoring?: boolean;
 }
 
+export type StepStatus = 'pending' | 'active' | 'done' | 'failed' | 'skipped';
+export interface PipelineStep {
+    id: string;
+    label: string;
+    status: StepStatus;
+    detail?: string;
+}
+
 export type WindModelId = 'gfs' | 'ecmwf' | 'icon' | 'bomAccess';
 
 export interface ModelRouteResult {
