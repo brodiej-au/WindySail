@@ -779,22 +779,39 @@
     .boat-section {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 6px;
         background: rgba(255, 255, 255, 0.05);
         border-radius: 6px;
-        padding: 10px;
+        padding: 8px 10px;
     }
 
-    .boat-preview {
+    .boat-row {
         display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .boat-thumb {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        overflow: hidden;
+        flex-shrink: 0;
+        cursor: pointer;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        display: flex;
+        align-items: center;
         justify-content: center;
-        padding: 2px 0;
+        transition: border-color 0.15s ease;
+
+        &:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+        }
     }
 
     .boat-buttons {
         display: flex;
-        gap: 6px;
-        justify-content: center;
+        gap: 5px;
     }
 
     .btn {
@@ -802,7 +819,7 @@
         border: 1px solid rgba(255, 255, 255, 0.15);
         border-radius: 4px;
         color: inherit;
-        padding: 5px 14px;
+        padding: 3px 10px;
         cursor: pointer;
         opacity: 0.85;
         transition: all 0.15s ease;
