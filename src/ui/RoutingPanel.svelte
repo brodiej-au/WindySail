@@ -139,19 +139,47 @@
         {/if}
     {/if}
 
-    <!-- Departure time -->
-    <div class="section mb-15 mt-10 departure-row">
-        <div class="departure-input">
-            <label class="size-xs label" for="departure">Departure:</label>
-            <input
-                id="departure"
-                type="datetime-local"
-                bind:value={departureStr}
-                class="input size-s"
-            />
-        </div>
-        <button class="gear-btn" on:click={() => settingsModal.open()} title="Settings">&#9881;</button>
+    <!-- Mode toggle -->
+    <div class="section mb-10 mt-10 mode-toggle">
+        <button
+            class="pill size-xs"
+            class:pill--active={mode === 'single'}
+            on:click={() => mode = 'single'}
+        >
+            Single Route
+        </button>
+        <button
+            class="pill size-xs"
+            class:pill--active={mode === 'departure'}
+            on:click={() => mode = 'departure'}
+        >
+            Departure Planner
+        </button>
     </div>
+
+    <!-- Departure time / window -->
+    {#if mode === 'single'}
+        <div class="section mb-15 departure-row">
+            <div class="departure-input">
+                <label class="size-xs label" for="departure">Departure:</label>
+                <input
+                    id="departure"
+                    type="datetime-local"
+                    bind:value={departureStr}
+                    class="input size-s"
+                />
+            </div>
+            <button class="gear-btn" on:click={() => settingsModal.open()} title="Settings">&#9881;</button>
+        </div>
+    {:else}
+        <div class="section mb-15">
+            <DepartureWindowInput
+                modelCount={settingsStore.get('selectedModels').length}
+                bind:this={departureWindowInput}
+            />
+            <button class="gear-btn gear-btn--float" on:click={() => settingsModal.open()} title="Settings">&#9881;</button>
+        </div>
+    {/if}
 
     <!-- Calculate button -->
     <div class="section mb-15">
@@ -161,7 +189,13 @@
             disabled={!canCalculate}
             on:click={handleCalculate}
         >
-            {isRouting ? 'Cancel' : 'Calculate Route'}
+            {#if isRouting || isDepartureScanning}
+                Cancel
+            {:else if mode === 'departure'}
+                Scan Departures
+            {:else}
+                Calculate Route
+            {/if}
         </button>
     </div>
 
@@ -270,6 +304,21 @@
         </div>
     {/if}
 
+    <!-- Departure planner results -->
+    {#if mode === 'departure' && (departureResults.length > 0 || isDepartureScanning)}
+        <DeparturePlannerResults
+            results={departureResults}
+            isScanning={isDepartureScanning}
+            onRouteHover={onDepartureRouteHover}
+            onRouteSelect={onDepartureRouteSelect}
+        />
+        {#if departureResults.length > 0 && !isDepartureScanning}
+            <button class="button size-s mt-15" style="width:100%" on:click={handleClear}>
+                Clear Results
+            </button>
+        {/if}
+    {/if}
+
     <!-- Data advisories -->
     {#if advisories.length > 0}
         <div class="section mb-10 advisories">
@@ -313,10 +362,12 @@
     import PolarViewEditModal from './PolarViewEditModal.svelte';
     import PlayerControls from './PlayerControls.svelte';
     import RouteDetailModal from './RouteDetailModal.svelte';
+    import DepartureWindowInput from './DepartureWindowInput.svelte';
+    import DeparturePlannerResults from './DeparturePlannerResults.svelte';
     import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
     import { settingsStore } from '../stores/SettingsStore';
 
-    import type { LatLon, ModelRouteResult, WindModelId, PipelineStep, SavedRoute, PolarData, UserSettings } from '../routing/types';
+    import type { LatLon, ModelRouteResult, WindModelId, PipelineStep, SavedRoute, PolarData, UserSettings, DepartureResult } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
     import { MODEL_LABELS } from '../map/modelColors';
 
@@ -350,6 +401,15 @@
     export let onEditStart: (latLon: { lat: number; lon: number }) => Promise<boolean> = async () => false;
     export let onEditEnd: (latLon: { lat: number; lon: number }) => Promise<boolean> = async () => false;
     export let onEditWaypoint: (index: number, latLon: { lat: number; lon: number }) => Promise<boolean> = async () => false;
+
+    export let mode: 'single' | 'departure' = 'single';
+    export let departureResults: DepartureResult[] = [];
+    export let isDepartureScanning: boolean = false;
+    export let onDepartureScan: () => void = () => {};
+    export let onDepartureRouteHover: (result: ModelRouteResult | null) => void = () => {};
+    export let onDepartureRouteSelect: (result: ModelRouteResult | null) => void = () => {};
+
+    let departureWindowInput: DepartureWindowInput;
 
     let settingsModal: SettingsModal;
     let polarModal: PolarViewEditModal;
@@ -423,14 +483,20 @@
         return new Date(departureStr).getTime();
     }
 
-    $: canCalculate = waypointState === 'READY' && !isRouting;
+    export function getDepartureWindowConfig() {
+        return departureWindowInput?.getWindowConfig();
+    }
+
+    $: canCalculate = waypointState === 'READY' && !isRouting && !isDepartureScanning;
 
     $: fastestDuration =
         results.length > 1 ? Math.min(...results.map((r) => r.route.durationHours)) : Infinity;
 
     function handleCalculate(): void {
-        if (isRouting) {
+        if (isRouting || isDepartureScanning) {
             onCancel();
+        } else if (mode === 'departure') {
+            onDepartureScan();
         } else {
             onCalculate();
         }
@@ -587,6 +653,20 @@
         color: inherit;
         padding: 6px 8px;
         font-size: 14px;
+    }
+
+    select.input {
+        cursor: pointer;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.5)'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        padding-right: 24px;
+
+        option {
+            background: #1a1a2e;
+            color: #e0e0e0;
+        }
     }
     .error-text {
         color: #e74c3c;
@@ -860,6 +940,50 @@
         padding: 4px;
         line-height: 1;
         margin-bottom: 2px;
+
+        &:hover {
+            color: rgba(255, 255, 255, 0.9);
+        }
+    }
+
+    /* Mode toggle */
+    .mode-toggle {
+        display: flex;
+        gap: 4px;
+    }
+
+    .pill {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 3px;
+        color: inherit;
+        padding: 4px 10px;
+        cursor: pointer;
+        opacity: 0.7;
+        transition: all 0.15s;
+
+        &:hover {
+            opacity: 1;
+        }
+
+        &.pill--active {
+            background: rgba(78, 205, 196, 0.2);
+            border-color: #4ecdc4;
+            opacity: 1;
+        }
+    }
+
+    .gear-btn--float {
+        position: absolute;
+        right: 0;
+        top: 0;
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px;
+        line-height: 1;
 
         &:hover {
             color: rgba(255, 255, 255, 0.9);
