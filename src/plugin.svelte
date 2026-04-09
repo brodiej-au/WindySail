@@ -286,13 +286,13 @@
         previewDistanceNm = 0;
         error = null;
         departureResults = [];
-        isDepartureScanning = true;
         progressPercent = 0;
         progressStatus = 'Starting departure scan...';
 
         try {
             const windowConfig = routingPanel.getDepartureWindowConfig();
             if (!windowConfig) return;
+            isDepartureScanning = true;
 
             const settings = settingsStore.getAll();
             const polar = getPolarByName(settings.selectedPolarName);

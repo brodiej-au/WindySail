@@ -6,7 +6,6 @@ import type {
     ModelRouteResult,
     DepartureWindowConfig,
     DepartureResult,
-    PipelineStep,
 } from '../routing/types';
 import { RoutingOrchestrator } from './RoutingOrchestrator';
 
@@ -28,6 +27,7 @@ export class DeparturePlanner {
     }
 
     static generateDepartureTimes(config: DepartureWindowConfig): number[] {
+        if (config.intervalHours <= 0 || config.windowEnd < config.windowStart) return [];
         const times: number[] = [];
         const intervalMs = config.intervalHours * 3600_000;
         let t = config.windowStart;
