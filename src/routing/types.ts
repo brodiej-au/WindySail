@@ -50,6 +50,8 @@ export interface RoutingOptions {
     motorThreshold?: number; // knots — motor if sail speed below this
     motorSpeed?: number; // knots — speed when motoring
     comfortWeight?: number; // 0-1, modulates swell speed penalty
+    landMarginNm?: number; // hard minimum distance from land
+    preferredLandMarginNm?: number; // soft preferred distance from land
 }
 
 export const DEFAULT_OPTIONS: RoutingOptions = {
@@ -74,6 +76,8 @@ export interface WindGridData {
     timestamps: number[]; // Unix timestamp ms
     windU: number[][][]; // windU[latIdx][lonIdx][timeIdx] in m/s
     windV: number[][][]; // windV[latIdx][lonIdx][timeIdx] in m/s
+    modelRunTime?: number;  // Unix ms — when the forecast model was run
+    dataUpdateTime?: number; // Unix ms — when data became available
 }
 
 export interface SwellGridData {
@@ -83,6 +87,9 @@ export interface SwellGridData {
     swellHeight: number[][][]; // [latIdx][lonIdx][timeIdx] in meters
     swellDir: number[][][];    // [latIdx][lonIdx][timeIdx] in degrees
     swellPeriod: number[][][]; // [latIdx][lonIdx][timeIdx] in seconds
+    modelRunTime?: number;  // Unix ms — when the forecast model was run
+    dataUpdateTime?: number; // Unix ms — when data became available
+    coverageEndTime?: number; // Unix ms — last timestamp with non-zero data
 }
 
 export interface CurrentGridData {
@@ -91,6 +98,9 @@ export interface CurrentGridData {
     timestamps: number[];
     currentU: number[][][]; // [latIdx][lonIdx][timeIdx] in m/s
     currentV: number[][][]; // [latIdx][lonIdx][timeIdx] in m/s
+    modelRunTime?: number;  // Unix ms — when the forecast model was run
+    dataUpdateTime?: number; // Unix ms — when data became available
+    coverageEndTime?: number; // Unix ms — last timestamp with non-zero data
 }
 
 export interface SwellPoint {
@@ -115,6 +125,7 @@ export interface IsochronePoint {
     heading: number;
     time: number;
     isMotoring?: boolean;
+    nearLand?: boolean; // within preferred land margin
     sog?: number; // speed over ground (after current), knots
 }
 
@@ -135,6 +146,44 @@ export interface ModelRouteResult {
     windGrid: WindGridData;
     swellGrid?: SwellGridData;
     currentGrid?: CurrentGridData;
+    modelRunTime?: number;  // Unix ms — when the forecast model was run
+    dataUpdateTime?: number; // Unix ms — when data became available
+    dataAdvisories?: string[];
+}
+
+export interface SavedRoute {
+    id: string;
+    name: string;
+    createdAt: number;   // Unix ms
+    start: LatLon;
+    end: LatLon;
+    waypoints: LatLon[];
+    departureTime: number; // Unix ms
+    polarName: string;
+    selectedModels: WindModelId[];
+    routingOptions: {
+        timeStep: number;
+        maxDuration: number;
+        headingStep: number;
+        numSectors: number;
+        arrivalRadius: number;
+        motorEnabled: boolean;
+        motorThreshold: number;
+        motorSpeed: number;
+        comfortWeight: number;
+    };
+}
+
+export interface DepartureWindowConfig {
+    windowStart: number;    // Unix ms
+    windowEnd: number;      // Unix ms
+    intervalHours: number;  // 3, 6, 12, or 24
+}
+
+export interface DepartureResult {
+    departureTime: number;          // Unix ms
+    modelResults: ModelRouteResult[]; // one per successful model
+    failedModels?: WindModelId[];
 }
 
 export interface UserSettings {
@@ -143,12 +192,14 @@ export interface UserSettings {
     headingStep: number; // degrees
     numSectors: number; // pruning sectors
     arrivalRadius: number; // nautical miles
-    landMarginNm: number; // nautical miles
+    landMarginNm: number; // nautical miles — hard minimum, never go closer
+    preferredLandMarginNm: number; // nautical miles — soft preference, penalize routes closer than this
     estimatedVmgKt: number; // knots, used to auto-estimate forecast duration
     motorEnabled: boolean; // allow motoring when boat speed is below threshold
     motorThreshold: number; // knots — motor if sail speed is below this
     motorSpeed: number; // knots — speed when motoring
     comfortWeight: number; // 0-1, modulates swell speed penalty
+    showIsochrones: boolean; // show isochrone expansion on map during routing
     selectedModels: WindModelId[];
     selectedPolarName: string;
 }
@@ -160,11 +211,13 @@ export const DEFAULT_SETTINGS: UserSettings = {
     numSectors: 72,
     arrivalRadius: 1.0,
     landMarginNm: 1,
+    preferredLandMarginNm: 5,
     estimatedVmgKt: 3,
     motorEnabled: false,
     motorThreshold: 2,
     motorSpeed: 4,
     comfortWeight: 0.3,
+    showIsochrones: false,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',
 }
