@@ -119,6 +119,11 @@
         isEditing = true;
         showModal = true;
     }
+
+    export function openInViewMode(): void {
+        showModal = true;
+        isEditing = false;
+    }
 </script>
 
 <style lang="less">
