@@ -35,13 +35,42 @@ function postMsg(msg: WorkerToMainMessage): void {
     (self as unknown as Worker).postMessage(msg);
 }
 
+// Number of ring sample points for margin detection (N/NE/E/SE/S/SW/W/NW)
+const MARGIN_RING_SIZE = 8;
+
+/**
+ * Generate ring points at a given radius around a point.
+ * Returns MARGIN_RING_SIZE points evenly spaced in a circle.
+ */
+function generateRingPoints(lat: number, lon: number, radiusNm: number): [number, number][] {
+    const points: [number, number][] = [];
+    const degPerNm = 1 / 60; // ~1 arcminute per nm
+    const cosLat = Math.cos(lat * Math.PI / 180);
+    for (let i = 0; i < MARGIN_RING_SIZE; i++) {
+        const angle = (i / MARGIN_RING_SIZE) * 2 * Math.PI;
+        const dLat = Math.cos(angle) * radiusNm * degPerNm;
+        const dLon = Math.sin(angle) * radiusNm * degPerNm / cosLat;
+        points.push([lat + dLat, lon + dLon]);
+    }
+    return points;
+}
+
 async function requestLandCheck(
     points: [number, number][],
     segments: [number, number, number, number][],
-): Promise<{ pointResults: boolean[]; segmentResults: boolean[] }> {
+    marginPoints?: [number, number][],
+): Promise<{ pointResults: boolean[]; segmentResults: boolean[]; marginResults?: boolean[] }> {
     return new Promise(resolve => {
         landCheckResolve = resolve;
-        postMsg({ type: 'CHECK_LAND', payload: { points, segments } });
+        postMsg({
+            type: 'CHECK_LAND',
+            payload: {
+                points,
+                segments,
+                marginPoints,
+                marginGroupSize: marginPoints ? MARGIN_RING_SIZE : undefined,
+            },
+        });
     });
 }
 
@@ -117,6 +146,7 @@ async function runRouting(payload: {
 
     const isochrones: IsochronePoint[][] = [[startPoint]];
     let frontier: IsochronePoint[] = [startPoint];
+    let lastIsoEmit = 0;
 
     for (let step = 0; step < maxSteps; step++) {
         // Expand frontier (with ocean data for current/swell-aware routing)
@@ -143,13 +173,36 @@ async function runRouting(payload: {
             return [parent.lat, parent.lon, c.lat, c.lon];
         });
 
-        // Request land validation from main thread
-        const landResults = await requestLandCheck(points, segments);
+        // Generate ring points for preferred margin detection
+        const prefMargin = options.preferredLandMarginNm ?? 5;
+        let marginPoints: [number, number][] | undefined;
+        if (prefMargin > 0) {
+            marginPoints = [];
+            for (const c of movingCandidates) {
+                marginPoints.push(...generateRingPoints(c.lat, c.lon, prefMargin));
+            }
+        }
 
-        // Filter to valid (sea) candidates
+        // Request land validation from main thread
+        const landResults = await requestLandCheck(points, segments, marginPoints);
+
+        // Filter to valid (sea) candidates and tag near-land
         const validCandidates = movingCandidates.filter(
             (_, i) => landResults.pointResults[i] && landResults.segmentResults[i],
         );
+
+        // Map original indices to tag near-land on valid candidates
+        if (landResults.marginResults) {
+            let validIdx = 0;
+            for (let i = 0; i < movingCandidates.length; i++) {
+                if (landResults.pointResults[i] && landResults.segmentResults[i]) {
+                    if (landResults.marginResults[i]) {
+                        validCandidates[validIdx].nearLand = true;
+                    }
+                    validIdx++;
+                }
+            }
+        }
 
         if (validCandidates.length === 0) {
             postMsg({
@@ -184,6 +237,16 @@ async function runRouting(payload: {
         // Prune to sectors
         frontier = pruneToSectors(validCandidates, start, end, numSectors);
         isochrones.push(frontier);
+
+        // Emit isochrone update throttled to ~1Hz
+        const now = Date.now();
+        if (now - lastIsoEmit >= 1000) {
+            postMsg({
+                type: 'ISOCHRONE_UPDATE',
+                payload: { step: step + 1, points: frontier.map(p => [p.lat, p.lon]) },
+            });
+            lastIsoEmit = now;
+        }
 
         // Log progress every 10 steps, or every step when within 10nm
         const postPruneClosest = Math.min(...frontier.map(p => distance(p, end)));
@@ -254,7 +317,7 @@ function enrichRoutePoints(
     for (const point of path) {
         const { lat, lon, time } = point;
 
-        if (swellGrid) {
+        if (swellGrid && (!swellGrid.coverageEndTime || time <= swellGrid.coverageEndTime)) {
             const { lats, lons, timestamps, swellHeight, swellDir, swellPeriod } = swellGrid;
             point.swell = {
                 height: trilinearInterpolate(swellHeight, lats, lons, timestamps, lat, lon, time),
@@ -263,7 +326,7 @@ function enrichRoutePoints(
             };
         }
 
-        if (currentGrid) {
+        if (currentGrid && (!currentGrid.coverageEndTime || time <= currentGrid.coverageEndTime)) {
             const { lats, lons, timestamps, currentU, currentV } = currentGrid;
             const u = trilinearInterpolate(currentU, lats, lons, timestamps, lat, lon, time);
             const v = trilinearInterpolate(currentV, lats, lons, timestamps, lat, lon, time);

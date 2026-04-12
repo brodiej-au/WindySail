@@ -13,11 +13,13 @@
             stroke-width="1"
         />
         <!-- Label at 0° position (top of arc) -->
+        {#if !mini}
         <text
             x={layout.cx + 4}
             y={layout.cy - (ring / maxSpeed) * layout.radius - 3}
             class="ring-label"
         >{ring}</text>
+        {/if}
     {/each}
 
     <!-- Angle reference lines -->
@@ -32,8 +34,10 @@
             stroke-width="1"
         />
         <!-- Angle label at outer edge -->
+        {#if !mini}
         {@const lbl = polarToSvg(deg, maxSpeed * 1.08, layout.cx, layout.cy, layout.radius, maxSpeed)}
         <text x={lbl.x} y={lbl.y} class="angle-label">{deg}°</text>
+        {/if}
     {/each}
 
     <!-- TWS curves -->
@@ -54,6 +58,7 @@
     {/each}
 </svg>
 
+{#if !mini}
 <!-- Legend -->
 <div class="legend">
     {#each polar.twsSpeeds as tws, ci}
@@ -64,6 +69,7 @@
         </span>
     {/each}
 </div>
+{/if}
 
 <script lang="ts">
     import type { PolarData } from '../routing/types';
@@ -79,6 +85,7 @@
 
     export let polar: PolarData;
     export let width: number = 460;
+    export let mini: boolean = false;
 
     const angleLines = [0, 30, 60, 90, 120, 150, 180];
 
@@ -114,6 +121,8 @@
         justify-content: center;
         gap: 10px 14px;
         padding: 8px 0 0;
+        color: rgba(255, 255, 255, 0.85);
+        background: transparent;
     }
 
     .legend-item {

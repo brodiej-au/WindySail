@@ -1,55 +1,74 @@
 <div class="routing-panel">
     <!-- Waypoint instructions -->
-    <div class="section mb-15">
+    <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
         {#if waypointState === 'WAITING_START'}
             <p class="size-m instruction">Click the map to set your <strong>start point</strong>.</p>
+            <button class="button size-xs location-btn" on:click={handleUseMyLocationAsStart}>Use my location</button>
         {:else if waypointState === 'WAITING_END'}
             <p class="size-m instruction">Click the map to set your <strong>end point</strong>.</p>
         {:else if waypointState === 'READY' || waypointState === 'ADDING_WAYPOINTS'}
-            {#if editingPoint === 'start'}
-                <div class="coord-edit-row size-xs">
-                    <span>Start:</span>
-                    <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                    <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                    <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
-                    <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
-                </div>
-            {:else}
-                <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('start')}>Start: {formatLatLon(start)}</p>
-            {/if}
-            {#each waypoints as wp, i}
-                {#if editingPoint === i}
-                    <div class="coord-edit-row size-xs">
+            {#if results.length > 0}
+                <!-- Read-only coords when a route is calculated -->
+                <p class="size-xs coords">{startName ? `Start: ${startName}` : `Start: ${formatLatLon(start)}`}</p>
+                {#if startName}<p class="size-xs coords coords--sub">{formatLatLon(start)}</p>{/if}
+                {#each waypoints as wp, i}
+                    <div class="waypoint-row size-xs">
                         <span class="wp-dot">{i + 1}</span>
+                        <span class="coords">{formatLatLon(wp)}</span>
+                    </div>
+                {/each}
+                <p class="size-xs coords">{endName ? `End: ${endName}` : `End: ${formatLatLon(end)}`}</p>
+                {#if endName}<p class="size-xs coords coords--sub">{formatLatLon(end)}</p>{/if}
+            {:else}
+                {#if editingPoint === 'start'}
+                    <div class="coord-edit-row size-xs">
+                        <span>Start:</span>
                         <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
                         <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
                         <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
                         <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
+                        <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title="Use my location">&#8982;</button>
                     </div>
                 {:else}
-                    <div class="waypoint-row size-xs">
-                        <span class="wp-dot">{i + 1}</span>
-                        <span class="coords clickable" on:click={() => !isRouting && startEditCoord(i)}>{formatLatLon(wp)}</span>
-                        <button class="wp-remove" on:click={() => onRemoveWaypoint(i)}>&#215;</button>
-                    </div>
+                    <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('start')}>{startName ? `Start: ${startName}` : `Start: ${formatLatLon(start)}`}</p>
+                    {#if startName}<p class="size-xs coords coords--sub">{formatLatLon(start)}</p>{/if}
                 {/if}
-            {/each}
-            {#if editingPoint === 'end'}
-                <div class="coord-edit-row size-xs">
-                    <span>End:</span>
-                    <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                    <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                    <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
-                    <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
-                </div>
-            {:else}
-                <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('end')}>End: {formatLatLon(end)}</p>
-            {/if}
-            {#if waypointState === 'ADDING_WAYPOINTS'}
-                <p class="size-xs instruction">Click the map to add a waypoint.</p>
-                <button class="button size-xs" on:click={onStopAddingWaypoints}>Done</button>
-            {:else}
-                <button class="button size-xs" on:click={onAddWaypoint}>+ Add Waypoint</button>
+                {#each waypoints as wp, i}
+                    {#if editingPoint === i}
+                        <div class="coord-edit-row size-xs">
+                            <span class="wp-dot">{i + 1}</span>
+                            <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                            <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                            <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
+                            <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
+                        </div>
+                    {:else}
+                        <div class="waypoint-row size-xs">
+                            <span class="wp-dot">{i + 1}</span>
+                            <span class="coords clickable" on:click={() => !isRouting && startEditCoord(i)}>{formatLatLon(wp)}</span>
+                            <button class="wp-remove" on:click={() => onRemoveWaypoint(i)}>&#215;</button>
+                        </div>
+                    {/if}
+                {/each}
+                {#if editingPoint === 'end'}
+                    <div class="coord-edit-row size-xs">
+                        <span>End:</span>
+                        <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
+                        <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
+                        <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title="Use my location">&#8982;</button>
+                    </div>
+                {:else}
+                    <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('end')}>{endName ? `End: ${endName}` : `End: ${formatLatLon(end)}`}</p>
+                    {#if endName}<p class="size-xs coords coords--sub">{formatLatLon(end)}</p>{/if}
+                {/if}
+                {#if waypointState === 'ADDING_WAYPOINTS'}
+                    <p class="size-xs instruction">Click the map to add a waypoint.</p>
+                    <button class="button size-xs" on:click={onStopAddingWaypoints}>Done</button>
+                {:else}
+                    <button class="button size-xs" on:click={onAddWaypoint}>+ Add Waypoint</button>
+                {/if}
             {/if}
         {/if}
     </div>
@@ -66,138 +85,167 @@
         <div class="section mb-10 warning-text size-s">{warning}</div>
     {/if}
 
-    <!-- Boat / Polar selection -->
-    <div class="section mb-10 boat-section">
-        <!-- Row 1: dropdown + polar thumbnail -->
-        <div class="boat-row">
-            <select class="input size-s" value={selectedPolarName} on:change={handlePolarChange}>
-                {#each allPolars as p}
-                    <option value={p.name}>{p.name}</option>
-                {/each}
-            </select>
-            {#if currentPolar}
-                <div class="boat-thumb" on:click={handleViewPolar} title="View polar diagram">
-                    <PolarDiagram polar={currentPolar} width={80} mini={true} />
-                </div>
-            {/if}
-        </div>
-        <!-- Row 2: action buttons -->
-        <div class="boat-buttons">
-            <button class="btn size-xs" on:click={handleEditPolar}>Edit</button>
-            <button class="btn size-xs" on:click={handleNewPolar}>New</button>
-            {#if isCustomPolar}
-                <button class="btn size-xs btn--danger" on:click={handleDeletePolar}>Delete</button>
-            {/if}
-        </div>
-    </div>
-    <div class="polar-modal-wrap">
-        {#if currentPolar}
-            <PolarViewEditModal
-                polar={currentPolar}
-                isCustom={isCustomPolar}
-                onSave={handlePolarSave}
-                bind:this={polarModal}
-            />
-        {/if}
-    </div>
-
-    <!-- Route management -->
-    {#if waypointState === 'READY' && !isRouting}
-        <div class="section mb-10 route-mgmt">
-            {#if showSaveInput}
-                <div class="save-row">
+    <!-- Pre-calculation UI (hidden when results exist) -->
+    {#if results.length === 0}
+        <!-- Boat / Polar selection -->
+        <div class="section mb-10 boat-section" class:section--disabled={isRouting || isDepartureScanning}>
+            <!-- Row 1: searchable dropdown + polar thumbnail -->
+            <div class="boat-row">
+                <div class="polar-search-wrap">
                     <input
-                        class="input size-xs save-name-input"
+                        class="input size-s polar-search-input"
                         type="text"
-                        placeholder="Route name"
-                        bind:value={saveRouteName}
-                        on:keydown={(e) => e.key === 'Enter' && confirmSaveRoute()}
+                        bind:value={polarSearchQuery}
+                        on:focus={openPolarDropdown}
+                        on:input={openPolarDropdown}
+                        on:keydown={handlePolarSearchKey}
+                        on:blur={closePolarDropdown}
+                        placeholder="Search boats..."
                     />
-                    <button class="button size-xs" on:click={confirmSaveRoute}>Save</button>
-                    <button class="button size-xs" on:click={cancelSaveRoute}>&#215;</button>
+                    {#if polarDropdownOpen}
+                        <div class="polar-dropdown">
+                            {#each filteredPolars as p}
+                                <button
+                                    class="polar-option"
+                                    class:polar-option--active={p.name === selectedPolarName}
+                                    on:mousedown|preventDefault={() => selectPolar(p.name)}
+                                >{p.name}</button>
+                            {/each}
+                            {#if filteredPolars.length === 0}
+                                <div class="polar-option polar-option--empty">No matches</div>
+                            {/if}
+                        </div>
+                    {/if}
                 </div>
-            {:else}
-                <button class="button size-xs" on:click={() => { showSaveInput = true; saveRouteName = suggestedRouteName; }}>Save Route</button>
+                {#if currentPolar}
+                    <div class="boat-thumb" on:click={handleViewPolar} title="View polar diagram">
+                        <PolarDiagram polar={currentPolar} width={80} mini={true} />
+                    </div>
+                {/if}
+            </div>
+            <!-- Row 2: action buttons -->
+            <div class="boat-buttons">
+                <button class="btn size-xs" on:click={handleEditPolar}>Edit</button>
+                <button class="btn size-xs" on:click={handleNewPolar}>New</button>
+                {#if isCustomPolar}
+                    <button class="btn size-xs btn--danger" on:click={handleDeletePolar}>Delete</button>
+                {/if}
+            </div>
+        </div>
+
+        <!-- Route management -->
+        {#if waypointState === 'READY' && !isRouting}
+            <div class="section mb-10 route-mgmt">
+                {#if showSaveInput}
+                    <div class="save-row">
+                        <input
+                            class="input size-xs save-name-input"
+                            type="text"
+                            placeholder="Route name"
+                            bind:value={saveRouteName}
+                            on:keydown={(e) => e.key === 'Enter' && confirmSaveRoute()}
+                        />
+                        <button class="button size-xs" on:click={confirmSaveRoute}>Save</button>
+                        <button class="button size-xs" on:click={cancelSaveRoute}>&#215;</button>
+                    </div>
+                {:else}
+                    <button class="button size-xs" on:click={() => { showSaveInput = true; saveRouteName = suggestedRouteName; }}>Save Route</button>
+                {/if}
+                {#if savedRoutes.length > 0}
+                    <button class="button size-xs" on:click={() => showRouteList = !showRouteList}>
+                        {showRouteList ? 'Hide' : 'Load'} ({savedRoutes.length})
+                    </button>
+                {/if}
+            </div>
+            {#if showRouteList && savedRoutes.length > 0}
+                <div class="section mb-10 route-list">
+                    {#each savedRoutes as sr (sr.id)}
+                        <div class="route-list-item size-xs">
+                            <button class="route-load-btn" on:click={() => { onLoadRoute(sr.id); showRouteList = false; }}>
+                                {sr.name}
+                            </button>
+                            <button class="wp-remove" on:click={() => onDeleteRoute(sr.id)}>&#215;</button>
+                        </div>
+                    {/each}
+                </div>
             {/if}
-            {#if savedRoutes.length > 0}
-                <button class="button size-xs" on:click={() => showRouteList = !showRouteList}>
-                    {showRouteList ? 'Hide' : 'Load'} ({savedRoutes.length})
+        {/if}
+
+        <!-- Mode toggle -->
+        <div class="section mb-10 mt-10 mode-toggle" class:section--disabled={isRouting || isDepartureScanning}>
+            <button
+                class="pill size-xs"
+                class:pill--active={mode === 'single'}
+                on:click={() => mode = 'single'}
+            >
+                Single Route
+            </button>
+            <button
+                class="pill size-xs"
+                class:pill--active={mode === 'departure'}
+                on:click={() => mode = 'departure'}
+            >
+                Departure Planner
+            </button>
+        </div>
+
+        <!-- Departure time / window -->
+        {#if mode === 'single'}
+            <div class="section mb-15 departure-row" class:section--disabled={isRouting || isDepartureScanning}>
+                <div class="departure-input">
+                    <label class="size-xs label" for="departure">Departure:</label>
+                    <input
+                        id="departure"
+                        type="datetime-local"
+                        bind:value={departureStr}
+                        class="input size-s"
+                        disabled={isRouting || isDepartureScanning}
+                    />
+                </div>
+                <button class="gear-btn" on:click={() => settingsModal.open()} title="Settings" disabled={isRouting || isDepartureScanning}>&#9881;</button>
+            </div>
+            {#if departureInPast}
+                <div class="section mb-10 warning-text size-xs">Departure time is in the past.</div>
+            {:else if departureBeyondForecast}
+                <div class="section mb-10 caution-text size-xs">Departure is &gt;7 days out — forecast accuracy will be limited.</div>
+            {/if}
+        {:else}
+            <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
+                <DepartureWindowInput
+                    modelCount={settingsStore.get('selectedModels').length}
+                    bind:this={departureWindowInput}
+                    onWindowInPastChange={handleWindowInPastChange}
+                />
+                <button class="gear-btn gear-btn--float" on:click={() => settingsModal.open()} title="Settings" disabled={isRouting || isDepartureScanning}>&#9881;</button>
+            </div>
+        {/if}
+
+        <!-- Calculate / Cancel button -->
+        <div class="section mb-15">
+            {#if isRouting || isDepartureScanning}
+                <button
+                    class="button button--variant-orange size-m"
+                    style="width:100%"
+                    on:click={onCancel}
+                >
+                    Cancel
+                </button>
+            {:else}
+                <button
+                    class="button button--variant-orange size-m"
+                    style="width:100%"
+                    disabled={!canCalculate}
+                    on:click={handleCalculate}
+                >
+                    {#if mode === 'departure'}
+                        Scan Departures
+                    {:else}
+                        Calculate Route
+                    {/if}
                 </button>
             {/if}
         </div>
-        {#if showRouteList && savedRoutes.length > 0}
-            <div class="section mb-10 route-list">
-                {#each savedRoutes as sr (sr.id)}
-                    <div class="route-list-item size-xs">
-                        <button class="route-load-btn" on:click={() => { onLoadRoute(sr.id); showRouteList = false; }}>
-                            {sr.name}
-                        </button>
-                        <button class="wp-remove" on:click={() => onDeleteRoute(sr.id)}>&#215;</button>
-                    </div>
-                {/each}
-            </div>
-        {/if}
     {/if}
-
-    <!-- Mode toggle -->
-    <div class="section mb-10 mt-10 mode-toggle">
-        <button
-            class="pill size-xs"
-            class:pill--active={mode === 'single'}
-            on:click={() => mode = 'single'}
-        >
-            Single Route
-        </button>
-        <button
-            class="pill size-xs"
-            class:pill--active={mode === 'departure'}
-            on:click={() => mode = 'departure'}
-        >
-            Departure Planner
-        </button>
-    </div>
-
-    <!-- Departure time / window -->
-    {#if mode === 'single'}
-        <div class="section mb-15 departure-row">
-            <div class="departure-input">
-                <label class="size-xs label" for="departure">Departure:</label>
-                <input
-                    id="departure"
-                    type="datetime-local"
-                    bind:value={departureStr}
-                    class="input size-s"
-                />
-            </div>
-            <button class="gear-btn" on:click={() => settingsModal.open()} title="Settings">&#9881;</button>
-        </div>
-    {:else}
-        <div class="section mb-15">
-            <DepartureWindowInput
-                modelCount={settingsStore.get('selectedModels').length}
-                bind:this={departureWindowInput}
-            />
-            <button class="gear-btn gear-btn--float" on:click={() => settingsModal.open()} title="Settings">&#9881;</button>
-        </div>
-    {/if}
-
-    <!-- Calculate button -->
-    <div class="section mb-15">
-        <button
-            class="button button--variant-orange size-m"
-            style="width:100%"
-            disabled={!canCalculate}
-            on:click={handleCalculate}
-        >
-            {#if isRouting || isDepartureScanning}
-                Cancel
-            {:else if mode === 'departure'}
-                Scan Departures
-            {:else}
-                Calculate Route
-            {/if}
-        </button>
-    </div>
 
     <!-- Progress -->
     {#if isRouting}
@@ -214,93 +262,172 @@
     {/if}
 
     <!-- Results -->
-    {#if results.length === 1}
-        {@const r = results[0].route}
+    {#if results.length > 0}
         <div class="section results">
-            <h3 class="size-m mb-10">Route Summary</h3>
-            <div class="result-grid">
-                <div class="result-item">
-                    <span class="size-xs label">ETA</span>
-                    <span class="size-s">{formatEta(r.eta)}</span>
-                </div>
-                <div class="result-item">
-                    <span class="size-xs label">Distance</span>
-                    <span class="size-s">{r.totalDistanceNm.toFixed(1)} nm</span>
-                </div>
-                <div class="result-item">
-                    <span class="size-xs label">Avg SOG</span>
-                    <span class="size-s">{r.avgSpeedKt.toFixed(1)} kt</span>
-                </div>
-                <div class="result-item">
-                    <span class="size-xs label">Max TWS</span>
-                    <span class="size-s">{r.maxTws.toFixed(0)} kt</span>
-                </div>
-                <div class="result-item">
-                    <span class="size-xs label">Duration</span>
-                    <span class="size-s">{formatDuration(r.durationHours)}</span>
-                </div>
-                {#if results[0].modelRunTime}
-                <div class="result-item">
-                    <span class="size-xs label">Forecast</span>
-                    <span class="size-s">{MODEL_LABELS[results[0].model]} run {formatModelAge(results[0].modelRunTime)}</span>
-                </div>
-                {/if}
+            <!-- Compact route reference -->
+            <div class="route-ref size-xs mb-10">
+                <div>Depart: {formatEta(results[0].route.path[0]?.time ?? Date.now())}</div>
             </div>
 
-            <button class="button size-s mt-15" style="width:100%" on:click={handleClear}>
-                Clear Route
-            </button>
-        </div>
-    {:else if results.length > 1}
-        <div class="section results">
-            <h3 class="size-m mb-10">Route Comparison</h3>
-            <table class="comparison-table size-xs">
-                <thead>
-                    <tr>
-                        <th>Model</th>
-                        <th>ETA</th>
-                        <th>Dist</th>
-                        <th>SOG</th>
-                        <th>TWS</th>
-                        <th>Duration</th>
-                        <th>Forecast</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {#each results as mr (mr.model)}
-                        {@const fastest = mr.route.durationHours === fastestDuration}
-                        <tr class:fastest-row={fastest}>
-                            <td class="model-cell">
-                                <span class="model-dot" style:background={mr.color}></span>
-                                <span class={fastest ? 'fastest-label' : ''}
-                                    >{MODEL_LABELS[mr.model]}</span
-                                >
-                            </td>
-                            <td>{formatEta(mr.route.eta)}</td>
-                            <td>{mr.route.totalDistanceNm.toFixed(0)} nm</td>
-                            <td>{mr.route.avgSpeedKt.toFixed(1)}</td>
-                            <td>{mr.route.maxTws.toFixed(0)}</td>
-                            <td>{formatDuration(mr.route.durationHours)}</td>
-                            <td>{formatModelAge(mr.modelRunTime)}</td>
+            <!-- Comparison table (multi-model only) -->
+            {#if results.length > 1}
+                <h3 class="size-s mb-5">Route Comparison</h3>
+                <table class="comparison-table size-xs">
+                    <thead>
+                        <tr>
+                            <th>Model</th>
+                            <th>Duration</th>
+                            <th>SOG</th>
+                            <th>TWS</th>
                         </tr>
-                    {/each}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {#each results as mr (mr.model)}
+                            {@const isSelected = mr.model === selectedComparisonModel}
+                            {@const isHovered = mr.model === hoveredComparisonModel}
+                            {@const fastest = mr.route.durationHours === fastestDuration}
+                            <tr
+                                class:selected-row={isSelected}
+                                class:hovered-row={isHovered && !isSelected}
+                                class:fastest-row={fastest && !isSelected && !isHovered}
+                                style:background={isSelected ? mr.color + '1F' : isHovered ? mr.color + '14' : ''}
+                                on:mouseenter={() => handleComparisonRowEnter(mr.model)}
+                                on:mouseleave={handleComparisonRowLeave}
+                                on:click={() => handleComparisonRowClick(mr.model)}
+                            >
+                                <td class="model-cell">
+                                    <span class="model-dot" style:background={mr.color}></span>
+                                    <span class={fastest ? 'fastest-label' : ''}>{MODEL_LABELS[mr.model]}</span>
+                                </td>
+                                <td>{formatDuration(mr.route.durationHours)}</td>
+                                <td>{mr.route.avgSpeedKt.toFixed(1)}</td>
+                                <td>{mr.route.maxTws.toFixed(0)}</td>
+                            </tr>
+                        {/each}
+                    </tbody>
+                </table>
+            {/if}
+
+            <!-- Selected route stats (or single-model stats) -->
+            {#if selectedResult}
+                {@const sr = selectedResult.route}
+                <div class="selected-stats mt-10">
+                    {#if results.length > 1}
+                        <div class="stats-header size-xs mb-5">{MODEL_LABELS[selectedResult.model]} Route</div>
+                    {/if}
+                    <div class="result-grid">
+                        <div class="result-item">
+                            <span class="size-xs label">ETA</span>
+                            <span class="size-s">{formatEta(sr.eta)}</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="size-xs label">Distance</span>
+                            <span class="size-s">{sr.totalDistanceNm.toFixed(1)} nm</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="size-xs label">Avg SOG</span>
+                            <span class="size-s">{sr.avgSpeedKt.toFixed(1)} kt</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="size-xs label">Max TWS</span>
+                            <span class="size-s">{sr.maxTws.toFixed(0)} kt</span>
+                        </div>
+                        <div class="result-item">
+                            <span class="size-xs label">Duration</span>
+                            <span class="size-s">{formatDuration(sr.durationHours)}</span>
+                        </div>
+                        {#if selectedResult.modelRunTime}
+                        <div class="result-item">
+                            <span class="size-xs label">Forecast</span>
+                            <span class="size-s">{MODEL_LABELS[selectedResult.model]} {formatModelAge(selectedResult.modelRunTime)}</span>
+                        </div>
+                        {/if}
+                    </div>
+
+                    {#if routeStats}
+                        {@const sailLegend = legendItems([
+                            [routeStats.sail.upwind, 'upwind', '#E63946'],
+                            [routeStats.sail.reaching, 'reaching', '#2A9D8F'],
+                            [routeStats.sail.downwind, 'downwind', '#457B9D'],
+                            [routeStats.sail.motoring, 'motoring', '#888'],
+                        ])}
+                        {@const windLegend = legendItems([
+                            [routeStats.wind.light, '<10 kt', '#89CFF0'],
+                            [routeStats.wind.moderate, '10-20 kt', '#457B9D'],
+                            [routeStats.wind.fresh, '20-30 kt', '#E9C46A'],
+                            [routeStats.wind.strong, '30+ kt', '#E63946'],
+                        ])}
+                        <div class="route-breakdown mt-10">
+                            <div class="breakdown-section">
+                                <div class="breakdown-label size-xs">Points of Sail</div>
+                                <div class="stacked-bar">
+                                    {#each sailLegend as s}
+                                        <div class="bar-seg" style="width:{s.pct}%;background:{s.color}"></div>
+                                    {/each}
+                                </div>
+                                <div class="breakdown-legend size-xs">
+                                    {#each sailLegend as s, i}
+                                        {#if i > 0}<span class="legend-sep">&middot;</span>{/if}
+                                        <span class="legend-dot" style="background:{s.color}"></span>
+                                        <span>{s.pct}% {s.label}</span>
+                                    {/each}
+                                </div>
+                            </div>
+
+                            <div class="breakdown-section">
+                                <div class="breakdown-label size-xs">Wind</div>
+                                <div class="stacked-bar">
+                                    {#each windLegend as w}
+                                        <div class="bar-seg" style="width:{w.pct}%;background:{w.color}"></div>
+                                    {/each}
+                                </div>
+                                <div class="breakdown-legend size-xs">
+                                    {#each windLegend as w, i}
+                                        {#if i > 0}<span class="legend-sep">&middot;</span>{/if}
+                                        <span class="legend-dot" style="background:{w.color}"></span>
+                                        <span>{w.pct}% {w.label}</span>
+                                    {/each}
+                                </div>
+                            </div>
+
+                            {#if routeStats.swell}
+                                {@const swellLegend = legendItems([
+                                    [routeStats.swell.calm, '<1m', '#2A9D8F'],
+                                    [routeStats.swell.moderate, '1-2m', '#E9C46A'],
+                                    [routeStats.swell.rough, '2-3m', '#E76F51'],
+                                    [routeStats.swell.heavy, '3+m', '#E63946'],
+                                ])}
+                                <div class="breakdown-section">
+                                    <div class="breakdown-label size-xs">Swell</div>
+                                    <div class="stacked-bar">
+                                        {#each swellLegend as s}
+                                            <div class="bar-seg" style="width:{s.pct}%;background:{s.color}"></div>
+                                        {/each}
+                                    </div>
+                                    <div class="breakdown-legend size-xs">
+                                        {#each swellLegend as s, i}
+                                            {#if i > 0}<span class="legend-sep">&middot;</span>{/if}
+                                            <span class="legend-dot" style="background:{s.color}"></span>
+                                            <span>{s.pct}% {s.label}</span>
+                                        {/each}
+                                    </div>
+                                </div>
+                            {/if}
+                        </div>
+                    {/if}
+                </div>
+            {/if}
 
             <!-- Failed model warnings -->
             {#if failedModels.length > 0}
                 <div class="failed-list mt-10">
                     {#each failedModels as fm}
                         <div class="failed-item size-xs">
-                            ⚠ {MODEL_LABELS[fm.model]}: {fm.reason}
+                            &#9888; {MODEL_LABELS[fm.model]}: {fm.reason}
                         </div>
                     {/each}
                 </div>
             {/if}
-
-            <button class="button size-s mt-15" style="width:100%" on:click={handleClear}>
-                Clear Route
-            </button>
         </div>
     {/if}
 
@@ -331,25 +458,57 @@
         </div>
     {/if}
 
-    <!-- Route Detail Modal -->
+    <!-- Route Detail Modal button + Player controls (post-calculation) -->
     {#if results.length > 0}
         <RouteDetailModal {results} />
-    {/if}
 
-    <!-- Player controls -->
-    {#if results.length > 0}
         <PlayerControls
             {results}
             {onTimeChange}
-            {onModelSwitch}
+            bind:this={playerControls}
         />
+
+        <button class="button size-s mt-10 clear-btn" style="width:100%" on:click={handleClear}>
+            Clear Route
+        </button>
     {/if}
 
-    <!-- Disclaimer -->
+    <!-- Footer -->
     <div class="disclaimer size-xs mt-15">
         Routes are advisory only. Not a substitute for proper passage planning and seamanship.
     </div>
+    <div class="footer size-xs mt-10">
+        v0.1.0 &mdash; Fair winds &mdash; <button class="footer-link" on:click={() => showAboutModal = true}>Appd</button>
+    </div>
 
+    {#if showAboutModal}
+        <div class="about-overlay" on:click|self={() => showAboutModal = false}>
+            <div class="about-modal">
+                <button class="about-close" on:click={() => showAboutModal = false}>&times;</button>
+                <h3 class="about-title">Sail Router by Appd</h3>
+                <p class="about-text">
+                    We'd love to hear your feedback, suggestions, or questions!
+                </p>
+                <p class="about-text">
+                    Email us at <a href="mailto:hello@appd.com.au" class="about-link">hello@appd.com.au</a>
+                </p>
+                <p class="about-text">
+                    <a href="https://appd.com.au" target="_blank" rel="noopener noreferrer" class="about-link">https://appd.com.au</a>
+                </p>
+            </div>
+        </div>
+    {/if}
+
+    <div class="polar-modal-wrap">
+        {#if currentPolar}
+            <PolarViewEditModal
+                polar={currentPolar}
+                isCustom={isCustomPolar}
+                onSave={handlePolarSave}
+                bind:this={polarModal}
+            />
+        {/if}
+    </div>
     <SettingsModal bind:this={settingsModal} />
 </div>
 
@@ -367,7 +526,7 @@
     import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
     import { settingsStore } from '../stores/SettingsStore';
 
-    import type { LatLon, ModelRouteResult, WindModelId, PipelineStep, SavedRoute, PolarData, UserSettings, DepartureResult } from '../routing/types';
+    import type { LatLon, ModelRouteResult, WindModelId, PipelineStep, SavedRoute, PolarData, UserSettings, DepartureResult, RoutePoint } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
     import { MODEL_LABELS } from '../map/modelColors';
 
@@ -388,12 +547,13 @@
     export let onCancel: () => void = () => {};
     export let onClear: () => void = () => {};
     export let onTimeChange: (time: number) => void = () => {};
-    export let onModelSwitch: (model: WindModelId) => void = () => {};
     export let onAddWaypoint: () => void = () => {};
     export let onStopAddingWaypoints: () => void = () => {};
     export let onRemoveWaypoint: (index: number) => void = () => {};
     export let savedRoutes: SavedRoute[] = [];
     export let suggestedRouteName: string = '';
+    export let startName: string = '';
+    export let endName: string = '';
     export let onSaveRoute: (name: string) => void = () => {};
     export let onLoadRoute: (id: string) => void = () => {};
     export let onDeleteRoute: (id: string) => void = () => {};
@@ -406,18 +566,175 @@
     export let departureResults: DepartureResult[] = [];
     export let isDepartureScanning: boolean = false;
     export let onDepartureScan: () => void = () => {};
-    export let onDepartureRouteHover: (result: ModelRouteResult | null) => void = () => {};
+    export let onDepartureRouteHover: (result: ModelRouteResult | null, siblings?: ModelRouteResult[]) => void = () => {};
     export let onDepartureRouteSelect: (result: ModelRouteResult | null) => void = () => {};
+    export let onComparisonHover: (model: WindModelId | null) => void = () => {};
+    export let onComparisonSelect: (model: WindModelId) => void = () => {};
+    export let onUseMyLocation: () => Promise<{ lat: number; lon: number } | null> = async () => null;
+    export let onPlaceMyLocation: (pos: { lat: number; lon: number }) => void = () => {};
 
     let departureWindowInput: DepartureWindowInput;
+    let departureWindowInPast = false;
+    let showAboutModal = false;
+
+    function handleWindowInPastChange(v: boolean): void {
+        departureWindowInPast = v;
+    }
+
+    // Selected model in comparison table (auto-set to fastest on results change)
+    let selectedComparisonModel: WindModelId | null = null;
+    let hoveredComparisonModel: WindModelId | null = null;
+
+    // When results change, auto-select the fastest model
+    $: if (results.length > 1) {
+        const fastest = results.reduce((a, b) => a.route.durationHours < b.route.durationHours ? a : b);
+        if (!selectedComparisonModel || !results.find(r => r.model === selectedComparisonModel)) {
+            selectedComparisonModel = fastest.model;
+            onComparisonSelect(fastest.model);
+        }
+    } else if (results.length === 1) {
+        selectedComparisonModel = results[0].model;
+    } else {
+        selectedComparisonModel = null;
+    }
+
+    $: displayModel = hoveredComparisonModel ?? selectedComparisonModel;
+    $: selectedResult = results.find(r => r.model === displayModel) ?? results[0] ?? null;
+
+    $: routeStats = selectedResult ? computeRouteStats(selectedResult.route.path) : null;
+
+    function computeRouteStats(path: RoutePoint[]) {
+        if (path.length < 2) return null;
+
+        let totalTime = 0;
+        let sailingTime = 0;
+        let motoringTime = 0;
+        let sailUpwind = 0, sailReaching = 0, sailDownwind = 0;
+        let windLight = 0, windMod = 0, windFresh = 0, windStrong = 0;
+        let swCalm = 0, swMod = 0, swRough = 0, swHeavy = 0;
+        let hasSwell = false;
+
+        for (let i = 0; i < path.length - 1; i++) {
+            const dt = path[i + 1].time - path[i].time;
+            if (dt <= 0) continue;
+            totalTime += dt;
+            const pt = path[i];
+
+            if (pt.isMotoring) {
+                motoringTime += dt;
+            } else {
+                sailingTime += dt;
+                const twa = Math.abs(pt.twa);
+                if (twa < 60) sailUpwind += dt;
+                else if (twa <= 120) sailReaching += dt;
+                else sailDownwind += dt;
+            }
+
+            if (pt.tws < 10) windLight += dt;
+            else if (pt.tws < 20) windMod += dt;
+            else if (pt.tws < 30) windFresh += dt;
+            else windStrong += dt;
+
+            if (pt.swell?.height != null) {
+                hasSwell = true;
+                const h = pt.swell.height;
+                if (h < 1) swCalm += dt;
+                else if (h < 2) swMod += dt;
+                else if (h < 3) swRough += dt;
+                else swHeavy += dt;
+            }
+        }
+
+        if (totalTime === 0) return null;
+
+        const pct = (v: number, t: number) => t > 0 ? Math.round((v / t) * 100) : 0;
+
+        return {
+            sail: {
+                upwind: pct(sailUpwind, totalTime),
+                reaching: pct(sailReaching, totalTime),
+                downwind: pct(sailDownwind, totalTime),
+                motoring: pct(motoringTime, totalTime),
+            },
+            wind: { light: pct(windLight, totalTime), moderate: pct(windMod, totalTime), fresh: pct(windFresh, totalTime), strong: pct(windStrong, totalTime) },
+            swell: hasSwell ? { calm: pct(swCalm, totalTime), moderate: pct(swMod, totalTime), rough: pct(swRough, totalTime), heavy: pct(swHeavy, totalTime) } : null,
+        };
+    }
+
+    function legendItems(items: [number, string, string][]): { pct: number; label: string; color: string }[] {
+        return items.filter(([v]) => v > 0).map(([pct, label, color]) => ({ pct, label, color }));
+    }
+
+    function handleComparisonRowEnter(model: WindModelId): void {
+        hoveredComparisonModel = model;
+        onComparisonHover(model);
+    }
+
+    function handleComparisonRowLeave(): void {
+        hoveredComparisonModel = null;
+        onComparisonHover(null);
+    }
+
+    function handleComparisonRowClick(model: WindModelId): void {
+        selectedComparisonModel = model;
+        onComparisonSelect(model);
+    }
 
     let settingsModal: SettingsModal;
     let polarModal: PolarViewEditModal;
+    let playerControls: PlayerControls;
+
+    /** Forward external timestamp to PlayerControls scrubber. */
+    export function setPlayerTime(time: number): void {
+        playerControls?.setTime(time);
+    }
     let allPolars = getAllPolars();
     let selectedPolarName: string = settingsStore.get('selectedPolarName');
 
     $: currentPolar = allPolars.find(p => p.name === selectedPolarName) ?? allPolars[0];
     $: isCustomPolar = getCustomPolars().some(p => p.name === selectedPolarName);
+
+    // Searchable polar dropdown
+    let polarSearchQuery = selectedPolarName;
+    let polarDropdownOpen = false;
+
+    $: filteredPolars = polarDropdownOpen
+        ? allPolars.filter(p => p.name.toLowerCase().includes(polarSearchQuery.toLowerCase()))
+        : [];
+
+    // Keep search query in sync when selection changes externally (e.g. settings)
+    $: if (!polarDropdownOpen) polarSearchQuery = selectedPolarName;
+
+    function openPolarDropdown(): void {
+        polarSearchQuery = '';
+        polarDropdownOpen = true;
+    }
+
+    function closePolarDropdown(): void {
+        // Small delay so mousedown on option fires before blur closes the list
+        setTimeout(() => {
+            polarDropdownOpen = false;
+            polarSearchQuery = selectedPolarName;
+        }, 150);
+    }
+
+    function selectPolar(name: string): void {
+        selectedPolarName = name;
+        settingsStore.set('selectedPolarName', name);
+        polarSearchQuery = name;
+        polarDropdownOpen = false;
+    }
+
+    function handlePolarSearchKey(e: KeyboardEvent): void {
+        if (e.key === 'Escape') {
+            polarDropdownOpen = false;
+            polarSearchQuery = selectedPolarName;
+            (e.target as HTMLInputElement).blur();
+        } else if (e.key === 'Enter' && filteredPolars.length > 0) {
+            selectPolar(filteredPolars[0].name);
+            (e.target as HTMLInputElement).blur();
+        }
+    }
     $: advisories = results.flatMap(r => r.dataAdvisories ?? []).filter((v, i, a) => a.indexOf(v) === i);
 
     // Default departure to now, formatted for datetime-local input
@@ -479,23 +796,47 @@
         editingPoint = null;
     }
 
+    async function useMyLocationForEdit(): Promise<void> {
+        const pos = await onUseMyLocation();
+        if (pos) {
+            editLat = pos.lat.toFixed(4);
+            editLon = pos.lon.toFixed(4);
+        }
+    }
+
+    async function handleUseMyLocationAsStart(): Promise<void> {
+        const pos = await onUseMyLocation();
+        if (pos) {
+            onPlaceMyLocation(pos);
+        }
+    }
+
     export function getDepartureTime(): number {
         return new Date(departureStr).getTime();
+    }
+
+    export function setDepartureTime(ts: number): void {
+        departureStr = formatDateForInput(new Date(ts));
     }
 
     export function getDepartureWindowConfig() {
         return departureWindowInput?.getWindowConfig();
     }
 
-    $: canCalculate = waypointState === 'READY' && !isRouting && !isDepartureScanning;
+    const FORECAST_HORIZON_MS = 7 * 24 * 3600_000; // 7 days — beyond this, forecast skill degrades
+
+    $: departureMs = new Date(departureStr).getTime();
+    $: departureInPast = departureMs < Date.now() - 3600_000; // 1-hour grace
+    $: departureBeyondForecast = departureMs > Date.now() + FORECAST_HORIZON_MS;
+
+    $: canCalculate = waypointState === 'READY' && !isRouting && !isDepartureScanning
+        && (mode === 'departure' ? !departureWindowInPast : !departureInPast);
 
     $: fastestDuration =
         results.length > 1 ? Math.min(...results.map((r) => r.route.durationHours)) : Infinity;
 
     function handleCalculate(): void {
-        if (isRouting || isDepartureScanning) {
-            onCancel();
-        } else if (mode === 'departure') {
+        if (mode === 'departure') {
             onDepartureScan();
         } else {
             onCalculate();
@@ -503,6 +844,7 @@
     }
 
     function handleClear(): void {
+        selectedComparisonModel = null;
         onClear();
     }
 
@@ -553,12 +895,6 @@
     }
 
     // --- Polar management ---
-
-    function handlePolarChange(e: Event): void {
-        const value = (e.target as HTMLSelectElement).value;
-        selectedPolarName = value;
-        settingsStore.set('selectedPolarName', value);
-    }
 
     function handleViewPolar(): void {
         if (polarModal) {
@@ -628,17 +964,44 @@
 <style lang="less">
     .routing-panel {
         padding: 5px 0;
+        display: flex;
+        flex-direction: column;
+        min-height: 100%;
     }
     .section {
         padding: 0;
+    }
+    .section--disabled {
+        opacity: 0.4;
+        pointer-events: none;
     }
     .instruction {
         line-height: 1.6;
         opacity: 0.9;
     }
+
+    .location-btn {
+        margin-top: 6px;
+        opacity: 0.7;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    .loc-btn {
+        padding: 2px 5px;
+        font-size: 14px;
+        line-height: 1;
+    }
     .coords {
         opacity: 0.7;
         line-height: 1.6;
+    }
+    .coords--sub {
+        opacity: 0.4;
+        margin-top: -4px;
+        line-height: 1.3;
     }
     .label {
         display: block;
@@ -680,6 +1043,10 @@
         color: #e9c46a;
         line-height: 1.4;
     }
+    .caution-text {
+        color: rgba(233, 196, 106, 0.7);
+        line-height: 1.4;
+    }
     .results {
         background: rgba(255, 255, 255, 0.05);
         border-radius: 6px;
@@ -693,6 +1060,32 @@
     .result-item {
         .label {
             margin-bottom: 0;
+        }
+    }
+
+    /* Route reference (compact coords) */
+    .route-ref {
+        opacity: 0.6;
+        line-height: 1.5;
+    }
+
+    /* Selected route stats */
+    .selected-stats {
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+        padding-top: 10px;
+    }
+
+    .stats-header {
+        opacity: 0.6;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    /* Clear route button */
+    .clear-btn {
+        opacity: 0.8;
+        &:hover {
+            opacity: 1;
         }
     }
 
@@ -715,10 +1108,26 @@
             white-space: nowrap;
         }
 
-        tr.fastest-row {
-            background: rgba(255, 255, 255, 0.06);
+        tbody tr {
+            cursor: pointer;
+            transition: background 0.1s ease;
+
+            &:hover {
+                background: rgba(255, 255, 255, 0.06);
+            }
+        }
+
+        tr.selected-row {
             border-radius: 3px;
             font-weight: 600;
+        }
+
+        tr.hovered-row {
+            border-radius: 3px;
+        }
+
+        tr.fastest-row {
+            background: rgba(255, 255, 255, 0.04);
         }
     }
 
@@ -757,6 +1166,91 @@
         opacity: 0.4;
         line-height: 1.4;
         font-style: italic;
+        margin-top: auto;
+    }
+
+    .footer {
+        opacity: 0.3;
+        text-align: center;
+        line-height: 1.4;
+    }
+
+    .footer-link {
+        background: none;
+        border: none;
+        color: inherit;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+        cursor: pointer;
+        padding: 0;
+        font: inherit;
+
+        &:hover {
+            opacity: 1;
+        }
+    }
+
+    .about-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 10000;
+    }
+
+    .about-modal {
+        background: #1a1a2e;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        padding: 24px;
+        max-width: 320px;
+        width: 90%;
+        position: relative;
+        color: #e0e0e0;
+    }
+
+    .about-close {
+        position: absolute;
+        top: 8px;
+        right: 12px;
+        background: none;
+        border: none;
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px;
+
+        &:hover {
+            color: white;
+        }
+    }
+
+    .about-title {
+        margin: 0 0 12px;
+        font-size: 16px;
+        font-weight: 600;
+    }
+
+    .about-text {
+        margin: 0 0 10px;
+        font-size: 13px;
+        line-height: 1.5;
+        opacity: 0.85;
+    }
+
+    .about-link {
+        color: #457b9d;
+        text-decoration: underline;
+        text-underline-offset: 2px;
+
+        &:hover {
+            color: #6aa3c4;
+        }
     }
 
     .waypoint-row {
@@ -889,6 +1383,58 @@
         }
     }
 
+    .polar-search-wrap {
+        position: relative;
+        flex: 1;
+        min-width: 0;
+    }
+
+    .polar-search-input {
+        width: 100%;
+    }
+
+    .polar-dropdown {
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        max-height: 200px;
+        overflow-y: auto;
+        background: #1a1a2e;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-top: none;
+        border-radius: 0 0 4px 4px;
+        z-index: 100;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .polar-option {
+        background: none;
+        border: none;
+        color: #e0e0e0;
+        padding: 6px 8px;
+        text-align: left;
+        cursor: pointer;
+        font-size: 13px;
+        line-height: 1.4;
+
+        &:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        &--active {
+            background: rgba(78, 205, 196, 0.15);
+            color: #4ecdc4;
+        }
+
+        &--empty {
+            opacity: 0.5;
+            cursor: default;
+            font-style: italic;
+        }
+    }
+
     .boat-buttons {
         display: flex;
         gap: 5px;
@@ -1015,6 +1561,54 @@
         margin-top: 1px;
     }
 
+    /* Route breakdown bars */
+    .route-breakdown {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .breakdown-section {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .breakdown-label {
+        opacity: 0.6;
+    }
+
+    .stacked-bar {
+        display: flex;
+        height: 6px;
+        border-radius: 3px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .bar-seg {
+        min-width: 1px;
+    }
+
+    .breakdown-legend {
+        opacity: 0.6;
+        line-height: 1.6;
+    }
+
+    .legend-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-right: 2px;
+        vertical-align: middle;
+    }
+
+    .legend-sep {
+        margin: 0 3px;
+        opacity: 0.4;
+    }
+
     .route-load-btn {
         flex: 1;
         text-align: left;
@@ -1029,6 +1623,29 @@
         &:hover {
             background: rgba(255, 255, 255, 0.12);
             opacity: 1;
+        }
+    }
+
+    @media (max-width: 600px) {
+        .input {
+            padding: 8px 10px;
+        }
+        .coord-input {
+            width: 65px;
+        }
+        .pill {
+            padding: 6px 12px;
+        }
+        .btn {
+            padding: 6px 12px;
+        }
+        .wp-remove {
+            padding: 4px 8px;
+            font-size: 18px;
+        }
+        .gear-btn {
+            font-size: 24px;
+            padding: 8px;
         }
     }
 </style>

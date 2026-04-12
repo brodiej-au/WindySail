@@ -13,7 +13,7 @@ export function enrichRoutePoints(
     for (const point of path) {
         const { lat, lon, time } = point;
 
-        if (swellGrid) {
+        if (swellGrid && (!swellGrid.coverageEndTime || time <= swellGrid.coverageEndTime)) {
             const { lats, lons, timestamps, swellHeight, swellDir, swellPeriod } = swellGrid;
             point.swell = {
                 height: trilinearInterpolate(swellHeight, lats, lons, timestamps, lat, lon, time),
@@ -22,7 +22,7 @@ export function enrichRoutePoints(
             };
         }
 
-        if (currentGrid) {
+        if (currentGrid && (!currentGrid.coverageEndTime || time <= currentGrid.coverageEndTime)) {
             const { lats, lons, timestamps, currentU, currentV } = currentGrid;
             const u = trilinearInterpolate(currentU, lats, lons, timestamps, lat, lon, time);
             const v = trilinearInterpolate(currentV, lats, lons, timestamps, lat, lon, time);

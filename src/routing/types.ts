@@ -180,6 +180,12 @@ export interface DepartureWindowConfig {
     intervalHours: number;  // 3, 6, 12, or 24
 }
 
+export interface PreloadedGrids {
+    windGrids: Map<WindModelId, WindGridData>;
+    swellGrid?: SwellGridData;
+    currentGrid?: CurrentGridData | null;
+}
+
 export interface DepartureResult {
     departureTime: number;          // Unix ms
     modelResults: ModelRouteResult[]; // one per successful model

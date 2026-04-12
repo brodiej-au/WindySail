@@ -1,0 +1,82 @@
+<h2>How should departure results be displayed?</h2>
+<p class="subtitle">After computing routes for multiple departure times, how should the user compare them?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Ranked Table</h3>
+      <p>A sorted list of departure times with key metrics (ETA, duration, avg wind, max swell, motoring %). User picks one to view on map. Simple and scannable.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-body" style="font-family: monospace; font-size: 12px; line-height: 1.6;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr; gap:4px; padding:8px; background:#1a1a2e; border-radius:6px; color:#ccc;">
+            <div style="color:#888; border-bottom:1px solid #333; padding-bottom:4px;">Depart</div>
+            <div style="color:#888; border-bottom:1px solid #333; padding-bottom:4px;">ETA</div>
+            <div style="color:#888; border-bottom:1px solid #333; padding-bottom:4px;">Duration</div>
+            <div style="color:#888; border-bottom:1px solid #333; padding-bottom:4px;">Avg TWS</div>
+            <div style="color:#888; border-bottom:1px solid #333; padding-bottom:4px;">Motor %</div>
+            <div style="color:#4ecdc4;">★ Fri 06:00</div><div>Sun 14:00</div><div>56h</div><div>14kt</div><div>8%</div>
+            <div>Fri 12:00</div><div>Sun 22:00</div><div>58h</div><div>12kt</div><div>15%</div>
+            <div>Sat 06:00</div><div>Mon 18:00</div><div>60h</div><div>11kt</div><div>22%</div>
+            <div style="color:#e74c3c;">Sat 12:00</div><div>Tue 02:00</div><div>62h</div><div>9kt</div><div>35%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Timeline Heatmap</h3>
+      <p>A visual timeline where each row is a departure time and columns show hours into the passage. Color-coded by conditions (green=good sailing, yellow=light wind, red=heavy weather). Gives a feel for what you'll encounter.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-body" style="font-family: monospace; font-size: 11px; padding: 8px; background:#1a1a2e; border-radius:6px; color:#ccc;">
+          <div style="margin-bottom:4px; color:#888;">────── Hours into passage ──────</div>
+          <div style="display:flex; gap:2px; align-items:center; margin-bottom:3px;">
+            <span style="width:60px;">Fri 06:00</span>
+            <div style="display:flex; gap:1px;">
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■■</span>
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■■</span>
+              <span style="background:#f39c12; padding:2px 4px; border-radius:2px;">■■</span>
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■■</span>
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■</span>
+            </div>
+            <span style="color:#4ecdc4;">56h ★</span>
+          </div>
+          <div style="display:flex; gap:2px; align-items:center; margin-bottom:3px;">
+            <span style="width:60px;">Fri 12:00</span>
+            <div style="display:flex; gap:1px;">
+              <span style="background:#f39c12; padding:2px 4px; border-radius:2px;">■■</span>
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■■</span>
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■■</span>
+              <span style="background:#f39c12; padding:2px 4px; border-radius:2px;">■■</span>
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■■</span>
+            </div>
+            <span>58h</span>
+          </div>
+          <div style="display:flex; gap:2px; align-items:center; margin-bottom:3px;">
+            <span style="width:60px;">Sat 06:00</span>
+            <div style="display:flex; gap:1px;">
+              <span style="background:#f39c12; padding:2px 4px; border-radius:2px;">■■</span>
+              <span style="background:#f39c12; padding:2px 4px; border-radius:2px;">■■</span>
+              <span style="background:#e74c3c; padding:2px 4px; border-radius:2px;">■■</span>
+              <span style="background:#f39c12; padding:2px 4px; border-radius:2px;">■■</span>
+              <span style="background:#2ecc71; color:#000; padding:2px 4px; border-radius:2px;">■■■</span>
+            </div>
+            <span>60h</span>
+          </div>
+          <div style="margin-top:6px; color:#666; font-size:10px;">🟢 Good sailing &nbsp; 🟡 Light/motor &nbsp; 🔴 Heavy weather</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Table + Best Route on Map</h3>
+      <p>Ranked table (like A) but automatically shows the top-ranked route on the map. Click any row to switch the displayed route. Combines data scanning with spatial context.</p>
+    </div>
+  </div>
+</div>

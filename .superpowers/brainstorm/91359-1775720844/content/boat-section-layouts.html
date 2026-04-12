@@ -1,0 +1,93 @@
+<h2>Boat/Polar Section — Layout Direction</h2>
+<p class="subtitle">The current stacked card wastes vertical space and looks disconnected. Which direction feels right for a ~320px sidebar?</p>
+
+<div class="cards">
+
+  <!-- Option A: Compact Row -->
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e; border-radius:6px; padding:10px; font-family:system-ui; color:#fff; font-size:12px;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <!-- Mini polar thumbnail -->
+          <div style="width:44px; height:44px; border-radius:50%; background:radial-gradient(circle at 50% 80%, #457b9d 0%, #2a4a5e 40%, #1a1a2e 70%); border:1px solid rgba(255,255,255,0.15); flex-shrink:0;"></div>
+          <!-- Dropdown + actions -->
+          <div style="flex:1; display:flex; flex-direction:column; gap:4px;">
+            <div style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:5px 8px; font-size:12px; display:flex; justify-content:space-between;">
+              <span style="opacity:0.9;">Beneteau First 40</span>
+              <span style="opacity:0.4;">&#9662;</span>
+            </div>
+            <div style="display:flex; gap:4px;">
+              <span style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:3px; padding:2px 8px; font-size:10px; opacity:0.7;">Edit</span>
+              <span style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:3px; padding:2px 8px; font-size:10px; opacity:0.7;">New</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — Compact Row</h3>
+      <p>Small polar thumbnail (44px) beside dropdown + buttons. Minimal vertical footprint. Diagram click opens full view.</p>
+    </div>
+  </div>
+
+  <!-- Option B: Two-Row Card -->
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e; border-radius:6px; padding:10px; font-family:system-ui; color:#fff; font-size:12px;">
+        <!-- Row 1: dropdown + thumbnail -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+          <div style="flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:5px 8px; font-size:12px; display:flex; justify-content:space-between;">
+            <span style="opacity:0.9;">Beneteau First 40</span>
+            <span style="opacity:0.4;">&#9662;</span>
+          </div>
+          <div style="width:36px; height:36px; border-radius:50%; background:radial-gradient(circle at 50% 80%, #457b9d 0%, #2a4a5e 40%, #1a1a2e 70%); border:1px solid rgba(255,255,255,0.15); flex-shrink:0;"></div>
+        </div>
+        <!-- Row 2: buttons -->
+        <div style="display:flex; gap:4px;">
+          <span style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:3px; padding:2px 8px; font-size:10px; opacity:0.7;">Edit</span>
+          <span style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:3px; padding:2px 8px; font-size:10px; opacity:0.7;">New</span>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — Two-Row Card</h3>
+      <p>Row 1: dropdown + small thumbnail. Row 2: action buttons. Background card groups them. Click thumbnail for full diagram.</p>
+    </div>
+  </div>
+
+  <!-- Option C: Expandable Section -->
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="background:#1a1a2e; border-radius:6px; padding:10px; font-family:system-ui; color:#fff; font-size:12px;">
+        <!-- Header row: clickable to expand -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px; cursor:pointer;">
+          <span style="opacity:0.5; font-size:10px;">&#9660;</span>
+          <div style="flex:1; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:4px; padding:5px 8px; font-size:12px; display:flex; justify-content:space-between;">
+            <span style="opacity:0.9;">Beneteau First 40</span>
+            <span style="opacity:0.4;">&#9662;</span>
+          </div>
+        </div>
+        <!-- Expanded: diagram + buttons -->
+        <div style="border-top:1px solid rgba(255,255,255,0.08); padding-top:8px;">
+          <div style="display:flex; justify-content:center; margin-bottom:6px;">
+            <div style="width:80px; height:45px; border-radius:6px; background:radial-gradient(ellipse at 50% 90%, #457b9d 0%, #2a4a5e 30%, #1a1a2e 60%); border:1px solid rgba(255,255,255,0.1);"></div>
+          </div>
+          <div style="display:flex; gap:4px; justify-content:center;">
+            <span style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:3px; padding:2px 8px; font-size:10px; opacity:0.7;">Edit</span>
+            <span style="background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.15); border-radius:3px; padding:2px 8px; font-size:10px; opacity:0.7;">New</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — Collapsible</h3>
+      <p>Dropdown always visible. Chevron toggle reveals diagram + buttons below. Collapsed = one line. Expanded = full preview.</p>
+    </div>
+  </div>
+
+</div>
+
+<div class="section" style="margin-top:24px;">
+  <h3>Key problem with the current design</h3>
+  <p>A 180px centered polar diagram in a ~320px sidebar dominates the panel. The boat section should be <strong>compact and informational</strong> — you pick a boat once and rarely change it. It shouldn't compete with waypoints and the Calculate button for attention.</p>
+</div>

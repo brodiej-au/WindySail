@@ -20,35 +20,25 @@
         />
     </div>
 
-    <!-- Row 3: Model toggle buttons (only if multi-model) -->
-    {#if results.length > 1}
-        <div class="row row--models">
-            {#each results as r}
-                <button
-                    class="button size-xs model-btn"
-                    class:model-btn--active={activeModel === r.model}
-                    style:border-color={r.color}
-                    style:background={activeModel === r.model
-                        ? r.color + '33'
-                        : 'rgba(255,255,255,0.06)'}
-                    on:click={() => handleModelSwitch(r.model)}
-                >
-                    {MODEL_LABELS[r.model]}
-                </button>
-            {/each}
-        </div>
-    {/if}
 </div>
 
 <script lang="ts">
     import { onDestroy } from 'svelte';
 
-    import { MODEL_LABELS } from '../map/modelColors';
-    import type { ModelRouteResult, WindModelId } from '../routing/types';
+    import type { ModelRouteResult } from '../routing/types';
 
     export let results: ModelRouteResult[] = [];
     export let onTimeChange: (time: number) => void = () => {};
-    export let onModelSwitch: (model: WindModelId) => void = () => {};
+
+    /**
+     * Set time from an external source (e.g. Windy timeline bar).
+     * Updates scrubber position and triggers boat marker updates.
+     */
+    export function setTime(time: number): void {
+        if (isPlaying) return; // Don't interrupt playback
+        if (time < minTime || time > maxTime) return;
+        currentTime = time;
+    }
 
     // Reactive computed bounds
     $: minTime =
@@ -64,13 +54,8 @@
         currentTime = minTime;
     }
 
-    $: if (results.length > 0 && activeModel === null) {
-        activeModel = results[0].model;
-    }
-
     let currentTime = 0;
     let isPlaying = false;
-    let activeModel: WindModelId | null = null;
     let rafId: number | null = null;
     let lastRealTime: number | null = null;
 
@@ -143,11 +128,6 @@
         rafId = requestAnimationFrame(tick);
     }
 
-    function handleModelSwitch(model: WindModelId): void {
-        activeModel = model;
-        onModelSwitch(model);
-    }
-
     onDestroy(() => {
         if (rafId !== null) {
             cancelAnimationFrame(rafId);
@@ -171,11 +151,6 @@
         gap: 8px;
     }
 
-    .row--models {
-        gap: 6px;
-        flex-wrap: wrap;
-    }
-
     .time-display {
         flex: 1;
         opacity: 0.9;
@@ -197,24 +172,10 @@
         accent-color: #457b9d;
     }
 
-    .model-btn {
-        border-width: 2px;
-        border-style: solid;
-        border-radius: 4px;
-        cursor: pointer;
-        color: inherit;
-        opacity: 0.85;
-        transition:
-            opacity 0.15s,
-            background 0.15s;
-        padding: 3px 8px;
-
-        &:hover {
-            opacity: 1;
-        }
-
-        &.model-btn--active {
-            opacity: 1;
+    @media (max-width: 600px) {
+        .play-btn {
+            min-width: 44px;
+            padding: 6px 10px;
         }
     }
 </style>

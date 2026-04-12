@@ -27,18 +27,20 @@ export function expandFrontier(
         const wind = getWindAt(windGrid, nextTime, point.lat, point.lon);
 
         // Pre-compute swell at this position (shared across headings)
+        // Zero out beyond coverage so unknown swell doesn't penalise the boat
         let swellHeight = 0;
         let swellDir = 0;
-        if (swellGrid) {
+        if (swellGrid && (!swellGrid.coverageEndTime || nextTime <= swellGrid.coverageEndTime)) {
             const { lats, lons, timestamps } = swellGrid;
             swellHeight = trilinearInterpolate(swellGrid.swellHeight, lats, lons, timestamps, point.lat, point.lon, nextTime);
             swellDir = interpolateAngle(swellGrid.swellDir, lats, lons, timestamps, point.lat, point.lon, nextTime);
         }
 
         // Pre-compute current at this position (shared across headings)
+        // Zero out beyond coverage so stale current data isn't used
         let curU = 0;
         let curV = 0;
-        if (currentGrid) {
+        if (currentGrid && (!currentGrid.coverageEndTime || nextTime <= currentGrid.coverageEndTime)) {
             const { lats, lons, timestamps } = currentGrid;
             curU = trilinearInterpolate(currentGrid.currentU, lats, lons, timestamps, point.lat, point.lon, nextTime);
             curV = trilinearInterpolate(currentGrid.currentV, lats, lons, timestamps, point.lat, point.lon, nextTime);
@@ -102,6 +104,14 @@ export function expandFrontier(
     return candidates;
 }
 
+/**
+ * Pruning penalty factors.
+ * Motoring/near-land candidates count as a fraction of actual distance,
+ * so sailing and open-water candidates are strongly preferred.
+ */
+const MOTOR_PRUNING_PENALTY = 0.4;
+const NEAR_LAND_PRUNING_PENALTY = 0.6;
+
 export function pruneToSectors(
     candidates: IsochronePoint[],
     start: LatLon,
@@ -121,16 +131,25 @@ export function pruneToSectors(
         const candidateBearing = bearing(start, candidate);
         const relativeAngle = normaliseAngle(candidateBearing - refBearing);
         const sectorIndex = Math.floor(relativeAngle / sectorSize) % numSectors;
-        const dist = distance(start, candidate);
+        const rawDist = distance(start, candidate);
 
-        if (sectors[sectorIndex] === null || dist > sectorDistances[sectorIndex]) {
+        // Apply penalties so sailing + open-water candidates are preferred.
+        // Penalties stack multiplicatively.
+        let penalty = 1;
+        if (candidate.isMotoring) penalty *= MOTOR_PRUNING_PENALTY;
+        if (candidate.nearLand) penalty *= NEAR_LAND_PRUNING_PENALTY;
+        const effectiveDist = rawDist * penalty;
+
+        if (sectors[sectorIndex] === null || effectiveDist > sectorDistances[sectorIndex]) {
             sectors[sectorIndex] = candidate;
-            sectorDistances[sectorIndex] = dist;
+            sectorDistances[sectorIndex] = effectiveDist;
         }
 
+        // For closest-to-end tracking, also penalize
         const distToEnd = distance(candidate, end);
-        if (distToEnd < closestToEndDist) {
-            closestToEndDist = distToEnd;
+        const effectiveDistToEnd = penalty < 1 ? distToEnd / penalty : distToEnd;
+        if (effectiveDistToEnd < closestToEndDist) {
+            closestToEndDist = effectiveDistToEnd;
             closestToEnd = candidate;
         }
     }

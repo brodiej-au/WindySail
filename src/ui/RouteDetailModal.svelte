@@ -1,6 +1,7 @@
 <!-- Button to open modal -->
 <button class="open-detail-btn size-s" on:click={openModal}>
-    Route Details ›
+    <span>Route Details</span>
+    <span class="popup-icon">&#8599;</span>
 </button>
 
 <!-- Modal overlay -->
@@ -55,6 +56,18 @@
                     <span class="summary-label size-xs">Max TWS</span>
                     <span class="summary-value size-s">{route.maxTws.toFixed(0)} kt</span>
                 </div>
+                {#if results[selectedIndex].modelRunTime}
+                <div class="summary-item">
+                    <span class="summary-label size-xs">Forecast</span>
+                    <span class="summary-value size-s">{MODEL_LABELS[results[selectedIndex].model]} run {formatModelRunTime(results[selectedIndex].modelRunTime)}</span>
+                    {#if results[selectedIndex].swellGrid?.modelRunTime}
+                    <span class="summary-sub size-xs">Swell: {formatModelRunTime(results[selectedIndex].swellGrid?.modelRunTime)}</span>
+                    {/if}
+                    {#if results[selectedIndex].currentGrid?.modelRunTime}
+                    <span class="summary-sub size-xs">Current: {formatModelRunTime(results[selectedIndex].currentGrid?.modelRunTime)}</span>
+                    {/if}
+                </div>
+                {/if}
             </div>
 
             <!-- Dataset toggles -->
@@ -248,7 +261,7 @@
             if (!xScale) return;
 
             ctx.save();
-            ctx.fillStyle = 'rgba(233, 196, 106, 0.06)';
+            ctx.fillStyle = 'rgba(233, 196, 106, 0.16)';
 
             let bandStart: number | null = null;
             for (let i = 0; i < pts.length; i++) {
@@ -268,6 +281,29 @@
                 const x0 = xScale.getPixelForValue(pts[bandStart].time);
                 const x1 = xScale.getPixelForValue(pts[pts.length - 1].time);
                 ctx.fillRect(x0, top, x1 - x0, bottom - top);
+            }
+
+            ctx.restore();
+        },
+        afterDatasetsDraw(chart: Chart) {
+            const pts = chartRoutePoints;
+            if (!pts || pts.length < 2) return;
+
+            const { ctx } = chart;
+            const xScale = chart.scales['x'];
+            const { top } = chart.chartArea;
+            if (!xScale) return;
+
+            ctx.save();
+            ctx.font = '14px sans-serif';
+            ctx.fillStyle = 'rgba(233, 196, 106, 0.8)';
+            ctx.textAlign = 'center';
+
+            for (let i = 0; i < pts.length; i++) {
+                if (pts[i].isMotoring && (i === 0 || !pts[i - 1].isMotoring)) {
+                    const x = xScale.getPixelForValue(pts[i].time);
+                    ctx.fillText('\u2699', x, top + 14);
+                }
             }
 
             ctx.restore();
@@ -346,9 +382,13 @@
         }
 
         if (hasCurrents && visibleDatasets.current) {
+            const coverageEnd = results[selectedIndex]?.currentGrid?.coverageEndTime;
             datasets.push({
                 label: 'Current (kt)',
-                data: pts.map(p => p.current?.speed ?? null),
+                data: pts.map(p => {
+                    if (coverageEnd && p.time > coverageEnd) return null;
+                    return p.current?.speed ?? null;
+                }),
                 borderColor: 'rgba(75, 192, 130, 0.9)',
                 backgroundColor: 'transparent',
                 fill: false,
@@ -493,6 +533,17 @@
         return days > 0 ? `${days}d ${hrs}h` : `${hrs}h`;
     }
 
+    function formatModelRunTime(ts: number | undefined): string {
+        if (!ts) return '';
+        return new Date(ts).toLocaleString(undefined, {
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZoneName: 'short',
+        });
+    }
+
     onDestroy(() => {
         destroyChart();
     });
@@ -500,23 +551,28 @@
 
 <style lang="less">
     .open-detail-btn {
-        display: block;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
         width: 100%;
         margin-top: 10px;
         padding: 8px 12px;
-        background: rgba(255, 255, 255, 0.08);
-        border: 1px solid rgba(255, 255, 255, 0.15);
+        background: rgba(42, 157, 143, 0.2);
+        border: 1px solid rgba(42, 157, 143, 0.5);
         border-radius: 4px;
         color: inherit;
         cursor: pointer;
-        text-align: left;
-        opacity: 0.85;
+        font-weight: 600;
         transition: all 0.2s ease;
 
         &:hover {
-            background: rgba(255, 255, 255, 0.12);
-            opacity: 1;
+            background: rgba(42, 157, 143, 0.35);
         }
+    }
+
+    .popup-icon {
+        font-size: 14px;
+        opacity: 0.7;
     }
 
     .modal-backdrop {
@@ -633,6 +689,11 @@
         opacity: 0.9;
     }
 
+    .summary-sub {
+        opacity: 0.5;
+        line-height: 1.3;
+    }
+
     .dataset-toggles {
         display: flex;
         flex-wrap: wrap;
@@ -720,6 +781,38 @@
             opacity: 0.5;
             font-style: italic;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+    }
+
+    @media (max-width: 600px) {
+        .modal-container {
+            width: 100vw;
+            max-width: none;
+            max-height: 100vh;
+            border-radius: 0;
+        }
+        .modal-header {
+            flex-wrap: wrap;
+            gap: 8px;
+            padding: 10px 12px;
+        }
+        .model-tabs {
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .modal-body {
+            height: 200px;
+        }
+        .leg-table-container {
+            max-height: 150px;
+        }
+        .close-btn {
+            padding: 8px 12px;
+            font-size: 22px;
+        }
+        .dataset-toggle input[type='checkbox'] {
+            width: 18px;
+            height: 18px;
         }
     }
 </style>

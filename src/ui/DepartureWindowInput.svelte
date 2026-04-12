@@ -19,18 +19,39 @@
     <div class="dw-summary size-xs">
         {departureCount} departures &times; {modelCount} model{modelCount !== 1 ? 's' : ''} = {departureCount * modelCount} routes
     </div>
+    {#if warning}
+        <div class="dw-warning size-xs" class:dw-warning--caution={!windowInPast}>{warning}</div>
+    {/if}
 </div>
 
 <script lang="ts">
     import type { DepartureWindowConfig } from '../routing/types';
 
     export let modelCount: number = 1;
+    export let onWindowInPastChange: ((v: boolean) => void) | undefined = undefined;
+
+    const FORECAST_HORIZON_MS = 7 * 24 * 3600_000;
 
     let fromStr = formatDateForInput(new Date());
     let toStr = formatDateForInput(new Date(Date.now() + 3 * 24 * 3600_000));
     let intervalHours = 6;
 
+    let windowInPast = false;
+
     $: departureCount = computeDepartureCount(fromStr, toStr, intervalHours);
+    $: fromMs = new Date(fromStr).getTime();
+    $: toMs = new Date(toStr).getTime();
+    $: windowReversed = toMs < fromMs;
+    $: windowInPast = windowReversed || toMs < Date.now() - 3600_000;
+    $: windowBeyondForecast = !windowReversed && fromMs > Date.now() + FORECAST_HORIZON_MS;
+    $: warning = windowReversed
+        ? 'End time is before start time.'
+        : windowInPast
+            ? 'Departure window is in the past.'
+            : windowBeyondForecast
+                ? 'Window starts >7 days out — forecast accuracy will be limited.'
+                : '';
+    $: if (onWindowInPastChange) onWindowInPastChange(windowInPast);
 
     function computeDepartureCount(from: string, to: string, interval: number): number {
         const start = new Date(from).getTime();
@@ -79,6 +100,15 @@
     .dw-summary {
         opacity: 0.6;
         line-height: 1.4;
+    }
+
+    .dw-warning {
+        color: #e9c46a;
+        line-height: 1.4;
+
+        &.dw-warning--caution {
+            color: rgba(233, 196, 106, 0.7);
+        }
     }
 
     .label {

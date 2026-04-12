@@ -138,28 +138,6 @@
                     </div>
                 </div>
 
-                <!-- TWA values -->
-                <div class="section mb-10">
-                    <span class="size-xs label">TWA (°)</span>
-                    <div class="value-list">
-                        {#each twaAngles as twa, ri}
-                            <div class="value-row">
-                                <input
-                                    type="number"
-                                    class="cell-input"
-                                    min="0" max="180" step="1"
-                                    value={twa}
-                                    on:change={e => updateTwa(ri, e)}
-                                />
-                            </div>
-                        {/each}
-                        <div class="btn-row">
-                            <button class="icon-btn" on:click={addRow} title="Add TWA">+</button>
-                            <button class="icon-btn" on:click={removeRow} title="Remove TWA" disabled={twaAngles.length <= 2}>−</button>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Table toggle -->
                 <button class="icon-btn full-width mb-10" on:click={() => { showTable = !showTable; }}>
                     {showTable ? 'Hide Table' : 'Show Table'}
@@ -370,26 +348,6 @@
         if (twsSpeeds.length <= 2) return;
         twsSpeeds = twsSpeeds.slice(0, -1);
         speeds = speeds.map(row => row.slice(0, -1));
-    }
-
-    function updateTwa(ri: number, e: Event): void {
-        const val = parseFloat((e.target as HTMLInputElement).value);
-        if (!isNaN(val)) {
-            twaAngles = twaAngles.map((v, i) => (i === ri ? val : v));
-        }
-    }
-
-    function addRow(): void {
-        const last = twaAngles[twaAngles.length - 1] ?? 0;
-        const next = Math.min(last + 15, 180);
-        twaAngles = [...twaAngles, next];
-        speeds = [...speeds, Array(twsSpeeds.length).fill(0)];
-    }
-
-    function removeRow(): void {
-        if (twaAngles.length <= 2) return;
-        twaAngles = twaAngles.slice(0, -1);
-        speeds = speeds.slice(0, -1);
     }
 
     function updateSpeed(ri: number, ci: number, e: Event): void {
@@ -743,5 +701,31 @@
 
     .mb-10 {
         margin-bottom: 10px;
+    }
+
+    @media (max-width: 600px) {
+        .modal-container {
+            width: 100vw;
+            max-width: none;
+            max-height: 100vh;
+            border-radius: 0;
+        }
+        .main-area {
+            flex-direction: column;
+        }
+        .sidebar {
+            min-width: unset;
+            max-width: none;
+            border-left: none;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            max-height: 40vh;
+        }
+        .diagram-pane {
+            padding: 6px;
+        }
+        .close-btn {
+            padding: 8px 12px;
+            font-size: 22px;
+        }
     }
 </style>

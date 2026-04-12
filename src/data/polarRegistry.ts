@@ -1,16 +1,71 @@
 import type { PolarData } from '../routing/types';
+
+// Cruising Monohulls
 import bavaria38 from './polars/bavaria38.json';
 import jeanneauSO440 from './polars/jeanneau-so440.json';
 import beneteuFirst40 from './polars/beneteau-first40.json';
+import catalina36 from './polars/catalina-36.json';
+import hallbergRassy40 from './polars/hallberg-rassy-40.json';
+import amel50 from './polars/amel-50.json';
+import islandPacket38 from './polars/island-packet-38.json';
+import bavaria46 from './polars/bavaria-46.json';
+import hanse388 from './polars/hanse-388.json';
+import dufour412 from './polars/dufour-412.json';
+import xYacht43 from './polars/x-yacht-43.json';
+import oyster565 from './polars/oyster-565.json';
+
+// Catamarans & Trimarans
+import lagoon42 from './polars/lagoon-42.json';
+import fountainePajot45 from './polars/fountaine-pajot-45.json';
+import outremer51 from './polars/outremer-51.json';
+import neel47 from './polars/neel-47.json';
+import gunboat68 from './polars/gunboat-68.json';
+
+// Performance / Racing
+import j111 from './polars/j-111.json';
+import beneteuFigaro3 from './polars/beneteau-figaro-3.json';
+import first36 from './polars/first-36.json';
+import sunFast3300 from './polars/sun-fast-3300.json';
+import dehler38sq from './polars/dehler-38sq.json';
+import clipper70 from './polars/clipper-70.json';
+
+// Classic / Small
+import contessa32 from './polars/contessa-32.json';
+import folkboat from './polars/folkboat.json';
+import j24 from './polars/j-24.json';
+import laser28 from './polars/laser-28.json';
 
 /**
- * Bundled polars (immutable).
- * More polars will be added in Task 16.
+ * Bundled polars (immutable), sorted alphabetically by name.
  */
 const BUNDLED_POLARS: PolarData[] = [
+    amel50 as PolarData,
     bavaria38 as PolarData,
-    jeanneauSO440 as PolarData,
+    bavaria46 as PolarData,
+    beneteuFigaro3 as PolarData,
     beneteuFirst40 as PolarData,
+    catalina36 as PolarData,
+    clipper70 as PolarData,
+    contessa32 as PolarData,
+    dehler38sq as PolarData,
+    dufour412 as PolarData,
+    first36 as PolarData,
+    folkboat as PolarData,
+    fountainePajot45 as PolarData,
+    gunboat68 as PolarData,
+    hallbergRassy40 as PolarData,
+    hanse388 as PolarData,
+    islandPacket38 as PolarData,
+    j24 as PolarData,
+    j111 as PolarData,
+    jeanneauSO440 as PolarData,
+    lagoon42 as PolarData,
+    laser28 as PolarData,
+    neel47 as PolarData,
+    outremer51 as PolarData,
+    oyster565 as PolarData,
+    sunFast3300 as PolarData,
+    xYacht43 as PolarData,
 ];
 
 const CUSTOM_POLARS_STORAGE_KEY = 'windysail-custom-polars';

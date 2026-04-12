@@ -31,7 +31,7 @@
                 <div
                     class="dp-row size-xs"
                     class:dp-row--selected={selectedKey === rowKey(dep.departureTime, mr.model)}
-                    on:mouseenter={() => onHover(dep.departureTime, mr.model, mr)}
+                    on:mouseenter={() => onHover(dep.departureTime, mr.model, mr, dep.modelResults)}
                     on:mouseleave={() => onHoverEnd()}
                     on:click={() => onSelect(dep.departureTime, mr.model, mr)}
                 >
@@ -85,7 +85,7 @@
 
     export let results: DepartureResult[] = [];
     export let isScanning: boolean = false;
-    export let onRouteHover: (result: ModelRouteResult | null) => void = () => {};
+    export let onRouteHover: (result: ModelRouteResult | null, siblings?: ModelRouteResult[]) => void = () => {};
     export let onRouteSelect: (result: ModelRouteResult | null) => void = () => {};
 
     const metrics: ConditionMetric[] = ['tws', 'sog', 'twa', 'swell'];
@@ -112,9 +112,9 @@
         return bestTime;
     }
 
-    function onHover(_departureTime: number, _model: WindModelId, mr: ModelRouteResult): void {
+    function onHover(_departureTime: number, _model: WindModelId, mr: ModelRouteResult, allModelResults?: ModelRouteResult[]): void {
         if (selectedKey) return;
-        onRouteHover(mr);
+        onRouteHover(mr, allModelResults);
     }
 
     function onHoverEnd(): void {
@@ -284,5 +284,14 @@
         opacity: 0.4;
         margin-top: 8px;
         font-style: italic;
+    }
+
+    @media (max-width: 600px) {
+        .departure-results {
+            overflow-x: auto;
+        }
+        .pill {
+            padding: 5px 10px;
+        }
     }
 </style>

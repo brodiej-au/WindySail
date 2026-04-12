@@ -27,6 +27,7 @@ export interface LandResultsMessage {
     payload: {
         pointResults: boolean[]; // true = sea (valid)
         segmentResults: boolean[]; // true = no land crossing (valid)
+        marginResults?: boolean[]; // true = within preferred margin of land
     };
 }
 
@@ -38,6 +39,8 @@ export interface CheckLandMessage {
     payload: {
         points: [number, number][]; // [lat, lon][]
         segments: [number, number, number, number][]; // [fromLat, fromLon, toLat, toLon][]
+        marginPoints?: [number, number][]; // ring points at preferred margin for near-land detection
+        marginGroupSize?: number; // number of ring points per candidate
     };
 }
 
@@ -62,8 +65,17 @@ export interface RouteFailedMessage {
     };
 }
 
+export interface IsochroneUpdateMessage {
+    type: 'ISOCHRONE_UPDATE';
+    payload: {
+        step: number;
+        points: [number, number][]; // [lat, lon][] — lightweight
+    };
+}
+
 export type WorkerToMainMessage =
     | CheckLandMessage
     | ProgressMessage
     | RouteCompleteMessage
-    | RouteFailedMessage;
+    | RouteFailedMessage
+    | IsochroneUpdateMessage;

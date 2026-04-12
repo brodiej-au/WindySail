@@ -20,6 +20,7 @@ export class WorkerBridge {
         onProgress?: ProgressCallback,
         swellGrid?: SwellGridData,
         currentGrid?: CurrentGridData,
+        onIsochrone?: (step: number, points: [number, number][]) => void,
     ): Promise<RouteResult> {
         // Fetch worker script and create blob URL to bypass cross-origin restriction
         // (plugin JS is served from localhost but runs on windy.com)
@@ -43,14 +44,36 @@ export class WorkerBridge {
                 switch (msg.type) {
                     case 'CHECK_LAND': {
                         // Perform land checks on main thread
-                        const [pointResults, segmentResults] = await Promise.all([
+                        const promises: [Promise<boolean[]>, Promise<boolean[]>, Promise<boolean[] | undefined>] = [
                             checkPoints(msg.payload.points),
                             checkSegments(msg.payload.segments),
-                        ]);
+                            msg.payload.marginPoints && msg.payload.marginPoints.length > 0
+                                ? checkPoints(msg.payload.marginPoints)
+                                : Promise.resolve(undefined),
+                        ];
+                        const [pointResults, segmentResults, rawMarginResults] = await Promise.all(promises);
+
+                        // Collapse ring results: candidate is near land if ANY ring point is on land
+                        let marginResults: boolean[] | undefined;
+                        if (rawMarginResults && msg.payload.marginGroupSize) {
+                            const groupSize = msg.payload.marginGroupSize;
+                            const numCandidates = Math.floor(rawMarginResults.length / groupSize);
+                            marginResults = [];
+                            for (let i = 0; i < numCandidates; i++) {
+                                let nearLand = false;
+                                for (let j = 0; j < groupSize; j++) {
+                                    if (!rawMarginResults[i * groupSize + j]) {
+                                        nearLand = true; // ring point hit land
+                                        break;
+                                    }
+                                }
+                                marginResults.push(nearLand);
+                            }
+                        }
 
                         this.worker?.postMessage({
                             type: 'LAND_RESULTS',
-                            payload: { pointResults, segmentResults },
+                            payload: { pointResults, segmentResults, marginResults },
                         });
                         break;
                     }
@@ -61,6 +84,10 @@ export class WorkerBridge {
                             msg.payload.step,
                             msg.payload.totalSteps,
                         );
+                        break;
+
+                    case 'ISOCHRONE_UPDATE':
+                        onIsochrone?.(msg.payload.step, msg.payload.points);
                         break;
 
                     case 'ROUTE_COMPLETE':

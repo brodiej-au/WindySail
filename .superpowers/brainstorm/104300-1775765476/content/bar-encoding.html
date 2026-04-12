@@ -1,0 +1,99 @@
+<h2>How should the condition bars encode data?</h2>
+<p class="subtitle">Each row in the departure table gets a mini-timeline bar. What should it show?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>SOG Bar (height) + Wind Color</h3>
+      <p>Bar height = speed over ground. Color = wind strength (blue→green→yellow→red). Gives two dimensions in one bar. Motoring periods shown as striped/hatched.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-body" style="padding: 12px; background:#1a1a2e; border-radius:6px;">
+          <div style="color:#888; font-size:10px; margin-bottom:4px;">Fri 06:00 → Sun 14:00 (56h) &nbsp; SOG: height &nbsp; TWS: color</div>
+          <div style="display:flex; align-items:flex-end; gap:1px; height:32px; padding:2px 0;">
+            <div style="width:6px; height:70%; background:#2ecc71; border-radius:1px;" title="12kt SOG, 14kt TWS"></div>
+            <div style="width:6px; height:80%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:6px; height:90%; background:#27ae60; border-radius:1px;"></div>
+            <div style="width:6px; height:85%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:6px; height:60%; background:#f39c12; border-radius:1px;"></div>
+            <div style="width:6px; height:40%; background:#f39c12; border-radius:1px;"></div>
+            <div style="width:6px; height:30%; background:repeating-linear-gradient(45deg, #3498db, #3498db 2px, #2c3e50 2px, #2c3e50 4px); border-radius:1px;" title="motoring"></div>
+            <div style="width:6px; height:55%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:6px; height:75%; background:#27ae60; border-radius:1px;"></div>
+            <div style="width:6px; height:95%; background:#e74c3c; border-radius:1px;"></div>
+            <div style="width:6px; height:80%; background:#e74c3c; border-radius:1px;"></div>
+            <div style="width:6px; height:70%; background:#f39c12; border-radius:1px;"></div>
+            <div style="width:6px; height:65%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:6px; height:60%; background:#2ecc71; border-radius:1px;"></div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px; color:#666; font-size:10px;">
+            <span>🟢 8-15kt</span> <span>🟡 15-20kt</span> <span>🔴 20kt+</span> <span>▨ Motor</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Simple Color Blocks (Composite Score)</h3>
+      <p>Combine SOG, TWS, swell, and motoring into a single "sailing quality" score per time segment. Green = great, yellow = okay, red = rough. Simpler to read but hides detail.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-body" style="padding: 12px; background:#1a1a2e; border-radius:6px;">
+          <div style="color:#888; font-size:10px; margin-bottom:4px;">Fri 06:00 → Sun 14:00 (56h) &nbsp; Block = 3h segment quality</div>
+          <div style="display:flex; align-items:center; gap:1px; height:16px; padding:2px 0;">
+            <div style="flex:1; height:100%; background:#2ecc71; border-radius:2px 0 0 2px;"></div>
+            <div style="flex:1; height:100%; background:#2ecc71;"></div>
+            <div style="flex:1; height:100%; background:#27ae60;"></div>
+            <div style="flex:1; height:100%; background:#f39c12;"></div>
+            <div style="flex:1; height:100%; background:#f39c12;"></div>
+            <div style="flex:1; height:100%; background:#3498db;" title="motoring"></div>
+            <div style="flex:1; height:100%; background:#2ecc71;"></div>
+            <div style="flex:1; height:100%; background:#27ae60;"></div>
+            <div style="flex:1; height:100%; background:#e74c3c;"></div>
+            <div style="flex:1; height:100%; background:#e74c3c;"></div>
+            <div style="flex:1; height:100%; background:#f39c12;"></div>
+            <div style="flex:1; height:100%; background:#2ecc71;"></div>
+            <div style="flex:1; height:100%; background:#2ecc71; border-radius:0 2px 2px 0;"></div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:6px; color:#666; font-size:10px;">
+            <span>🟢 Good</span> <span>🟡 Marginal</span> <span>🔴 Rough</span> <span>🔵 Motor</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Switchable Bar Mode</h3>
+      <p>Small toggle above the table: SOG | TWS | TWA | Swell. The bars change to show whichever metric the user cares about. Color thresholds adjust per metric. Power-user friendly.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-body" style="padding: 12px; background:#1a1a2e; border-radius:6px;">
+          <div style="margin-bottom:8px;">
+            <span style="background:#4ecdc4; color:#000; padding:3px 8px; border-radius:3px; font-size:11px; font-weight:bold;">SOG</span>
+            <span style="background:#333; color:#888; padding:3px 8px; border-radius:3px; font-size:11px; margin-left:2px;">TWS</span>
+            <span style="background:#333; color:#888; padding:3px 8px; border-radius:3px; font-size:11px; margin-left:2px;">TWA</span>
+            <span style="background:#333; color:#888; padding:3px 8px; border-radius:3px; font-size:11px; margin-left:2px;">Swell</span>
+          </div>
+          <div style="color:#888; font-size:10px; margin-bottom:4px;">Showing: Speed Over Ground (kt)</div>
+          <div style="display:flex; align-items:flex-end; gap:1px; height:28px; padding:2px 0;">
+            <div style="width:8px; height:65%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:8px; height:75%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:8px; height:90%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:8px; height:80%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:8px; height:45%; background:#f39c12; border-radius:1px;"></div>
+            <div style="width:8px; height:25%; background:#e74c3c; border-radius:1px;"></div>
+            <div style="width:8px; height:50%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:8px; height:70%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:8px; height:85%; background:#2ecc71; border-radius:1px;"></div>
+            <div style="width:8px; height:60%; background:#f39c12; border-radius:1px;"></div>
+            <div style="width:8px; height:55%; background:#2ecc71; border-radius:1px;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

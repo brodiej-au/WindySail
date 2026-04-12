@@ -8,6 +8,16 @@ vi.mock('../../src/adapters/RoutingOrchestrator', () => ({
     })),
 }));
 
+vi.mock('../../src/adapters/WindProvider', () => ({
+    fetchWindGrid: vi.fn().mockResolvedValue({ lats: [], lons: [], timestamps: [], windU: [], windV: [] }),
+    computeBoundsFromPoints: vi.fn().mockReturnValue({ north: 0, south: 0, east: 0, west: 0 }),
+}));
+
+vi.mock('../../src/adapters/OceanDataProvider', () => ({
+    fetchSwellGrid: vi.fn().mockResolvedValue(undefined),
+    fetchCurrentGrid: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { DeparturePlanner } from '../../src/adapters/DeparturePlanner';
 import type { DepartureWindowConfig } from '../../src/routing/types';
 

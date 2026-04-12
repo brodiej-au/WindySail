@@ -30,12 +30,13 @@
         onCancel={handleCancel}
         onClear={handleClear}
         onTimeChange={handlePlayerTimeChange}
-        onModelSwitch={handleModelSwitch}
         onAddWaypoint={handleAddWaypoint}
         onStopAddingWaypoints={handleStopAddingWaypoints}
         onRemoveWaypoint={handleRemoveWaypoint}
         {savedRoutes}
         {suggestedRouteName}
+        {startName}
+        {endName}
         onSaveRoute={handleSaveRoute}
         onLoadRoute={handleLoadRoute}
         onDeleteRoute={handleDeleteRoute}
@@ -45,6 +46,10 @@
         onDepartureScan={handleDepartureScan}
         onDepartureRouteHover={handleDepartureRouteHover}
         onDepartureRouteSelect={handleDepartureRouteSelect}
+        onComparisonHover={handleComparisonHover}
+        onComparisonSelect={handleComparisonSelect}
+        onUseMyLocation={handleUseMyLocation}
+        onPlaceMyLocation={handlePlaceMyLocation}
         bind:this={routingPanel}
     />
 </section>
@@ -52,10 +57,13 @@
 <script lang="ts">
     import bcast from '@windy/broadcast';
     import store from '@windy/store';
+    import { map } from '@windy/map';
     import { get as reverseName } from '@windy/reverseName';
+    import { getGPSlocation } from '@windy/geolocation';
     import { onDestroy } from 'svelte';
 
     import config from './pluginConfig';
+    import { initAnalytics, trackEvent } from './analytics';
     import RoutingPanel from './ui/RoutingPanel.svelte';
     import { WaypointManager } from './map/WaypointManager';
     import { RouteRenderer } from './map/RouteRenderer';
@@ -71,7 +79,7 @@
     import { distance } from './routing/geo';
 
     import type { LatLon, ModelRouteResult, WindModelId, PipelineStep } from './routing/types';
-    import { MODEL_COLORS } from './map/modelColors';
+    import { MODEL_COLORS, getWindyProduct } from './map/modelColors';
     import type { WaypointState } from './map/WaypointManager';
 
     const { title, name } = config;
@@ -92,16 +100,20 @@
     let previewDistanceNm = 0;
     let savedRoutes: SavedRoute[] = routeStore.getAll();
     let suggestedRouteName = '';
+    let startName = '';
+    let endName = '';
 
     let mode: 'single' | 'departure' = 'single';
     let departureResults: DepartureResult[] = [];
     let isDepartureScanning = false;
     const departurePlanner = new DeparturePlanner();
+    let selectedComparisonModel: WindModelId | null = null;
 
     let routingPanel: RoutingPanel;
 
     let originalTimestamp: number | null = null;
     let originalProduct: string | null = null;
+    let originalOverlay: string | null = null;
 
     const renderer = new RouteRenderer();
     const boatMarkers = new BoatMarkerManager();
@@ -153,8 +165,15 @@
 
         if (newStart && newEnd) {
             Promise.all([reverseName(newStart), reverseName(newEnd)]).then(([s, e]) => {
-                suggestedRouteName = `${s.name} to ${e.name}`;
+                startName = formatPlaceName(s);
+                endName = formatPlaceName(e);
+                suggestedRouteName = startName && endName
+                    ? `${startName} to ${endName}`
+                    : startName || endName || '';
             }).catch(() => {});
+        } else {
+            startName = '';
+            endName = '';
         }
     }
 
@@ -171,7 +190,8 @@
         end = liveEnd;
         waypoints = liveWaypoints;
 
-        renderer.clearPreview();
+        renderer.clear();
+        boatMarkers.clear();
         previewDistanceNm = 0;
         error = null;
         results = [];
@@ -180,10 +200,19 @@
         progressPercent = 0;
         progressStatus = 'Starting...';
 
+        const computeStart = Date.now();
+
         try {
             const departureTime = routingPanel.getDepartureTime();
             const settings = settingsStore.getAll();
             const polar = getPolarByName(settings.selectedPolarName);
+
+            trackEvent('route_calculate', {
+                mode,
+                models: settings.selectedModels.length,
+                polar_name: settings.selectedPolarName,
+                distance_nm: Math.round(previewDistanceNm),
+            });
 
             const distNm = distance(liveStart, liveEnd);
             const worstCaseVmg = settings.motorEnabled
@@ -193,6 +222,13 @@
             const effectiveMaxDuration = Math.min(estimatedHours, settings.maxDuration);
 
             progressStatus = `Fetching ${effectiveMaxDuration}h of forecast data (~${distNm.toFixed(0)}nm)`;
+
+            // Zoom map to route extents so Windy loads the right tiles before sampling
+            const allPts: [number, number][] = [liveStart, ...(liveWaypoints ?? []), liveEnd]
+                .map(p => [p.lat, p.lon] as [number, number]);
+            if (allPts.length >= 2) {
+                map.fitBounds(L.latLngBounds(allPts), { padding: [60, 60] });
+            }
 
             const options = {
                 startTime: departureTime,
@@ -236,7 +272,24 @@
 
             renderer.clearIsochrones();
             results = routeResults;
-            renderer.renderRoutes(routeResults);
+
+            // Ensure wind overlay is active so product switch shows data
+            store.set('overlay', 'wind');
+
+            if (routeResults.length > 1) {
+                // Multi-model: render with fitBounds first, then switch to selection mode
+                renderer.renderRoutes(routeResults);
+                const fastest = routeResults.reduce((a, b) => a.route.durationHours < b.route.durationHours ? a : b);
+                selectedComparisonModel = fastest.model;
+                // Switch to selection rendering (no fitBounds) after initial fit
+                renderer.renderRoutesWithSelection(routeResults, fastest.model);
+                store.set('product', fastest.model);
+            } else if (routeResults.length === 1) {
+                // Single model: render normally with fitBounds
+                renderer.renderRoutes(routeResults);
+                selectedComparisonModel = routeResults[0].model;
+                store.set('product', routeResults[0].model);
+            }
 
             // Auto-save last route for restoration on reopen
             routeStore.saveLastRoute({
@@ -259,13 +312,35 @@
                 },
             });
 
+            if (routeResults.length > 0) {
+                const fastest = routeResults.reduce((a, b) =>
+                    a.route.durationHours < b.route.durationHours ? a : b,
+                );
+                trackEvent('route_complete', {
+                    mode,
+                    models: routeResults.length,
+                    polar_name: settings.selectedPolarName,
+                    duration_hours: Math.round(fastest.route.durationHours * 10) / 10,
+                    distance_nm: Math.round(fastest.route.totalDistanceNm),
+                    avg_sog: Math.round(fastest.route.avgSpeedKt * 10) / 10,
+                    compute_time_ms: Date.now() - computeStart,
+                });
+            }
+
             // Identify models that were selected but didn't return results
             const succeededModels = routeResults.map(r => r.model);
             failedModels = settings.selectedModels
                 .filter(m => !succeededModels.includes(m))
                 .map(m => ({ model: m, reason: 'No data available or routing failed' }));
         } catch (err) {
-            error = err instanceof Error ? err.message : 'Routing computation failed.';
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                // User cancelled — not an error
+            } else {
+                error = err instanceof Error ? err.message : 'Routing computation failed.';
+                trackEvent('route_error', {
+                    error: (error ?? 'unknown').slice(0, 100),
+                });
+            }
         } finally {
             isRouting = false;
         }
@@ -289,6 +364,8 @@
         progressPercent = 0;
         progressStatus = 'Starting departure scan...';
 
+        const scanStart = Date.now();
+
         try {
             const windowConfig = routingPanel.getDepartureWindowConfig();
             if (!windowConfig) return;
@@ -297,12 +374,24 @@
             const settings = settingsStore.getAll();
             const polar = getPolarByName(settings.selectedPolarName);
 
+            trackEvent('departure_scan', {
+                models: settings.selectedModels.length,
+                polar_name: settings.selectedPolarName,
+            });
+
             const distNm = distance(liveStart, liveEnd);
             const worstCaseVmg = settings.motorEnabled
                 ? Math.min(settings.estimatedVmgKt, settings.motorSpeed)
                 : settings.estimatedVmgKt;
             const estimatedHours = Math.max(24, Math.ceil(distNm / worstCaseVmg) * 2.0);
             const effectiveMaxDuration = Math.min(estimatedHours, settings.maxDuration);
+
+            // Zoom map to route extents so Windy loads the right tiles before sampling
+            const allPts: [number, number][] = [liveStart, ...(liveWaypoints ?? []), liveEnd]
+                .map(p => [p.lat, p.lon] as [number, number]);
+            if (allPts.length >= 2) {
+                map.fitBounds(L.latLngBounds(allPts), { padding: [60, 60] });
+            }
 
             const baseOptions = {
                 startTime: 0,
@@ -335,32 +424,63 @@
                     departureResults = [...departureResults, result];
                 },
             );
+
+            trackEvent('departure_complete', {
+                models: settings.selectedModels.length,
+                departure_count: departureResults.length,
+                compute_time_ms: Date.now() - scanStart,
+            });
         } catch (err) {
-            error = err instanceof Error ? err.message : 'Departure scan failed.';
+            if (err instanceof DOMException && err.name === 'AbortError') {
+                // User cancelled — not an error
+            } else {
+                error = err instanceof Error ? err.message : 'Departure scan failed.';
+            }
         } finally {
             isDepartureScanning = false;
         }
     }
 
-    function handleDepartureRouteHover(result: ModelRouteResult | null): void {
-        renderer.clear();
+    function handleDepartureRouteHover(result: ModelRouteResult | null, siblings: ModelRouteResult[] = []): void {
+        renderer.clearDeparturePreview();
         if (result) {
-            renderer.renderRoutes([result]);
+            const otherModels = siblings.filter(s => s.model !== result.model);
+            renderer.renderDeparturePreview(result, otherModels);
         }
     }
 
     function handleDepartureRouteSelect(result: ModelRouteResult | null): void {
+        renderer.clearDeparturePreview();
         renderer.clear();
         boatMarkers.clear();
         if (result) {
-            renderer.renderRoutes([result]);
+            renderer.renderRoutes([result]); // full render with fitBounds on click
             results = [result];
         } else {
             results = [];
         }
     }
 
+    /**
+     * Build a readable place name from reverseName result.
+     * Combines available fields: "name, region" or "name, country".
+     * Avoids duplicates (e.g. "Fiji, Fiji") and empty segments.
+     */
+    function formatPlaceName(r: { name?: string; region?: string; country?: string }): string {
+        const segments = [r.name, r.region, r.country].filter(Boolean) as string[];
+        // Deduplicate adjacent segments (e.g. name="NSW", region="NSW")
+        const unique: string[] = [];
+        for (const s of segments) {
+            if (unique.length === 0 || unique[unique.length - 1] !== s) {
+                unique.push(s);
+            }
+        }
+        // Keep at most 2 segments for brevity
+        return unique.slice(0, 2).join(', ');
+    }
+
     function handleCancel(): void {
+        trackEvent('route_cancel');
         orchestrator.cancel();
         departurePlanner.cancel();
         isRouting = false;
@@ -374,19 +494,46 @@
         departureResults = [];
         failedModels = [];
         error = null;
+        selectedComparisonModel = null;
         renderer.clear();
         boatMarkers.clear();
         previewDistanceNm = 0;
     }
 
-    function handlePlayerTimeChange(time: number): void {
+    // Guard to prevent store.on('timestamp') -> handlePlayerTimeChange -> store.set('timestamp') loop
+    let settingTimestamp = false;
+
+    /** Update boat marker visuals for a given time (no store side-effects). */
+    function updateBoatMarkers(time: number): void {
         for (const result of results) {
             const point = interpolateAtTime(result.route.path, time);
             if (point) {
                 boatMarkers.updateMarker(result.model, point, result.color);
             }
         }
+        // Gray out non-selected boat markers in multi-model mode
+        if (results.length > 1 && selectedComparisonModel) {
+            const colorMap: Record<string, string> = {};
+            for (const r of results) colorMap[r.model] = r.color;
+            boatMarkers.setActiveModel(selectedComparisonModel, colorMap);
+        }
+    }
+
+    /** Called by our PlayerControls scrubber/playback — updates markers AND syncs Windy timeline. */
+    function handlePlayerTimeChange(time: number): void {
+        updateBoatMarkers(time);
+        settingTimestamp = true;
         store.set('timestamp', time);
+        settingTimestamp = false;
+    }
+
+    /** Called when user drags Windy's bottom timeline bar — updates our player & markers. */
+    function handleWindyTimestampChange(time: number): void {
+        if (settingTimestamp) return; // We caused this change, ignore
+        if (isRouting || isDepartureScanning) return; // Ignore during data fetching
+        if (results.length === 0) return;
+        updateBoatMarkers(time);
+        routingPanel?.setPlayerTime(time);
     }
 
     function handleWarning(msg: string): void {
@@ -395,11 +542,54 @@
         warningTimeout = setTimeout(() => { warning = null; }, 3000);
     }
 
-    function handleModelSwitch(model: WindModelId): void {
-        store.set('product', model);
+    /** Set the Windy product for a model, mapped to the correct name for the current overlay. */
+    function switchWindyProduct(model: WindModelId): void {
+        const overlay = store.get('overlay');
+        const product = getWindyProduct(model, overlay);
+        if (product) {
+            store.set('product', product);
+        }
+        // If null (no equivalent for this overlay), leave the product as-is
+    }
+
+    function handleComparisonHover(model: WindModelId | null): void {
+        if (results.length <= 1) return;
+        const renderModel = model ?? selectedComparisonModel;
+        if (renderModel) {
+            renderer.renderRoutesWithSelection(results, renderModel);
+            switchWindyProduct(renderModel);
+        }
+    }
+
+    function handleComparisonSelect(model: WindModelId): void {
+        selectedComparisonModel = model;
+        if (results.length > 1) {
+            renderer.renderRoutesWithSelection(results, model);
+        }
+        switchWindyProduct(model);
+    }
+
+    async function handleUseMyLocation(): Promise<{ lat: number; lon: number } | null> {
+        trackEvent('use_my_location');
+        try {
+            const pos = await getGPSlocation({ doNotShowFailureMessage: true });
+            if (pos && pos.lat && pos.lon) {
+                return { lat: pos.lat, lon: pos.lon };
+            }
+            handleWarning('Could not get your location');
+            return null;
+        } catch {
+            handleWarning('Could not get your location');
+            return null;
+        }
+    }
+
+    function handlePlaceMyLocation(pos: { lat: number; lon: number }): void {
+        waypointMgr?.placePoint(pos, true);
     }
 
     function handleAddWaypoint(): void {
+        trackEvent('waypoint_add', { waypoint_count: waypoints.length + 1 });
         waypointMgr?.startAddingWaypoints();
     }
 
@@ -412,6 +602,7 @@
     }
 
     function handleSaveRoute(name: string): void {
+        trackEvent('route_save');
         if (!start || !end) return;
         const settings = settingsStore.getAll();
         routeStore.createRoute(
@@ -437,6 +628,7 @@
     }
 
     function handleLoadRoute(id: string): void {
+        trackEvent('route_load');
         const route = routeStore.get(id);
         if (!route || !waypointMgr) return;
         // Clear existing results
@@ -469,28 +661,56 @@
     }
     routeStore.subscribe(onRoutesChanged);
 
+    let timestampSubId: number | null = null;
+    let lastPolarName: string = settingsStore.get('selectedPolarName');
+
+    function onSettingsChange(settings: { selectedPolarName: string }): void {
+        if (settings.selectedPolarName !== lastPolarName) {
+            lastPolarName = settings.selectedPolarName;
+            trackEvent('polar_select', { polar_name: settings.selectedPolarName });
+        }
+    }
+
     export const onopen = (_params: unknown) => {
+        initAnalytics();
+        trackEvent('plugin_open');
+        settingsStore.subscribe(onSettingsChange);
         originalTimestamp = store.get('timestamp');
         originalProduct = store.get('product');
+        originalOverlay = store.get('overlay');
         waypointMgr = new WaypointManager(name, handleWaypointChange, handleWarning, handleDrag);
         waypointMgr.activate();
+
+        // Sync with Windy's bottom timeline bar
+        timestampSubId = store.on('timestamp', handleWindyTimestampChange);
 
         // Restore last route if available
         const lastRoute = routeStore.getLastRoute();
         if (lastRoute) {
             waypointMgr.loadRoute(lastRoute.start, lastRoute.end, lastRoute.waypoints);
+            if (lastRoute.departureTime) {
+                routingPanel?.setDepartureTime(lastRoute.departureTime);
+            }
         }
     };
 
     onDestroy(() => {
+        trackEvent('plugin_close');
+        if (timestampSubId !== null) {
+            store.off(timestampSubId);
+        }
         waypointMgr?.destroy();
         renderer.clear();
         boatMarkers.clear();
         orchestrator.destroy();
         departurePlanner.destroy();
         routeStore.unsubscribe(onRoutesChanged);
+        settingsStore.unsubscribe(onSettingsChange);
         if (originalTimestamp !== null) {
             store.set('timestamp', originalTimestamp);
+        }
+        if (originalOverlay !== null) {
+            store.set('overlay', originalOverlay);
         }
         if (originalProduct !== null) {
             store.set('product', originalProduct);

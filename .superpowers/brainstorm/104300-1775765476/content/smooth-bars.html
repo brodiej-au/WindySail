@@ -1,0 +1,106 @@
+<h2>Smooth gradient bars with metric toggle</h2>
+<p class="subtitle">Toggle at table level switches what all bars show. Bars use smooth gradients sampled ~1hr.</p>
+
+<div class="mockup" style="margin-top: 16px;">
+  <div class="mockup-body" style="padding: 16px; background:#1a1a2e; border-radius:8px; color:#ccc;">
+
+    <!-- Model tabs -->
+    <div style="display:flex; gap:4px; margin-bottom:12px;">
+      <span style="background:#e74c3c; color:#fff; padding:4px 10px; border-radius:4px; font-size:11px; font-weight:bold;">GFS</span>
+      <span style="background:#333; color:#888; padding:4px 10px; border-radius:4px; font-size:11px;">ECMWF</span>
+      <span style="background:#333; color:#888; padding:4px 10px; border-radius:4px; font-size:11px;">ICON</span>
+    </div>
+
+    <!-- Metric toggle -->
+    <div style="display:flex; gap:3px; margin-bottom:14px; align-items:center;">
+      <span style="color:#888; font-size:10px; margin-right:4px;">Show:</span>
+      <span style="background:#4ecdc4; color:#000; padding:3px 8px; border-radius:3px; font-size:11px; font-weight:bold;">TWS</span>
+      <span style="background:#333; color:#888; padding:3px 8px; border-radius:3px; font-size:11px;">SOG</span>
+      <span style="background:#333; color:#888; padding:3px 8px; border-radius:3px; font-size:11px;">TWA</span>
+      <span style="background:#333; color:#888; padding:3px 8px; border-radius:3px; font-size:11px;">Swell</span>
+    </div>
+
+    <!-- Table header -->
+    <div style="display:grid; grid-template-columns: 80px 1fr 52px 52px 42px; gap:6px; padding:0 4px 6px; font-size:10px; color:#666; border-bottom:1px solid #333;">
+      <div>Depart</div>
+      <div>Conditions (TWS)</div>
+      <div>ETA</div>
+      <div>Dur.</div>
+      <div>Mtr%</div>
+    </div>
+
+    <!-- Row 1 - best -->
+    <div style="display:grid; grid-template-columns: 80px 1fr 52px 52px 42px; gap:6px; padding:8px 4px; align-items:center; border-bottom:1px solid #222; background:rgba(78,205,196,0.05); border-left:2px solid #4ecdc4;">
+      <div style="font-size:11px;">
+        <div style="color:#4ecdc4; font-weight:bold;">★ Fri 06:00</div>
+      </div>
+      <div style="height:14px; border-radius:7px; overflow:hidden; background: linear-gradient(to right, #2ecc71 0%, #27ae60 8%, #2ecc71 15%, #2ecc71 25%, #a8e06a 32%, #f39c12 38%, #f39c12 42%, #a8e06a 48%, #2ecc71 55%, #27ae60 62%, #2ecc71 70%, #2ecc71 78%, #27ae60 85%, #2ecc71 92%, #2ecc71 100%);"></div>
+      <div style="font-size:11px;">Sun 14h</div>
+      <div style="font-size:11px;">56h</div>
+      <div style="font-size:11px;">8%</div>
+    </div>
+
+    <!-- Row 2 -->
+    <div style="display:grid; grid-template-columns: 80px 1fr 52px 52px 42px; gap:6px; padding:8px 4px; align-items:center; border-bottom:1px solid #222;">
+      <div style="font-size:11px;">
+        <div>Fri 12:00</div>
+      </div>
+      <div style="height:14px; border-radius:7px; overflow:hidden; background: linear-gradient(to right, #a8e06a 0%, #f39c12 10%, #f39c12 18%, #a8e06a 25%, #2ecc71 35%, #2ecc71 45%, #27ae60 55%, #2ecc71 62%, #a8e06a 70%, #f39c12 78%, #a8e06a 85%, #2ecc71 92%, #2ecc71 100%);"></div>
+      <div style="font-size:11px;">Sun 22h</div>
+      <div style="font-size:11px;">58h</div>
+      <div style="font-size:11px;">15%</div>
+    </div>
+
+    <!-- Row 3 -->
+    <div style="display:grid; grid-template-columns: 80px 1fr 52px 52px 42px; gap:6px; padding:8px 4px; align-items:center; border-bottom:1px solid #222;">
+      <div style="font-size:11px;">
+        <div>Sat 06:00</div>
+      </div>
+      <div style="height:14px; border-radius:7px; overflow:hidden; background: linear-gradient(to right, #f39c12 0%, #f39c12 12%, #e67e22 20%, #e74c3c 30%, #e74c3c 40%, #e67e22 48%, #f39c12 55%, #a8e06a 65%, #2ecc71 75%, #2ecc71 85%, #27ae60 92%, #2ecc71 100%);"></div>
+      <div style="font-size:11px;">Mon 18h</div>
+      <div style="font-size:11px;">60h</div>
+      <div style="font-size:11px;">22%</div>
+    </div>
+
+    <!-- Row 4 - worst -->
+    <div style="display:grid; grid-template-columns: 80px 1fr 52px 52px 42px; gap:6px; padding:8px 4px; align-items:center; border-bottom:1px solid #222;">
+      <div style="font-size:11px;">
+        <div style="color:#e74c3c;">Sat 12:00</div>
+      </div>
+      <div style="height:14px; border-radius:7px; overflow:hidden; background: linear-gradient(to right, #e74c3c 0%, #e74c3c 15%, #e67e22 22%, #f39c12 30%, #f39c12 40%, #e67e22 50%, #e74c3c 60%, #e74c3c 72%, #e67e22 80%, #f39c12 88%, #a8e06a 95%, #2ecc71 100%);"></div>
+      <div style="font-size:11px;">Tue 02h</div>
+      <div style="font-size:11px;">62h</div>
+      <div style="font-size:11px;">35%</div>
+    </div>
+
+    <!-- Legend -->
+    <div style="display:flex; gap:12px; margin-top:10px; padding-top:8px; border-top:1px solid #222;">
+      <div style="display:flex; align-items:center; gap:4px; font-size:10px; color:#666;">
+        <div style="width:10px; height:10px; border-radius:2px; background:#2ecc71;"></div> 8-12kt
+      </div>
+      <div style="display:flex; align-items:center; gap:4px; font-size:10px; color:#666;">
+        <div style="width:10px; height:10px; border-radius:2px; background:#a8e06a;"></div> 12-15kt
+      </div>
+      <div style="display:flex; align-items:center; gap:4px; font-size:10px; color:#666;">
+        <div style="width:10px; height:10px; border-radius:2px; background:#f39c12;"></div> 15-20kt
+      </div>
+      <div style="display:flex; align-items:center; gap:4px; font-size:10px; color:#666;">
+        <div style="width:10px; height:10px; border-radius:2px; background:#e74c3c;"></div> 20kt+
+      </div>
+    </div>
+
+    <div style="color:#555; font-size:10px; margin-top:8px; font-style:italic;">Hover a row to preview route on map</div>
+  </div>
+</div>
+
+<div style="margin-top:16px; padding:12px; background:rgba(78,205,196,0.1); border-radius:6px; border-left:3px solid #4ecdc4;">
+  <h3 style="margin-top:0; font-size:13px;">How it works</h3>
+  <ul style="font-size:12px; color:#aaa; margin:0; padding-left:16px; line-height:1.6;">
+    <li>Model tabs (GFS/ECMWF/ICON) switch the entire table between models</li>
+    <li>Metric toggle (TWS/SOG/TWA/Swell) changes what the gradient bars represent</li>
+    <li>Bars use CSS gradients sampled every ~1hr along the route for smooth transitions</li>
+    <li>Color scales adjust per metric (e.g., for TWA: green=beam reach, yellow=close hauled, red=no-go zone)</li>
+    <li>Hover a row → route appears on map; click to "select" it as the active route</li>
+    <li>Rows sorted by total passage duration (best first)</li>
+  </ul>
+</div>

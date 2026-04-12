@@ -1,49 +1,12 @@
 import store from '@windy/store';
 import { getLatLonInterpolator } from '@windy/interpolator';
+import products from '@windy/products';
 import type { LatLon, LatLonBounds, WindGridData, WindModelId } from '../routing/types';
 import * as WindCache from './WindCache';
+import { waitForRedraw, waitForProductReady } from './windyHelpers';
 
 const GRID_STEP = 1.0; // degrees — coarser grid for speed, router interpolates
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
-
-/**
- * Wait for Windy to finish a product switch.
- *
- * After setting the product via `store.set('product', model)`, Windy needs
- * to load tiles for the new model.  We poll `getLatLonInterpolator()` at a
- * reference point until it returns a value different from the baseline, or
- * until the timeout expires.  This is far more reliable than waiting for
- * `redrawFinished` which can fire before tiles are actually loaded.
- */
-async function waitForProductReady(
-    refLat: number,
-    refLon: number,
-    baseline: number[] | null,
-    timeoutMs: number = 5000,
-): Promise<void> {
-    const start = Date.now();
-    const checkInterval = 200;
-
-    while (Date.now() - start < timeoutMs) {
-        await new Promise(r => setTimeout(r, checkInterval));
-        try {
-            const interp = await getLatLonInterpolator();
-            if (!interp) continue;
-            const result = await interp({ lat: refLat, lon: refLon });
-            if (result && result.length >= 2) {
-                // If we have no baseline to compare against (first model), accept immediately
-                if (!baseline) return;
-                // If the values differ from the baseline, the product switch took effect
-                if (result[0] !== baseline[0] || result[1] !== baseline[1]) {
-                    return;
-                }
-            }
-        } catch {
-            // Interpolator not ready yet — keep waiting
-        }
-    }
-    console.warn('[WindProvider] Product switch timed out — interpolator may still have stale data');
-}
 
 /**
  * Build a wind grid by scrubbing Windy's timeline and sampling the interpolator.
@@ -61,6 +24,7 @@ export async function fetchWindGrid(
     maxDurationHours: number,
     onProgress?: (msg: string, pct: number) => void,
     previousGrid?: WindGridData,
+    signal?: AbortSignal,
 ): Promise<WindGridData> {
     // Check cache first — return immediately if fresh
     const cacheKey = WindCache.buildCacheKey(model, bounds, departureTime, maxDurationHours);
@@ -120,6 +84,9 @@ export async function fetchWindGrid(
         baseline = [previousGrid.windU[0][0][0], previousGrid.windV[0][0][0]];
     }
 
+    let modelRunTime: number | undefined;
+    let dataUpdateTime: number | undefined;
+
     try {
         // Ensure wind overlay is active and switch to the requested model.
         store.set('overlay', 'wind');
@@ -132,7 +99,26 @@ export async function fetchWindGrid(
         // previous model's grid, confirming the product switch took effect.
         await waitForProductReady(refLat, refLon, baseline);
 
+        // Capture model run time from the product calendar
+        try {
+            const product = products[model];
+            if (product) {
+                const calendar = await product.getCalendar();
+                if (calendar) {
+                    modelRunTime = calendar.refTimeTs;
+                    dataUpdateTime = calendar.updateTs;
+                }
+            }
+        } catch {
+            // Calendar not available — not critical
+        }
+
+        let consecutiveEmpty = 0;
+        let lastNonEmptyIdx = -1;
+
         for (let ti = 0; ti < timestamps.length; ti++) {
+            if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
             onProgress?.(
                 `Sampling wind ${ti + 1}/${timestamps.length}...`,
                 Math.round((ti / timestamps.length) * 100),
@@ -141,23 +127,86 @@ export async function fetchWindGrid(
             // Only switch timestamp if not already set (first iteration handled above)
             if (ti > 0) {
                 store.set('timestamp', timestamps[ti]);
-                await new Promise(r => setTimeout(r, 150));
+                await waitForRedraw(150);
             }
 
             const interpolate = await getLatLonInterpolator();
             if (!interpolate) continue;
 
+            let nonZero = 0;
+            const jobs: Promise<any>[] = [];
             for (let li = 0; li < lats.length; li++) {
                 for (let lo = 0; lo < lons.length; lo++) {
-                    try {
-                        const result = await interpolate({ lat: lats[li], lon: lons[lo] });
+                    jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
+                }
+            }
+            const batchResults = await Promise.all(jobs);
+            let idx = 0;
+            for (let li = 0; li < lats.length; li++) {
+                for (let lo = 0; lo < lons.length; lo++) {
+                    const result = batchResults[idx++];
+                    if (result && typeof result === 'object' && result.length >= 2) {
+                        windU[li][lo][ti] = result[0];
+                        windV[li][lo][ti] = result[1];
+                        if (result[0] !== 0 || result[1] !== 0) nonZero++;
+                    }
+                }
+            }
+
+            if (nonZero > 0) {
+                consecutiveEmpty = 0;
+                lastNonEmptyIdx = ti;
+                continue;
+            }
+
+            // All zeros — retry once in case tiles hadn't loaded yet
+            console.warn(`[WindProvider] Timestamp ${ti + 1}/${timestamps.length}: all-zero data, retrying...`);
+            await waitForRedraw(300);
+
+            const retryInterp = await getLatLonInterpolator();
+            if (retryInterp) {
+                const retryJobs: Promise<any>[] = [];
+                for (let li = 0; li < lats.length; li++) {
+                    for (let lo = 0; lo < lons.length; lo++) {
+                        retryJobs.push(retryInterp({ lat: lats[li], lon: lons[lo] }).catch(() => null));
+                    }
+                }
+                const retryResults = await Promise.all(retryJobs);
+                let ri = 0;
+                for (let li = 0; li < lats.length; li++) {
+                    for (let lo = 0; lo < lons.length; lo++) {
+                        const result = retryResults[ri++];
                         if (result && typeof result === 'object' && result.length >= 2) {
                             windU[li][lo][ti] = result[0];
                             windV[li][lo][ti] = result[1];
+                            if (result[0] !== 0 || result[1] !== 0) nonZero++;
                         }
-                    } catch {
-                        // Outside loaded tiles — leave as 0
                     }
+                }
+            }
+
+            if (nonZero > 0) {
+                consecutiveEmpty = 0;
+                lastNonEmptyIdx = ti;
+            } else {
+                consecutiveEmpty++;
+                if (consecutiveEmpty >= 2) {
+                    console.log(`[WindProvider] Wind data ended at timestamp ${ti + 1}/${timestamps.length} — forecast doesn't extend further`);
+                    break;
+                }
+            }
+        }
+
+        // Trim arrays to actual coverage
+        const trimLen = lastNonEmptyIdx >= 0 && lastNonEmptyIdx < timestamps.length - 1
+            ? lastNonEmptyIdx + 1
+            : timestamps.length;
+        if (trimLen < timestamps.length) {
+            timestamps.length = trimLen;
+            for (let li = 0; li < lats.length; li++) {
+                for (let lo = 0; lo < lons.length; lo++) {
+                    windU[li][lo].length = trimLen;
+                    windV[li][lo].length = trimLen;
                 }
             }
         }
@@ -167,7 +216,7 @@ export async function fetchWindGrid(
         store.set('product', originalProduct);
     }
 
-    const grid: WindGridData = { lats, lons, timestamps, windU, windV };
+    const grid: WindGridData = { lats, lons, timestamps, windU, windV, modelRunTime, dataUpdateTime };
     WindCache.set(cacheKey, grid);
     return grid;
 }

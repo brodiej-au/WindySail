@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git clone:*)",
+      "Bash(git init:*)",
+      "Bash(cp -r /tmp/windy-template/src /mnt/c/Users/brodi/dev/WindySail/ && cp -r /tmp/windy-template/declarations /mnt/c/Users/brodi/dev/WindySail/ && cp /tmp/windy-template/package.json /mnt/c/Users/brodi/dev/WindySail/ && cp /tmp/windy-template/tsconfig.json /mnt/c/Users/brodi/dev/WindySail/ && cp /tmp/windy-template/rollup.config.js /mnt/c/Users/brodi/dev/WindySail/ && cp /tmp/windy-template/svelte.config.js /mnt/c/Users/brodi/dev/WindySail/ && cp /tmp/windy-template/.eslintrc.cjs /mnt/c/Users/brodi/dev/WindySail/ && cp /tmp/windy-template/.prettierrc /mnt/c/Users/brodi/dev/WindySail/ && cp /tmp/windy-template/.gitignore /mnt/c/Users/brodi/dev/WindySail/ && cp -r /tmp/windy-template/.github /mnt/c/Users/brodi/dev/WindySail/ 2>&1)",
+      "Bash(npm install:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vitest:*)",
+      "Bash(ls -lh /mnt/c/Users/brodi/dev/WindySail/dist/*.js)",
+      "Bash(wc:*)",
+      "Bash(SERVE=false npm run:*)",
+      "Bash(npm start:*)",
+      "Bash(npx rollup:*)",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "WebSearch",
+      "WebFetch(domain:api.windy.com)",
+      "WebFetch(domain:docs.windy-plugins.com)",
+      "Bash(npx prettier:*)",
+      "Bash(grep:*)",
+      "Bash(cat:*)",
+      "Bash(npx eslint:*)",
+      "Bash(git reset:*)",
+      "Bash(pnpm add:*)",
+      "Bash(SERVE=false npx rollup:*)",
+      "WebFetch(domain:community.windy.com)",
+      "Bash(bash:*)",
+      "Bash(/home/brodiej/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/scripts/start-server.sh:*)",
+      "Bash(/home/brodiej/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh:*)",
+      "Bash(timeout 30 npx rollup:*)",
+      "Bash(find:*)",
+      "Bash(grep -A5 '\"build\"' package.json 2>/dev/null || head -30 rollup.config.* 2>/dev/null)"
+    ]
+  }
+}

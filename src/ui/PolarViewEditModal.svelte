@@ -262,5 +262,22 @@
 
     .view-body {
         padding: 16px;
+        background: #1a1a2e;
+        color: #e0e0e0;
+    }
+
+    @media (max-width: 600px) {
+        .modal-container {
+            width: 100vw;
+            max-width: none;
+            border-radius: 0;
+        }
+        .close-btn {
+            padding: 8px 12px;
+            font-size: 22px;
+        }
+        .action-btn {
+            padding: 6px 12px;
+        }
     }
 </style>

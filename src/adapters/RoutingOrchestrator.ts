@@ -1,8 +1,9 @@
-import type { LatLon, PolarData, RouteResult, RoutePoint, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData, PipelineStep } from '../routing/types';
+import type { LatLon, PolarData, RouteResult, RoutePoint, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData, PipelineStep, PreloadedGrids } from '../routing/types';
 import { fetchWindGrid, computeBoundsFromPoints } from './WindProvider';
-import { fetchSwellGrid, fetchCurrentGrid } from './OceanDataProvider';
+import { fetchSwellGrid, fetchCurrentGrid, fetchOceanGrids } from './OceanDataProvider';
 import { clearCache as clearLandCache } from './LandChecker';
 import { clear as clearWindCache } from './WindCache';
+import { clear as clearOceanCache } from './OceanCache';
 import { WorkerBridge } from './WorkerBridge';
 import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
 import { enrichRoutePoints } from '../routing/RouteEnricher';
@@ -12,6 +13,7 @@ export type StatusCallback = (status: string, percent: number, steps?: PipelineS
 
 export class RoutingOrchestrator {
     private bridges: WorkerBridge[] = [];
+    private abortController: AbortController | null = null;
 
     constructor(_pluginName?: string) {
         // pluginName reserved for future use (e.g., worker naming)
@@ -40,13 +42,15 @@ export class RoutingOrchestrator {
         waypoints: LatLon[] | undefined,
         options: RoutingOptions,
         onStatus?: StatusCallback,
+        onIsochrone?: (model: WindModelId, step: number, points: [number, number][]) => void,
+        preloaded?: PreloadedGrids,
     ): Promise<ModelRouteResult[]> {
         if (!start || !end) {
             throw new Error('Start and end points must be set.');
         }
 
-        // Clear stale wind cache to avoid reusing bad data from earlier failed runs.
-        clearWindCache();
+        this.abortController = new AbortController();
+        const signal = this.abortController.signal;
 
         const allPoints = [start, ...(waypoints ?? []), end];
         const bounds = computeBoundsFromPoints(allPoints, 1.0);
@@ -74,141 +78,155 @@ export class RoutingOrchestrator {
         });
 
         // --- Wind sampling phase (0–40%) ---
-        // Must run sequentially: switching Windy products one at a time.
         const windGrids = new Map<WindModelId, WindGridData>();
+        let swellGrid: SwellGridData | undefined;
+        let currentGrid: CurrentGridData | null | undefined;
 
-        let lastGrid: WindGridData | undefined;
+        if (preloaded) {
+            // Use pre-fetched grids — mark all sampling steps as done immediately
+            for (const model of models) {
+                const grid = preloaded.windGrids.get(model);
+                if (grid) windGrids.set(model, grid);
+                const step = steps.find(s => s.id === `wind-${model}`)!;
+                step.status = grid ? 'done' : 'failed';
+                if (!grid) step.detail = 'No preloaded data';
+            }
+            swellGrid = preloaded.swellGrid;
+            currentGrid = preloaded.currentGrid;
+            const swellStep = steps.find(s => s.id === 'swell')!;
+            swellStep.status = 'done';
+            swellStep.detail = swellGrid ? undefined : 'No data';
+            const currentStep = steps.find(s => s.id === 'currents')!;
+            currentStep.status = 'done';
+            currentStep.detail = currentGrid ? undefined : 'No data';
 
-        for (let i = 0; i < models.length; i++) {
-            const model = models[i];
-            const stepId = `wind-${model}`;
-            const step = steps.find(s => s.id === stepId)!;
-            step.status = 'active';
-            const baseProgress = Math.round((i / models.length) * 40);
+            emitStatus('Computing routes...', 55);
+        } else {
+            // Must run sequentially: switching Windy products one at a time.
+            let lastGrid: WindGridData | undefined;
 
-            emitStatus(`Sampling wind data (${MODEL_LABELS[model]})...`, baseProgress);
+            for (let i = 0; i < models.length; i++) {
+                if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+                const model = models[i];
+                const stepId = `wind-${model}`;
+                const step = steps.find(s => s.id === stepId)!;
+                step.status = 'active';
+                const baseProgress = Math.round((i / models.length) * 40);
+
+                emitStatus(`Sampling wind data (${MODEL_LABELS[model]})...`, baseProgress);
+
+                try {
+                    const grid = await fetchWindGrid(
+                        model,
+                        bounds,
+                        options.startTime,
+                        options.maxDuration,
+                        (msg, pct) => {
+                            const sliceSize = 40 / models.length;
+                            const scaled = Math.round(baseProgress + pct * (sliceSize / 100));
+                            step.detail = msg;
+                            emitStatus(msg, scaled);
+                        },
+                        lastGrid,
+                        signal,
+                    );
+                    windGrids.set(model, grid);
+                    lastGrid = grid;
+                    step.status = 'done';
+
+                    // Count non-zero values for diagnostics
+                    let nonZeroCount = 0;
+                    let totalCount = 0;
+                    for (const lat of grid.windU) {
+                        for (const lon of lat) {
+                            for (const val of lon) {
+                                totalCount++;
+                                if (val !== 0) nonZeroCount++;
+                            }
+                        }
+                    }
+
+                    console.log(`[RoutingOrchestrator] Wind grid for "${model}":`, {
+                        lats: grid.lats.length,
+                        lons: grid.lons.length,
+                        timestamps: grid.timestamps.length,
+                        nonZeroValues: `${nonZeroCount}/${totalCount}`,
+                        timeRange: `${new Date(grid.timestamps[0]).toISOString()} → ${new Date(grid.timestamps[grid.timestamps.length - 1]).toISOString()}`,
+                    });
+
+                    if (nonZeroCount === 0) {
+                        console.warn(
+                            `[RoutingOrchestrator] Wind grid for model "${model}" has all-zero values — data may have failed silently.`,
+                        );
+                    }
+                } catch (err) {
+                    step.status = 'failed';
+                    step.detail = 'Sampling failed';
+                    console.warn(`[RoutingOrchestrator] Wind sampling failed for model "${model}":`, err);
+                }
+            }
+
+            // Verify wind grids are actually different between models
+            if (windGrids.size >= 2) {
+                const grids = [...windGrids.entries()];
+                for (let i = 1; i < grids.length; i++) {
+                    const [modelA, gridA] = grids[0];
+                    const [modelB, gridB] = grids[i];
+                    let diffCount = 0;
+                    let totalCount = 0;
+                    for (let li = 0; li < Math.min(gridA.windU.length, gridB.windU.length); li++) {
+                        for (let lo = 0; lo < Math.min(gridA.windU[li].length, gridB.windU[li].length); lo++) {
+                            for (let ti = 0; ti < Math.min(gridA.windU[li][lo].length, gridB.windU[li][lo].length); ti++) {
+                                totalCount++;
+                                if (gridA.windU[li][lo][ti] !== gridB.windU[li][lo][ti] ||
+                                    gridA.windV[li][lo][ti] !== gridB.windV[li][lo][ti]) {
+                                    diffCount++;
+                                }
+                            }
+                        }
+                    }
+                    if (diffCount === 0) {
+                        console.error(`[RoutingOrchestrator] WARNING: Wind grids for "${modelA}" and "${modelB}" are IDENTICAL (${totalCount} values). Product switch likely failed.`);
+                    } else {
+                        console.log(`[RoutingOrchestrator] Wind grids "${modelA}" vs "${modelB}": ${diffCount}/${totalCount} values differ ✓`);
+                    }
+                }
+            }
+
+            // --- Ocean data phase (40–55%) ---
+            const swellStep = steps.find(s => s.id === 'swell')!;
+            const currentStep = steps.find(s => s.id === 'currents')!;
+            swellStep.status = 'active';
+            emitStatus('Sampling ocean data...', 40);
 
             try {
-                const grid = await fetchWindGrid(
-                    model,
+                const oceanResult = await fetchOceanGrids(
                     bounds,
                     options.startTime,
                     options.maxDuration,
                     (msg, pct) => {
-                        const sliceSize = 40 / models.length;
-                        const scaled = Math.round(baseProgress + pct * (sliceSize / 100));
-                        step.detail = msg;
+                        const scaled = Math.round(40 + pct * 0.08);
+                        swellStep.detail = msg;
                         emitStatus(msg, scaled);
                     },
-                    lastGrid,
+                    (msg, pct) => {
+                        const scaled = Math.round(48 + pct * 0.07);
+                        currentStep.detail = msg;
+                        emitStatus(msg, scaled);
+                    },
+                    signal,
                 );
-                windGrids.set(model, grid);
-                lastGrid = grid;
-                step.status = 'done';
-
-                // Count non-zero values for diagnostics
-                let nonZeroCount = 0;
-                let totalCount = 0;
-                for (const lat of grid.windU) {
-                    for (const lon of lat) {
-                        for (const val of lon) {
-                            totalCount++;
-                            if (val !== 0) nonZeroCount++;
-                        }
-                    }
-                }
-
-                console.log(`[RoutingOrchestrator] Wind grid for "${model}":`, {
-                    lats: grid.lats.length,
-                    lons: grid.lons.length,
-                    timestamps: grid.timestamps.length,
-                    nonZeroValues: `${nonZeroCount}/${totalCount}`,
-                    timeRange: `${new Date(grid.timestamps[0]).toISOString()} → ${new Date(grid.timestamps[grid.timestamps.length - 1]).toISOString()}`,
-                });
-
-                if (nonZeroCount === 0) {
-                    console.warn(
-                        `[RoutingOrchestrator] Wind grid for model "${model}" has all-zero values — data may have failed silently.`,
-                    );
-                }
+                swellGrid = oceanResult.swellGrid;
+                currentGrid = oceanResult.currentGrid;
+                swellStep.status = 'done';
+                currentStep.status = 'done';
             } catch (err) {
-                step.status = 'failed';
-                step.detail = 'Sampling failed';
-                console.warn(`[RoutingOrchestrator] Wind sampling failed for model "${model}":`, err);
+                swellStep.status = 'done';
+                swellStep.detail = 'Partial or no data — continuing without swell';
+                currentStep.status = 'done';
+                currentStep.detail = 'Partial or no data — continuing without currents';
+                console.warn('[RoutingOrchestrator] Ocean data sampling failed, continuing without ocean data:', err);
             }
-        }
-
-        // Verify wind grids are actually different between models
-        if (windGrids.size >= 2) {
-            const grids = [...windGrids.entries()];
-            for (let i = 1; i < grids.length; i++) {
-                const [modelA, gridA] = grids[0];
-                const [modelB, gridB] = grids[i];
-                let diffCount = 0;
-                let totalCount = 0;
-                for (let li = 0; li < Math.min(gridA.windU.length, gridB.windU.length); li++) {
-                    for (let lo = 0; lo < Math.min(gridA.windU[li].length, gridB.windU[li].length); lo++) {
-                        for (let ti = 0; ti < Math.min(gridA.windU[li][lo].length, gridB.windU[li][lo].length); ti++) {
-                            totalCount++;
-                            if (gridA.windU[li][lo][ti] !== gridB.windU[li][lo][ti] ||
-                                gridA.windV[li][lo][ti] !== gridB.windV[li][lo][ti]) {
-                                diffCount++;
-                            }
-                        }
-                    }
-                }
-                if (diffCount === 0) {
-                    console.error(`[RoutingOrchestrator] WARNING: Wind grids for "${modelA}" and "${modelB}" are IDENTICAL (${totalCount} values). Product switch likely failed.`);
-                } else {
-                    console.log(`[RoutingOrchestrator] Wind grids "${modelA}" vs "${modelB}": ${diffCount}/${totalCount} values differ ✓`);
-                }
-            }
-        }
-
-        // --- Ocean data phase (40–55%) ---
-        let swellGrid: SwellGridData | undefined;
-        let currentGrid: CurrentGridData | null | undefined;
-
-        const swellStep = steps.find(s => s.id === 'swell')!;
-        swellStep.status = 'active';
-        emitStatus('Sampling swell data...', 40);
-        try {
-            swellGrid = await fetchSwellGrid(
-                bounds,
-                options.startTime,
-                options.maxDuration,
-                (msg, pct) => {
-                    const scaled = Math.round(40 + pct * 0.08);
-                    swellStep.detail = msg;
-                    emitStatus(msg, scaled);
-                },
-            );
-            swellStep.status = 'done';
-        } catch (err) {
-            swellStep.status = 'failed';
-            swellStep.detail = 'Sampling failed';
-            console.warn('[RoutingOrchestrator] Swell sampling failed, continuing without swell data:', err);
-        }
-
-        const currentStep = steps.find(s => s.id === 'currents')!;
-        currentStep.status = 'active';
-        emitStatus('Sampling current data...', 48);
-        try {
-            currentGrid = await fetchCurrentGrid(
-                bounds,
-                options.startTime,
-                options.maxDuration,
-                (msg, pct) => {
-                    const scaled = Math.round(48 + pct * 0.07);
-                    currentStep.detail = msg;
-                    emitStatus(msg, scaled);
-                },
-            );
-            currentStep.status = 'done';
-        } catch (err) {
-            currentStep.status = 'failed';
-            currentStep.detail = 'Sampling failed';
-            console.warn('[RoutingOrchestrator] Current sampling failed, continuing without current data:', err);
         }
 
         // --- Routing phase (55–100%) ---
@@ -260,6 +278,7 @@ export class RoutingOrchestrator {
                         }
                     },
                     swellGrid, currentGrid ?? undefined,
+                    (step, pts) => onIsochrone?.(model, step, pts),
                 );
 
                 // Tag with leg index and concatenate (skip first point of subsequent legs to avoid duplicates)
@@ -300,6 +319,8 @@ export class RoutingOrchestrator {
                 route: compositeRoute,
                 color: MODEL_COLORS[model],
                 windGrid: grid,
+                modelRunTime: grid.modelRunTime,
+                dataUpdateTime: grid.dataUpdateTime,
             } as ModelRouteResult;
         });
 
@@ -330,9 +351,29 @@ export class RoutingOrchestrator {
         routingStep.status = 'done';
 
         // Attach ocean data to results and enrich route points for charting
+        const advisories: string[] = [];
+        const routeEndTime = Math.max(...results.map(r => r.route.eta));
+        if (currentGrid?.coverageEndTime) {
+            if (currentGrid.coverageEndTime < routeEndTime) {
+                const coverDate = new Date(currentGrid.coverageEndTime).toLocaleString(undefined, {
+                    weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                });
+                advisories.push(`Current data covers until ${coverDate}; beyond this, ocean currents are not factored into the route.`);
+            }
+        }
+        if (swellGrid?.coverageEndTime) {
+            if (swellGrid.coverageEndTime < routeEndTime) {
+                const coverDate = new Date(swellGrid.coverageEndTime).toLocaleString(undefined, {
+                    weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+                });
+                advisories.push(`Swell data covers until ${coverDate}; beyond this, swell conditions are not factored into comfort weighting.`);
+            }
+        }
+
         for (const result of results) {
             result.swellGrid = swellGrid;
             result.currentGrid = currentGrid ?? undefined;
+            result.dataAdvisories = advisories.length > 0 ? [...advisories] : undefined;
             enrichRoutePoints(result.route.path, swellGrid, currentGrid ?? undefined);
         }
 
@@ -359,6 +400,8 @@ export class RoutingOrchestrator {
      * Cancel any in-progress routing by terminating all active workers.
      */
     cancel(): void {
+        this.abortController?.abort();
+        this.abortController = null;
         for (const bridge of this.bridges) {
             bridge.terminate();
         }
@@ -369,10 +412,14 @@ export class RoutingOrchestrator {
      * Cleanup all resources.
      */
     destroy(): void {
+        this.abortController?.abort();
+        this.abortController = null;
         for (const bridge of this.bridges) {
             bridge.terminate();
         }
         this.bridges = [];
         clearLandCache();
+        clearWindCache();
+        clearOceanCache();
     }
 }
