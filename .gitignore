@@ -2,6 +2,7 @@
 tmp
 .DS_Store
 .vscode
+.claude
 .rollup.cache
 .secret-api-key.sh
 nohup.out
