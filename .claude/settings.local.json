@@ -34,7 +34,8 @@
       "Bash(/home/brodiej/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7/skills/brainstorming/scripts/start-server.sh:*)",
       "Bash(timeout 30 npx rollup:*)",
       "Bash(find:*)",
-      "Bash(grep -A5 '\"build\"' package.json 2>/dev/null || head -30 rollup.config.* 2>/dev/null)"
+      "Bash(grep -A5 '\"build\"' package.json 2>/dev/null || head -30 rollup.config.* 2>/dev/null)",
+      "Bash(chmod +x:*)"
     ]
   }
 }
