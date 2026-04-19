@@ -54,6 +54,11 @@
     />
 </section>
 
+<DisclaimerModal
+    visible={disclaimerVisible}
+    onAccept={onDisclaimerAccept}
+/>
+
 <script lang="ts">
     import bcast from '@windy/broadcast';
     import store from '@windy/store';
@@ -64,7 +69,9 @@
 
     import config from './pluginConfig';
     import { getOrCreateDeviceId, hasPersistedDeviceId } from './backend/deviceId';
-    import { postInstall, postHeartbeat, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
+    import { postInstall, postHeartbeat, postDisclaimerAck, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
+    import { DISCLAIMER_VERSION } from './backend/config';
+    import DisclaimerModal from './ui/DisclaimerModal.svelte';
     import { initAnalytics, trackEvent } from './analytics';
     import RoutingPanel from './ui/RoutingPanel.svelte';
     import { WaypointManager } from './map/WaypointManager';
@@ -116,6 +123,44 @@
     let originalTimestamp: number | null = null;
     let originalProduct: string | null = null;
     let originalOverlay: string | null = null;
+
+    const DISCLAIMER_ACK_KEY = 'windysail-disclaimer-ack';
+    let disclaimerVisible = false;
+    let pendingCalculate: (() => void) | null = null;
+
+    function hasAcknowledgedDisclaimer(): boolean {
+        try {
+            const raw = localStorage.getItem(DISCLAIMER_ACK_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            return parsed?.version === DISCLAIMER_VERSION;
+        } catch { return false; }
+    }
+
+    function markDisclaimerAccepted(): void {
+        try {
+            localStorage.setItem(DISCLAIMER_ACK_KEY, JSON.stringify({
+                version: DISCLAIMER_VERSION,
+                acceptedAt: new Date().toISOString(),
+            }));
+        } catch {}
+    }
+
+    function onDisclaimerAccept() {
+        markDisclaimerAccepted();
+        const deviceId = getOrCreateDeviceId();
+        const email = (store.get('user') as any)?.email ?? null;
+        postDisclaimerAck({
+            deviceId,
+            email,
+            pluginVersion: config.version,
+            disclaimerVersion: DISCLAIMER_VERSION,
+            acceptedAt: new Date().toISOString(),
+        });
+        disclaimerVisible = false;
+        pendingCalculate?.();
+        pendingCalculate = null;
+    }
 
     const renderer = new RouteRenderer();
     const boatMarkers = new BoatMarkerManager();
@@ -196,7 +241,16 @@
         }
     }
 
-    async function handleCalculate(): Promise<void> {
+    function handleCalculate(): void {
+        if (hasAcknowledgedDisclaimer()) {
+            performCalculate();
+            return;
+        }
+        pendingCalculate = () => { performCalculate(); };
+        disclaimerVisible = true;
+    }
+
+    async function performCalculate(): Promise<void> {
         // Read latest positions directly from WaypointManager to avoid stale state
         const liveStart = waypointMgr?.getStart() ?? start;
         const liveEnd = waypointMgr?.getEnd() ?? end;
