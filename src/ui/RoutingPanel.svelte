@@ -102,20 +102,27 @@
                         </div>
                     {/if}
                 </div>
-                {#if currentPolar}
+                {#if currentPolar && !motorboatMode}
                     <div class="boat-thumb" on:click={handleViewPolar} title={t('boat.viewPolarTitle')}>
                         <PolarDiagram polar={currentPolar} width={80} mini={true} />
                     </div>
                 {/if}
             </div>
+            {#if motorboatMode}
+                <div class="motor-summary size-xs">
+                    {t('boat.motorSummary', { cruise: motorboatCruiseKt, heavy: motorboatHeavyKt, swell: motorboatSwellThresholdM })}
+                </div>
+            {/if}
             <!-- Row 2: action buttons -->
-            <div class="boat-buttons">
-                <button class="btn size-xs" on:click={handleEditPolar}>{t('boat.edit')}</button>
-                <button class="btn size-xs" on:click={handleNewPolar}>{t('boat.new')}</button>
-                {#if isCustomPolar}
-                    <button class="btn size-xs btn--danger" on:click={handleDeletePolar}>{t('boat.delete')}</button>
-                {/if}
-            </div>
+            {#if !motorboatMode}
+                <div class="boat-buttons">
+                    <button class="btn size-xs" on:click={handleEditPolar}>{t('boat.edit')}</button>
+                    <button class="btn size-xs" on:click={handleNewPolar}>{t('boat.new')}</button>
+                    {#if isCustomPolar}
+                        <button class="btn size-xs btn--danger" on:click={handleDeletePolar}>{t('boat.delete')}</button>
+                    {/if}
+                </div>
+            {/if}
         </div>
 
         <!-- Route management -->
@@ -684,6 +691,10 @@
     }
     let allPolars = getAllPolars();
     let selectedPolarName: string = settingsStore.get('selectedPolarName');
+    let motorboatMode: boolean = settingsStore.get('motorboatMode');
+    let motorboatCruiseKt: number = settingsStore.get('motorboatCruiseKt');
+    let motorboatHeavyKt: number = settingsStore.get('motorboatHeavyKt');
+    let motorboatSwellThresholdM: number = settingsStore.get('motorboatSwellThresholdM');
 
     $: currentPolar = allPolars.find(p => p.name === selectedPolarName) ?? allPolars[0];
     $: isCustomPolar = getCustomPolars().some(p => p.name === selectedPolarName);
@@ -715,8 +726,18 @@
     function selectPolar(name: string): void {
         selectedPolarName = name;
         settingsStore.set('selectedPolarName', name);
+        motorboatMode = name === 'Motorboat';
+        settingsStore.set('motorboatMode', motorboatMode);
         polarSearchQuery = name;
         polarDropdownOpen = false;
+    }
+
+    /** Re-read motorboat fields from store (e.g. after SettingsModal changes). */
+    export function refreshFromSettings(): void {
+        motorboatMode = settingsStore.get('motorboatMode');
+        motorboatCruiseKt = settingsStore.get('motorboatCruiseKt');
+        motorboatHeavyKt = settingsStore.get('motorboatHeavyKt');
+        motorboatSwellThresholdM = settingsStore.get('motorboatSwellThresholdM');
     }
 
     function handlePolarSearchKey(e: KeyboardEvent): void {
@@ -1461,6 +1482,15 @@
     .boat-buttons {
         display: flex;
         gap: 5px;
+    }
+
+    .motor-summary {
+        color: #8a9ab0;
+        padding: 6px 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 6px;
+        line-height: 1.35;
+        margin-top: 6px;
     }
 
     .btn {

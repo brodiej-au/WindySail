@@ -54,6 +54,7 @@ export const en = {
         new: 'New',
         delete: 'Delete',
         motorboat: 'Motorboat',
+        motorSummary: 'Motorboat · cruise {cruise} kt · heavy-weather {heavy} kt above {swell} m swell',
         polarDiagram: 'Polar Diagram',
         editPrefix: 'Edit: {name}',
         duplicateAndEdit: 'Duplicate & Edit',
@@ -144,6 +145,9 @@ export const en = {
         nightSpeedFactor: 'Night speed factor',
         reefAboveTws: 'Reef above TWS (kt)',
         reefFactor: 'Reef speed factor',
+        mbCruise: 'Cruise speed (kt)',
+        mbHeavy: 'Heavy-weather speed (kt)',
+        mbSwell: 'Swell threshold (m)',
     },
     disclaimer: {
         title: 'Before we route',

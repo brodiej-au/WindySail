@@ -84,6 +84,65 @@
                             <span>{t('settings.showIsochronesShort')}</span>
                         </label>
                     </div>
+
+                    <!-- Motorboat inputs (visible when Motorboat polar is selected) -->
+                    {#if motorboatMode}
+                        <div class="section mb-10">
+                            <span class="size-xs label">{t('boat.motorboat')}</span>
+                            <div class="param-grid">
+                                <label class="size-xs param-label" for="mb-cruise">{t('settings.mbCruise')}</label>
+                                <input id="mb-cruise" type="number" class="input size-s" min="1" max="50" step="0.5"
+                                    value={motorboatCruiseKt} on:change={(e) => handleNumberChange('motorboatCruiseKt', e)} />
+                                <label class="size-xs param-label" for="mb-heavy">{t('settings.mbHeavy')}</label>
+                                <input id="mb-heavy" type="number" class="input size-s" min="1" max="50" step="0.5"
+                                    value={motorboatHeavyKt} on:change={(e) => handleNumberChange('motorboatHeavyKt', e)} />
+                                <label class="size-xs param-label" for="mb-swell">{t('settings.mbSwell')}</label>
+                                <input id="mb-swell" type="number" class="input size-s" min="0.5" max="10" step="0.5"
+                                    value={motorboatSwellThresholdM} on:change={(e) => handleNumberChange('motorboatSwellThresholdM', e)} />
+                            </div>
+                        </div>
+                    {/if}
+
+                    <!-- Advanced settings -->
+                    <div class="section mb-10 advanced-section">
+                        <button class="advanced-header" on:click={() => advancedOpen = !advancedOpen}>
+                            <span class="size-xs label">{t('settings.advanced')}</span>
+                            <span class="chev">{advancedOpen ? '▾' : '▸'}</span>
+                        </button>
+                        {#if !advancedOpen}
+                            <div class="size-xs advanced-summary">{t('settings.advancedSummary')}</div>
+                        {/if}
+                        {#if advancedOpen}
+                            <div class="param-grid">
+                                <label class="size-xs param-label" for="adv-tack">{t('settings.tackPenaltyS')}</label>
+                                <input id="adv-tack" type="number" class="input size-s" min="0" max="300" step="1"
+                                    value={advanced.tackPenaltyS} on:change={(e) => handleAdvancedNumberChange('tackPenaltyS', e, false)} />
+                                <label class="size-xs param-label" for="adv-gybe">{t('settings.gybePenaltyS')}</label>
+                                <input id="adv-gybe" type="number" class="input size-s" min="0" max="300" step="1"
+                                    value={advanced.gybePenaltyS} on:change={(e) => handleAdvancedNumberChange('gybePenaltyS', e, false)} />
+
+                                <label class="size-xs param-label" for="adv-motor-above">{t('settings.motorAboveTws')}</label>
+                                <input id="adv-motor-above" type="number" class="input size-s" min="0" max="80" step="1"
+                                    value={advanced.motorAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorAboveTws', e, true)} placeholder="off" />
+                                <label class="size-xs param-label" for="adv-motor-below">{t('settings.motorBelowTws')}</label>
+                                <input id="adv-motor-below" type="number" class="input size-s" min="0" max="20" step="1"
+                                    value={advanced.motorBelowTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorBelowTws', e, true)} placeholder="off" />
+
+                                <label class="size-xs param-label" for="adv-night">{t('settings.nightSpeedFactor')}</label>
+                                <input id="adv-night" type="range" min="0.5" max="1" step="0.05"
+                                    value={advanced.nightSpeedFactor} on:change={(e) => handleAdvancedNumberChange('nightSpeedFactor', e, false)} />
+                                <span class="size-xs">{(advanced.nightSpeedFactor * 100).toFixed(0)}%</span>
+
+                                <label class="size-xs param-label" for="adv-reef-tws">{t('settings.reefAboveTws')}</label>
+                                <input id="adv-reef-tws" type="number" class="input size-s" min="0" max="80" step="1"
+                                    value={advanced.reefAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('reefAboveTws', e, true)} placeholder="off" />
+                                <label class="size-xs param-label" for="adv-reef-factor">{t('settings.reefFactor')}</label>
+                                <input id="adv-reef-factor" type="range" min="0.5" max="1" step="0.05"
+                                    value={advanced.reefFactor} on:change={(e) => handleAdvancedNumberChange('reefFactor', e, false)} />
+                                <span class="size-xs">{(advanced.reefFactor * 100).toFixed(0)}%</span>
+                            </div>
+                        {/if}
+                    </div>
             </div>
         </div>
     </div>
@@ -115,6 +174,12 @@
     let motorSpeed: number = settingsStore.get('motorSpeed');
     let comfortWeight: number = settingsStore.get('comfortWeight');
     let showIsochrones: boolean = settingsStore.get('showIsochrones');
+    let motorboatMode: boolean = settingsStore.get('motorboatMode');
+    let motorboatCruiseKt: number = settingsStore.get('motorboatCruiseKt');
+    let motorboatHeavyKt: number = settingsStore.get('motorboatHeavyKt');
+    let motorboatSwellThresholdM: number = settingsStore.get('motorboatSwellThresholdM');
+    let advanced: import('../routing/types').AdvancedSettings = settingsStore.get('advanced');
+    let advancedOpen = false;
 
     export function open(): void {
         showModal = true;
@@ -150,7 +215,7 @@
     }
 
     function handleNumberChange(
-        key: keyof Pick<UserSettings, 'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'preferredLandMarginNm' | 'estimatedVmgKt' | 'motorThreshold' | 'motorSpeed'>,
+        key: keyof Pick<UserSettings, 'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'preferredLandMarginNm' | 'estimatedVmgKt' | 'motorThreshold' | 'motorSpeed' | 'motorboatCruiseKt' | 'motorboatHeavyKt' | 'motorboatSwellThresholdM'>,
         e: Event,
     ): void {
         const raw = (e.target as HTMLInputElement).value;
@@ -168,8 +233,30 @@
                 case 'estimatedVmgKt': estimatedVmgKt = value; break;
                 case 'motorThreshold': motorThreshold = value; break;
                 case 'motorSpeed': motorSpeed = value; break;
+                case 'motorboatCruiseKt': motorboatCruiseKt = value; break;
+                case 'motorboatHeavyKt': motorboatHeavyKt = value; break;
+                case 'motorboatSwellThresholdM': motorboatSwellThresholdM = value; break;
             }
         }
+    }
+
+    function handleAdvancedNumberChange(
+        key: keyof import('../routing/types').AdvancedSettings,
+        e: Event,
+        nullable: boolean,
+    ): void {
+        const raw = (e.target as HTMLInputElement).value.trim();
+        let value: number | null;
+        if (nullable && raw === '') {
+            value = null;
+        } else {
+            const parsed = parseFloat(raw);
+            if (isNaN(parsed)) return;
+            value = parsed;
+        }
+        const next = { ...advanced, [key]: value } as import('../routing/types').AdvancedSettings;
+        advanced = next;
+        settingsStore.set('advanced', next);
     }
 
     function handleComfortChange(e: Event): void {
@@ -358,5 +445,26 @@
         .input {
             padding: 8px 10px;
         }
+    }
+
+    .advanced-section {
+        border-top: 1px solid #2a3547;
+        padding-top: 10px;
+    }
+    .advanced-header {
+        background: transparent;
+        border: none;
+        color: #e6eef8;
+        cursor: pointer;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 0;
+    }
+    .advanced-summary {
+        color: #8a9ab0;
+        font-style: italic;
+        margin-top: 4px;
     }
 </style>
