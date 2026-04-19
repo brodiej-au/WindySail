@@ -1,7 +1,7 @@
 <script lang="ts">
     export let visible: boolean = false;
-    export let title: string = 'Before you go';
-    export let body: string = 'This tool is a planning aid. It is NOT for navigation. Verify with official charts and your own judgement. Conditions can change rapidly; always maintain a safe watch.';
+    export let title: string = 'Before we route';
+    export let body: string = 'This tool is a planning aid. It is NOT for navigation. Verify with official charts and your own judgement. Conditions can change rapidly; always maintain a safe watch. We won\'t show this again on this device.';
     export let checkboxLabel: string = 'I understand this is not for navigation.';
     export let acceptLabel: string = 'Accept & Calculate';
     export let onAccept: () => void;
