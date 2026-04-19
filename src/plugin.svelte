@@ -798,9 +798,11 @@
 
     async function handleOpenWithCoords(lat: number, lon: number): Promise<void> {
         const coord: LatLon = { lat, lon };
-        // If a route is already calculated, reset so the user can start fresh.
+        // If a route is already calculated, wipe everything — including the map
+        // markers — and start a fresh placement from this coord as the new Start.
         if (results.length > 0) {
             handleClear();
+            waypointMgr.reset();
         }
         // Move into ADDING_WAYPOINTS if start+end already set so a third
         // right-click can drop a waypoint without the user toggling UI.
