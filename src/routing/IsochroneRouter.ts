@@ -1,5 +1,5 @@
 import type { AdvancedSettings, IsochronePoint, LatLon, PolarData, RoutePoint, WindGridData, SwellGridData, CurrentGridData } from './types';
-import { advancePosition, bearing, computeTWA, distance, normaliseAngle, segmentClosestApproach } from './geo';
+import { advancePosition, bearing, computeTWA, distance, normaliseAngle, segmentClosestApproach, signedTWA } from './geo';
 import { getWindAt } from './WindGrid';
 import { getSpeed } from './Polar';
 import { trilinearInterpolate, interpolateAngle } from './interpolate';
@@ -132,7 +132,21 @@ export function expandFrontier(
                 effectiveHdg = (Math.atan2(sogE, sogN) * 180 / Math.PI + 360) % 360;
             }
 
-            const distNm = sog * timeStepHours;
+            // Tack/gybe penalty: consumes a fraction of the leg's time if the
+            // boat had to cross head-to-wind (tack) or dead-downwind (gybe).
+            let effectiveTimeStepHours = timeStepHours;
+            if (advanced && !isMotoring && point.parent !== null) {
+                const prevSignedTwa = signedTWA(point.heading, point.twd);
+                const currSignedTwa = signedTWA(hdg, wind.direction);
+                const sameSide = Math.sign(prevSignedTwa) === Math.sign(currSignedTwa);
+                if (!sameSide) {
+                    const avgAbs = (Math.abs(prevSignedTwa) + Math.abs(currSignedTwa)) / 2;
+                    const penaltyS = avgAbs < 90 ? advanced.tackPenaltyS : advanced.gybePenaltyS;
+                    effectiveTimeStepHours = Math.max(0, timeStepHours - penaltyS / 3600);
+                }
+            }
+
+            const distNm = sog * effectiveTimeStepHours;
 
             if (distNm <= 0) {
                 candidates.push({
