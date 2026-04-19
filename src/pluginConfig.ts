@@ -21,6 +21,7 @@ const config: ExternalPluginConfig = {
     mobileUI: 'fullscreen',
     routerPath: '/sail-router/:lat?/:lon?',
     listenToSingleclick: true,
+    addToContextmenu: true,
     private: false,
 };
 
