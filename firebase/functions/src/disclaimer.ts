@@ -15,6 +15,8 @@ export async function handleDisclaimer(req: any, res: any): Promise<void> {
         disclaimerVersion: data.disclaimerVersion,
         disclaimerAcceptedAt: serverTimestamp(),
         lastSeenAt: serverTimestamp(),
+        lastLang: data.usedLang,
+        lastVersion: data.pluginVersion,
     }, { merge: true });
 
     await recordEvent('disclaimer-ack', data.deviceId, data, ipHash);
