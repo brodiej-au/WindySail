@@ -478,7 +478,7 @@
         {t('footer.advisoryNotice')}
     </div>
     <div class="footer size-xs mt-10">
-        v0.1.0 &mdash; {t('footer.fairWinds')} &mdash; <button class="footer-link" on:click={() => showAboutModal = true}>Appd</button>
+        {t('footer.versionPrefix')}{pkg.version} &mdash; {t('footer.fairWinds')} &mdash; <button class="footer-link" on:click={() => showAboutModal = true}>Appd</button>
     </div>
 
     {#if showAboutModal}
@@ -515,6 +515,7 @@
 <script lang="ts">
     import { onDestroy } from 'svelte';
     import { t, locale } from '../i18n';
+    import pkg from '../../package.json';
     import ProgressBar from './ProgressBar.svelte';
     import TaskChecklist from './TaskChecklist.svelte';
     import SettingsModal from './SettingsModal.svelte';
