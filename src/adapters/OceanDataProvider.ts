@@ -131,22 +131,38 @@ export async function fetchSwellGrid(
                 Math.round((ti / timestamps.length) * 100),
             );
 
-            if (ti > 0) {
-                store.set('timestamp', timestamps[ti]);
-                await waitForRedraw(150);
-            }
-
-            const interpolate = await getLatLonInterpolator();
-
-            let anyNonZero = false;
-            if (interpolate) {
+            const sampleOneStep = async (): Promise<any[] | null> => {
+                if (ti > 0) {
+                    store.set('timestamp', timestamps[ti]);
+                    await waitForRedraw(150);
+                }
+                const interpolate = await getLatLonInterpolator();
+                if (!interpolate) return null;
                 const jobs: Promise<any>[] = [];
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
                         jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
                     }
                 }
-                const batchResults = await Promise.all(jobs);
+                return await Promise.all(jobs);
+            };
+
+            let batchResults: any[] | null = null;
+            try {
+                batchResults = await retryWithBackoff(
+                    () => withTimeout(sampleOneStep(), STEP_TIMEOUT_MS, `swell ts=${ti}`),
+                    STEP_RETRIES,
+                    STEP_RETRY_BACKOFF_MS,
+                    signal,
+                );
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') throw err;
+                console.warn(`[OceanDataProvider] Swell step ${ti + 1}/${timestamps.length} failed after ${STEP_RETRIES} retries — skipping.`, err);
+                batchResults = null;
+            }
+
+            let anyNonZero = false;
+            if (batchResults) {
                 let idx = 0;
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
@@ -290,22 +306,38 @@ export async function fetchCurrentGrid(
                 Math.round((ti / timestamps.length) * 100),
             );
 
-            if (ti > 0) {
-                store.set('timestamp', timestamps[ti]);
-                await waitForRedraw(150);
-            }
-
-            const interpolate = await getLatLonInterpolator();
-
-            let anyNonZero = false;
-            if (interpolate) {
+            const sampleOneStep = async (): Promise<any[] | null> => {
+                if (ti > 0) {
+                    store.set('timestamp', timestamps[ti]);
+                    await waitForRedraw(150);
+                }
+                const interpolate = await getLatLonInterpolator();
+                if (!interpolate) return null;
                 const jobs: Promise<any>[] = [];
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
                         jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
                     }
                 }
-                const batchResults = await Promise.all(jobs);
+                return await Promise.all(jobs);
+            };
+
+            let batchResults: any[] | null = null;
+            try {
+                batchResults = await retryWithBackoff(
+                    () => withTimeout(sampleOneStep(), STEP_TIMEOUT_MS, `current ts=${ti}`),
+                    STEP_RETRIES,
+                    STEP_RETRY_BACKOFF_MS,
+                    signal,
+                );
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') throw err;
+                console.warn(`[OceanDataProvider] Current step ${ti + 1}/${timestamps.length} failed after ${STEP_RETRIES} retries — skipping.`, err);
+                batchResults = null;
+            }
+
+            let anyNonZero = false;
+            if (batchResults) {
                 let idx = 0;
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
@@ -648,22 +680,38 @@ async function _sampleCurrentInner(
             Math.round((ti / timestamps.length) * 100),
         );
 
-        if (ti > 0) {
-            store.set('timestamp', timestamps[ti]);
-            await waitForRedraw(150);
-        }
-
-        const interpolate = await getLatLonInterpolator();
-
-        let anyNonZero = false;
-        if (interpolate) {
+        const sampleOneStep = async (): Promise<any[] | null> => {
+            if (ti > 0) {
+                store.set('timestamp', timestamps[ti]);
+                await waitForRedraw(150);
+            }
+            const interpolate = await getLatLonInterpolator();
+            if (!interpolate) return null;
             const jobs: Promise<any>[] = [];
             for (let li = 0; li < lats.length; li++) {
                 for (let lo = 0; lo < lons.length; lo++) {
                     jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
                 }
             }
-            const batchResults = await Promise.all(jobs);
+            return await Promise.all(jobs);
+        };
+
+        let batchResults: any[] | null = null;
+        try {
+            batchResults = await retryWithBackoff(
+                () => withTimeout(sampleOneStep(), STEP_TIMEOUT_MS, `current ts=${ti}`),
+                STEP_RETRIES,
+                STEP_RETRY_BACKOFF_MS,
+                signal,
+            );
+        } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') throw err;
+            console.warn(`[OceanDataProvider] Current step ${ti + 1}/${timestamps.length} failed after ${STEP_RETRIES} retries — skipping.`, err);
+            batchResults = null;
+        }
+
+        let anyNonZero = false;
+        if (batchResults) {
             let idx = 0;
             for (let li = 0; li < lats.length; li++) {
                 for (let lo = 0; lo < lons.length; lo++) {
