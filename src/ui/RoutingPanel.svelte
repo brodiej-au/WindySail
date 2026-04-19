@@ -445,10 +445,11 @@
 
     <!-- Route Detail Modal button + Player controls (post-calculation) -->
     {#if results.length > 0}
-        <RouteDetailModal {results} />
+        <RouteDetailModal {results} {waypoints} />
 
         <PlayerControls
             {results}
+            {waypoints}
             {onTimeChange}
             bind:this={playerControls}
         />

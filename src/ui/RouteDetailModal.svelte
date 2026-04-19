@@ -162,8 +162,9 @@
         Filler,
     } from 'chart.js';
     import 'chartjs-adapter-date-fns';
-    import type { ModelRouteResult, RoutePoint } from '../routing/types';
+    import type { LatLon, ModelRouteResult, RoutePoint } from '../routing/types';
     import { MODEL_LABELS } from '../map/modelColors';
+    import { waypointEtas } from '../routing/waypointEta';
 
     Chart.register(
         LineController,
@@ -177,9 +178,11 @@
     );
 
     export let results: ModelRouteResult[] = [];
+    export let waypoints: LatLon[] = [];
 
     let canvasEl: HTMLCanvasElement;
     let chart: Chart | null = null;
+    let waypointTimes: number[] = [];
     let showModal = false;
     let selectedIndex = 0;
     let visibleDatasets: Record<string, boolean> = {
@@ -311,12 +314,50 @@
         },
     };
 
+    const waypointAnnotationsPlugin = {
+        id: 'waypointAnnotations',
+        afterDatasetsDraw(chart: Chart) {
+            const ts = waypointTimes;
+            if (!ts || !ts.length) return;
+            const xScale = chart.scales['x'];
+            if (!xScale) return;
+            const { ctx } = chart;
+            const { top, bottom } = chart.chartArea;
+            ctx.save();
+            for (let i = 0; i < ts.length; i++) {
+                const x = xScale.getPixelForValue(ts[i]);
+                if (!Number.isFinite(x)) continue;
+                // Dashed vertical line
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(96,165,250,0.8)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, top);
+                ctx.lineTo(x, bottom);
+                ctx.stroke();
+                // Numbered badge
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(x, top + 10, 9, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 11px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(i + 1), x, top + 10);
+            }
+            ctx.restore();
+        },
+    };
+
     function buildChart(pts: RoutePoint[]): void {
         destroyChart();
         if (!canvasEl || pts.length < 2) return;
 
         // Store route points for the motoring bands plugin and tooltip access
         chartRoutePoints = pts;
+        waypointTimes = waypointEtas(pts, waypoints);
 
         const labels = pts.map(p => p.time);
         const datasets: any[] = [];
@@ -506,7 +547,7 @@
                     },
                 },
             },
-            plugins: [motoringBandsPlugin],
+            plugins: [motoringBandsPlugin, waypointAnnotationsPlugin],
         });
     }
 

@@ -9,15 +9,20 @@
 
     <!-- Row 2: Time scrubber -->
     <div class="row mb-10">
-        <input
-            type="range"
-            class="scrubber"
-            min={minTime}
-            max={maxTime}
-            step={60000}
-            bind:value={currentTime}
-            on:input={handleScrub}
-        />
+        <div class="scrubber-wrap">
+            {#each waypointFractions as f, i}
+                <div class="wp-tick" style="left: {f * 100}%" title="Waypoint {i + 1}"></div>
+            {/each}
+            <input
+                type="range"
+                class="scrubber"
+                min={minTime}
+                max={maxTime}
+                step={60000}
+                bind:value={currentTime}
+                on:input={handleScrub}
+            />
+        </div>
     </div>
 
 </div>
@@ -25,9 +30,11 @@
 <script lang="ts">
     import { onDestroy } from 'svelte';
 
-    import type { ModelRouteResult } from '../routing/types';
+    import type { LatLon, ModelRouteResult } from '../routing/types';
+    import { waypointEtas } from '../routing/waypointEta';
 
     export let results: ModelRouteResult[] = [];
+    export let waypoints: LatLon[] = [];
     export let onTimeChange: (time: number) => void = () => {};
 
     /**
@@ -48,6 +55,18 @@
 
     $: maxTime =
         results.length > 0 ? Math.max(...results.map(r => r.route.eta)) : Date.now() + 3600000;
+
+    // Waypoint crossings as fractions of the scrubber range.
+    $: waypointFractions = (() => {
+        if (!waypoints.length || results.length === 0) return [];
+        const span = maxTime - minTime;
+        if (span <= 0) return [];
+        // Use the first route's path — all models share the same waypoints.
+        const etas = waypointEtas(results[0].route.path, waypoints);
+        return etas
+            .map(t => (t - minTime) / span)
+            .filter(f => f >= 0 && f <= 1);
+    })();
 
     // Reactive defaults
     $: if (results.length > 0 && currentTime === 0) {
@@ -164,6 +183,23 @@
         min-width: 36px;
         text-align: center;
         padding: 4px 8px;
+    }
+
+    .scrubber-wrap {
+        position: relative;
+        width: 100%;
+    }
+
+    .wp-tick {
+        position: absolute;
+        top: -6px;
+        width: 8px;
+        height: 8px;
+        background: #3b82f6;
+        border-radius: 50%;
+        transform: translateX(-4px);
+        pointer-events: none;
+        z-index: 1;
     }
 
     .scrubber {
