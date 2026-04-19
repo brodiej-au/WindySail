@@ -7,19 +7,20 @@
         {:else if waypointState === 'WAITING_END'}
             <p class="size-m instruction">{t('routing.startPrompt', { what: t('routing.endWhat') })}</p>
         {:else if waypointState === 'READY' || waypointState === 'ADDING_WAYPOINTS'}
-            {#if results.length > 0}
-                <!-- Read-only coords when a route is calculated -->
-                <p class="size-xs coords">{t('routing.startPrefix', { name: startName || formatLatLon(start) })}</p>
-                {#if startName}<p class="size-xs coords coords--sub">{formatLatLon(start)}</p>{/if}
-                {#each waypoints as wp, i}
-                    <div class="waypoint-row size-xs">
-                        <span class="wp-dot">{i + 1}</span>
-                        <span class="coords">{formatLatLon(wp)}</span>
-                    </div>
-                {/each}
-                <p class="size-xs coords">{t('routing.endPrefix', { name: endName || formatLatLon(end) })}</p>
-                {#if endName}<p class="size-xs coords coords--sub">{formatLatLon(end)}</p>{/if}
-            {:else}
+            <RouteStopsCard
+                {start}
+                {startName}
+                {end}
+                {endName}
+                {waypoints}
+                readOnly={results.length > 0}
+                onEditStart={handleEditStartFromCard}
+                onEditEnd={handleEditEndFromCard}
+                onEditWaypoint={handleEditWaypointFromCard}
+                {onRemoveWaypoint}
+            />
+
+            {#if results.length === 0}
                 {#if editingPoint === 'start'}
                     <div class="coord-edit-row size-xs">
                         <span>{t('routing.startLabel')}:</span>
@@ -29,28 +30,7 @@
                         <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
                         <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title={t('routing.useMyLocationTitle')}>&#8982;</button>
                     </div>
-                {:else}
-                    <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('start')}>{t('routing.startPrefix', { name: startName || formatLatLon(start) })}</p>
-                    {#if startName}<p class="size-xs coords coords--sub">{formatLatLon(start)}</p>{/if}
-                {/if}
-                {#each waypoints as wp, i}
-                    {#if editingPoint === i}
-                        <div class="coord-edit-row size-xs">
-                            <span class="wp-dot">{i + 1}</span>
-                            <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                            <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                            <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
-                            <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
-                        </div>
-                    {:else}
-                        <div class="waypoint-row size-xs">
-                            <span class="wp-dot">{i + 1}</span>
-                            <span class="coords clickable" on:click={() => !isRouting && startEditCoord(i)}>{formatLatLon(wp)}</span>
-                            <button class="wp-remove" on:click={() => onRemoveWaypoint(i)}>&#215;</button>
-                        </div>
-                    {/if}
-                {/each}
-                {#if editingPoint === 'end'}
+                {:else if editingPoint === 'end'}
                     <div class="coord-edit-row size-xs">
                         <span>{t('routing.endLabel')}:</span>
                         <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
@@ -59,10 +39,16 @@
                         <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
                         <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title={t('routing.useMyLocationTitle')}>&#8982;</button>
                     </div>
-                {:else}
-                    <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('end')}>{t('routing.endPrefix', { name: endName || formatLatLon(end) })}</p>
-                    {#if endName}<p class="size-xs coords coords--sub">{formatLatLon(end)}</p>{/if}
+                {:else if typeof editingPoint === 'number'}
+                    <div class="coord-edit-row size-xs">
+                        <span class="wp-dot">{editingPoint + 1}</span>
+                        <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
+                        <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
+                    </div>
                 {/if}
+
                 {#if waypointState === 'ADDING_WAYPOINTS'}
                     <p class="size-xs instruction">{t('routing.waypointPrompt')}</p>
                     <button class="button size-xs" on:click={onStopAddingWaypoints}>{t('routing.doneButton')}</button>
@@ -525,6 +511,7 @@
     import RouteDetailModal from './RouteDetailModal.svelte';
     import DepartureWindowInput from './DepartureWindowInput.svelte';
     import DeparturePlannerResults from './DeparturePlannerResults.svelte';
+    import RouteStopsCard from './RouteStopsCard.svelte';
     import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
     import { settingsStore } from '../stores/SettingsStore';
 
@@ -764,6 +751,16 @@
     let editingPoint: 'start' | 'end' | number | null = null;
     let editLat = '';
     let editLon = '';
+
+    function handleEditStartFromCard(): void {
+        if (!isRouting && !isDepartureScanning) startEditCoord('start');
+    }
+    function handleEditEndFromCard(): void {
+        if (!isRouting && !isDepartureScanning) startEditCoord('end');
+    }
+    function handleEditWaypointFromCard(i: number): void {
+        if (!isRouting && !isDepartureScanning) startEditCoord(i);
+    }
 
     function startEditCoord(point: 'start' | 'end' | number): void {
         editingPoint = point;
