@@ -454,6 +454,10 @@
             bind:this={playerControls}
         />
 
+        <button class="button size-xs mt-10" style="width:100%" on:click={handleExportGpx}>
+            {t('routing.exportGpx')}
+        </button>
+
         <button class="button size-s mt-10 clear-btn" style="width:100%" on:click={handleClear}>
             {t('routing.clearRoute')}
         </button>
@@ -502,6 +506,7 @@
     import { onDestroy } from 'svelte';
     import { t, locale } from '../i18n';
     import pkg from '../../package.json';
+    import { triggerGpxDownload } from '../export/gpxExport';
     import ProgressBar from './ProgressBar.svelte';
     import TaskChecklist from './TaskChecklist.svelte';
     import SettingsModal from './SettingsModal.svelte';
@@ -851,6 +856,19 @@
     function handleClear(): void {
         selectedComparisonModel = null;
         onClear();
+    }
+
+    function handleExportGpx(): void {
+        if (!start || !end) return;
+        triggerGpxDownload({
+            startName: startName || 'Start',
+            endName: endName || 'Finish',
+            start,
+            end,
+            waypoints,
+            version: pkg.version,
+            timestamp: new Date().toISOString(),
+        });
     }
 
     function formatLatLon(pos: LatLon | null): string {
