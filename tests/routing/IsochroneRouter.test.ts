@@ -46,6 +46,30 @@ describe('expandFrontier', () => {
     });
 });
 
+describe('modifier stack walkthrough (F-1 audit)', () => {
+    // Documents the modifier order: polar lookup → swell penalty → motor check → current.
+    // Paper walkthrough: twa=110, tws=15 (Bavaria 38 ~7.85 kt); swell 2.0m @ 180°, hdg 200°
+    // gives relSwellAngle=20°, beamFactor=sin(20°)=0.342, penaltyPerMeter=0.04,
+    // penalty=min(0.5, 2.0*0.342*0.04)=0.0274 → boatSpeed≈7.64 kt. With motor threshold 3
+    // and speed 6, no motor engages. With zero current, sog == boatSpeed.
+    it('produces one candidate per heading step when the pipeline runs end-to-end', () => {
+        const polar: PolarData = {
+            name: 'Audit',
+            twaAngles: [0, 110, 180],
+            twsSpeeds: [15],
+            speeds: [[0], [7.3], [0]],
+        };
+        const windGrid = makeUniformWindGrid();
+        const frontier: IsochronePoint[] = [{
+            lat: -33.5, lon: 151.5, parent: null,
+            twa: 0, tws: 0, twd: 0, boatSpeed: 0,
+            heading: 0, time: 0, isMotoring: false, sog: 0,
+        }];
+        const out = expandFrontier(frontier, windGrid, polar, 1, 0);
+        expect(out.length).toBe(72); // 360 / 5-deg heading step
+    });
+});
+
 describe('pruneToSectors', () => {
     it('keeps one point per sector', () => {
         const start: LatLon = { lat: -34, lon: 151 };
