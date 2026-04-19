@@ -192,6 +192,26 @@ export interface DepartureResult {
     failedModels?: WindModelId[];
 }
 
+export interface AdvancedSettings {
+    tackPenaltyS: number;
+    gybePenaltyS: number;
+    motorAboveTws: number | null;
+    motorBelowTws: number | null;
+    nightSpeedFactor: number;
+    reefAboveTws: number | null;
+    reefFactor: number;
+}
+
+export const DEFAULT_ADVANCED: AdvancedSettings = {
+    tackPenaltyS: 15,
+    gybePenaltyS: 20,
+    motorAboveTws: null,
+    motorBelowTws: 4,
+    nightSpeedFactor: 1.0,
+    reefAboveTws: null,
+    reefFactor: 0.85,
+};
+
 export interface UserSettings {
     timeStep: number; // hours
     maxDuration: number; // hours
@@ -208,6 +228,15 @@ export interface UserSettings {
     showIsochrones: boolean; // show isochrone expansion on map during routing
     selectedModels: WindModelId[];
     selectedPolarName: string;
+
+    // Motorboat mode (sub-project C)
+    motorboatMode: boolean;
+    motorboatCruiseKt: number;
+    motorboatHeavyKt: number;
+    motorboatSwellThresholdM: number;
+
+    // Advanced routing (sub-project D)
+    advanced: AdvancedSettings;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -226,4 +255,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     showIsochrones: false,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',
+    motorboatMode: false,
+    motorboatCruiseKt: 7,
+    motorboatHeavyKt: 5,
+    motorboatSwellThresholdM: 2.5,
+    advanced: DEFAULT_ADVANCED,
 }
