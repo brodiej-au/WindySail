@@ -42,4 +42,19 @@ describe('getSpeed', () => {
         expect(result).toBeLessThanOrEqual(getSpeed(polar, 90, 4));
     });
     it('clamps TWS above maximum', () => { expect(getSpeed(polar, 90, 30)).toBeCloseTo(getSpeed(polar, 90, 25)); });
+
+    describe('TWA folding', () => {
+        it('folds negative TWA to its positive counterpart', () => {
+            expect(getSpeed(polar, -90, 10)).toBeCloseTo(getSpeed(polar, 90, 10), 5);
+        });
+        it('folds TWA above 180 to its reflected counterpart', () => {
+            expect(getSpeed(polar, 270, 10)).toBeCloseTo(getSpeed(polar, 90, 10), 5);
+        });
+        it('folds TWA above 360 through modulo', () => {
+            expect(getSpeed(polar, 450, 10)).toBeCloseTo(getSpeed(polar, 90, 10), 5);
+        });
+        it('folds strongly negative TWA through modulo', () => {
+            expect(getSpeed(polar, -450, 10)).toBeCloseTo(getSpeed(polar, 90, 10), 5);
+        });
+    });
 });
