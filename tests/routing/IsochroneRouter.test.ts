@@ -46,6 +46,19 @@ describe('expandFrontier', () => {
     });
 });
 
+describe('motorboat mode', () => {
+    it('uses cruise speed in calm swell, ignoring polar', () => {
+        const polar = { name: 'unused', twaAngles: [0, 180], twsSpeeds: [0, 30], speeds: [[0, 0], [0, 0]] };
+        const windGrid = makeUniformWindGrid();
+        const frontier = [{ lat: -34, lon: 151, parent: null as number | null, twa: 0, tws: 0, twd: 0, boatSpeed: 0, heading: 0, time: 0, isMotoring: false, sog: 0 }];
+        const out = expandFrontier(frontier as any, windGrid, polar as any, 1, 0, {
+            motorboat: { enabled: true, cruiseKt: 7, heavyKt: 5, swellThresholdM: 2.5 },
+        });
+        expect(out[0].boatSpeed).toBe(7);
+        expect(out[0].isMotoring).toBe(true);
+    });
+});
+
 describe('modifier stack walkthrough (F-1 audit)', () => {
     // Documents the modifier order: polar lookup → swell penalty → motor check → current.
     // Paper walkthrough: twa=110, tws=15 (Bavaria 38 ~7.85 kt); swell 2.0m @ 180°, hdg 200°

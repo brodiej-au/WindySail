@@ -322,6 +322,11 @@
                 comfortWeight: settings.comfortWeight,
                 landMarginNm: settings.landMarginNm,
                 preferredLandMarginNm: settings.preferredLandMarginNm,
+                motorboatMode: settings.motorboatMode,
+                motorboatCruiseKt: settings.motorboatCruiseKt,
+                motorboatHeavyKt: settings.motorboatHeavyKt,
+                motorboatSwellThresholdM: settings.motorboatSwellThresholdM,
+                advanced: settings.advanced,
             };
 
             // Set up isochrone visualization callback if enabled
@@ -485,6 +490,11 @@
                 comfortWeight: settings.comfortWeight,
                 landMarginNm: settings.landMarginNm,
                 preferredLandMarginNm: settings.preferredLandMarginNm,
+                motorboatMode: settings.motorboatMode,
+                motorboatCruiseKt: settings.motorboatCruiseKt,
+                motorboatHeavyKt: settings.motorboatHeavyKt,
+                motorboatSwellThresholdM: settings.motorboatSwellThresholdM,
+                advanced: settings.advanced,
             };
 
             await departurePlanner.scan(

@@ -1,8 +1,23 @@
-import type { IsochronePoint, LatLon, PolarData, RoutePoint, WindGridData, SwellGridData, CurrentGridData } from './types';
+import type { AdvancedSettings, IsochronePoint, LatLon, PolarData, RoutePoint, WindGridData, SwellGridData, CurrentGridData } from './types';
 import { advancePosition, bearing, computeTWA, distance, normaliseAngle, segmentClosestApproach } from './geo';
 import { getWindAt } from './WindGrid';
 import { getSpeed } from './Polar';
 import { trilinearInterpolate, interpolateAngle } from './interpolate';
+import { isNight } from './sunAltitude';
+
+export interface ExpandOptions {
+    motor?: { enabled: boolean; threshold: number; speed: number };
+    currentGrid?: CurrentGridData;
+    swellGrid?: SwellGridData;
+    comfortWeight?: number;
+    motorboat?: {
+        enabled: boolean;
+        cruiseKt: number;
+        heavyKt: number;
+        swellThresholdM: number;
+    };
+    advanced?: AdvancedSettings;
+}
 
 export function expandFrontier(
     frontier: IsochronePoint[],
@@ -10,16 +25,18 @@ export function expandFrontier(
     polar: PolarData,
     timeStepHours: number,
     parentIsoIndex: number,
-    motorOptions?: { enabled: boolean; threshold: number; speed: number },
-    currentGrid?: CurrentGridData,
-    swellGrid?: SwellGridData,
-    comfortWeight?: number,
+    opts: ExpandOptions = {},
 ): IsochronePoint[] {
     const candidates: IsochronePoint[] = [];
     const headingStep = 5;
     const numHeadings = 360 / headingStep;
     const dtMs = timeStepHours * 3600000;
-    const cw = comfortWeight ?? 0.3;
+    const cw = opts.comfortWeight ?? 0.3;
+    const swellGrid = opts.swellGrid;
+    const currentGrid = opts.currentGrid;
+    const motorOptions = opts.motor;
+    const motorboat = opts.motorboat;
+    const advanced = opts.advanced;
 
     for (let fi = 0; fi < frontier.length; fi++) {
         const point = frontier[fi];
@@ -49,22 +66,55 @@ export function expandFrontier(
         for (let hi = 0; hi < numHeadings; hi++) {
             const hdg = hi * headingStep;
             const twa = computeTWA(hdg, wind.direction);
-            let boatSpeed = getSpeed(polar, twa, wind.speed);
+            let boatSpeed: number;
             let isMotoring = false;
 
-            // Swell speed reduction (before motor check)
-            if (swellGrid && swellHeight > 0 && !isMotoring) {
-                const relSwellAngle = computeTWA(hdg, swellDir);
-                const beamFactor = Math.sin(relSwellAngle * Math.PI / 180);
-                const penaltyPerMeter = 0.025 + cw * 0.05;
-                const penalty = Math.min(0.5, swellHeight * beamFactor * penaltyPerMeter);
-                boatSpeed *= (1 - penalty);
-            }
-
-            // Motor if sail speed is below threshold
-            if (motorOptions?.enabled && boatSpeed < motorOptions.threshold) {
-                boatSpeed = motorOptions.speed;
+            if (motorboat?.enabled) {
+                // Short-circuit polar + swell + motor-override + advanced adjustments.
+                boatSpeed = swellHeight > motorboat.swellThresholdM
+                    ? motorboat.heavyKt
+                    : motorboat.cruiseKt;
                 isMotoring = true;
+            } else {
+                boatSpeed = getSpeed(polar, twa, wind.speed);
+
+                // Reef factor: reduce speed above configured TWS
+                if (advanced?.reefAboveTws != null && wind.speed > advanced.reefAboveTws) {
+                    boatSpeed *= advanced.reefFactor;
+                }
+
+                // Night speed factor: apply at leg midpoint
+                if (advanced?.nightSpeedFactor != null && advanced.nightSpeedFactor < 1) {
+                    const midTime = point.time + dtMs / 2;
+                    if (isNight(point.lat, point.lon, midTime)) {
+                        boatSpeed *= advanced.nightSpeedFactor;
+                    }
+                }
+
+                // Swell speed reduction (before motor check)
+                if (swellGrid && swellHeight > 0) {
+                    const relSwellAngle = computeTWA(hdg, swellDir);
+                    const beamFactor = Math.sin(relSwellAngle * Math.PI / 180);
+                    const penaltyPerMeter = 0.025 + cw * 0.05;
+                    const penalty = Math.min(0.5, swellHeight * beamFactor * penaltyPerMeter);
+                    boatSpeed *= (1 - penalty);
+                }
+
+                // Motor if sail speed is below threshold
+                if (motorOptions?.enabled && boatSpeed < motorOptions.threshold) {
+                    boatSpeed = motorOptions.speed;
+                    isMotoring = true;
+                }
+
+                // Advanced TWS limits: above or below, force motor (if motor enabled)
+                if (motorOptions?.enabled && advanced) {
+                    const aboveLimit = advanced.motorAboveTws != null && wind.speed > advanced.motorAboveTws;
+                    const belowLimit = advanced.motorBelowTws != null && wind.speed < advanced.motorBelowTws;
+                    if (aboveLimit || belowLimit) {
+                        boatSpeed = motorOptions.speed;
+                        isMotoring = true;
+                    }
+                }
             }
 
             // Apply current as vector addition

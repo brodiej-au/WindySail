@@ -52,6 +52,13 @@ export interface RoutingOptions {
     comfortWeight?: number; // 0-1, modulates swell speed penalty
     landMarginNm?: number; // hard minimum distance from land
     preferredLandMarginNm?: number; // soft preferred distance from land
+    // Motorboat mode — short-circuits polar + swell + advanced adjustments
+    motorboatMode?: boolean;
+    motorboatCruiseKt?: number;
+    motorboatHeavyKt?: number;
+    motorboatSwellThresholdM?: number;
+    // Advanced routing (tack/gybe, TWS limits, night, reef)
+    advanced?: AdvancedSettings;
 }
 
 export const DEFAULT_OPTIONS: RoutingOptions = {
