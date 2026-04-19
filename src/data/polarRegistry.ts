@@ -68,6 +68,18 @@ const BUNDLED_POLARS: PolarData[] = [
     xYacht43 as PolarData,
 ];
 
+// Integrity check: every polar's speeds[][] dimensions must match twaAngles × twsSpeeds.
+for (const p of BUNDLED_POLARS) {
+    if (p.speeds.length !== p.twaAngles.length) {
+        throw new Error(`Polar "${p.name}" has ${p.speeds.length} rows but ${p.twaAngles.length} TWA angles.`);
+    }
+    for (let i = 0; i < p.speeds.length; i++) {
+        if (p.speeds[i].length !== p.twsSpeeds.length) {
+            throw new Error(`Polar "${p.name}" row ${i} has ${p.speeds[i].length} cols but ${p.twsSpeeds.length} TWS speeds.`);
+        }
+    }
+}
+
 const CUSTOM_POLARS_STORAGE_KEY = 'windysail-custom-polars';
 
 /**
