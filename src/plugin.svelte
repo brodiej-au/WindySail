@@ -60,9 +60,11 @@
     import { map } from '@windy/map';
     import { get as reverseName } from '@windy/reverseName';
     import { getGPSlocation } from '@windy/geolocation';
-    import { onDestroy } from 'svelte';
+    import { onDestroy, onMount } from 'svelte';
 
     import config from './pluginConfig';
+    import { getOrCreateDeviceId, hasPersistedDeviceId } from './backend/deviceId';
+    import { postInstall, postHeartbeat, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
     import { initAnalytics, trackEvent } from './analytics';
     import RoutingPanel from './ui/RoutingPanel.svelte';
     import { WaypointManager } from './map/WaypointManager';
@@ -119,6 +121,23 @@
     const boatMarkers = new BoatMarkerManager();
     const orchestrator = new RoutingOrchestrator(name);
     let waypointMgr: WaypointManager;
+
+    onMount(() => {
+        const freshInstall = !hasPersistedDeviceId();
+        const deviceId = getOrCreateDeviceId();
+        const email = (store.get('user') as any)?.email ?? null;
+        const pluginVersion = config.version;
+        const usedLang = (store.get('usedLang') as string) ?? 'en';
+        const userAgent = navigator.userAgent;
+
+        // Fire-and-forget, never await. Plugin UX must never block on backend.
+        if (freshInstall) {
+            postInstall({ deviceId, email, pluginVersion, usedLang, userAgent });
+        } else if (shouldSendHeartbeat()) {
+            postHeartbeat({ deviceId, email, pluginVersion, usedLang });
+        }
+        flushPendingEvents();
+    });
 
     function updatePreview(
         liveStart: LatLon | null,
