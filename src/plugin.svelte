@@ -787,6 +787,16 @@
         }
     };
 
+    // Fires when the plugin is already open and the user right-clicks again
+    // with new lat/lon params. Without this, the prior route's S/F markers
+    // stay on the map because `onopen` only runs on first open.
+    export const paramsChanged = (params: unknown) => {
+        const coordParams = extractLatLon(params);
+        if (coordParams) {
+            handleOpenWithCoords(coordParams.lat, coordParams.lon);
+        }
+    };
+
     function extractLatLon(params: unknown): { lat: number; lon: number } | null {
         if (!params || typeof params !== 'object') return null;
         const p = params as Record<string, unknown>;
