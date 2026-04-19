@@ -1,0 +1,10 @@
+{
+    "name": "Motorboat",
+    "twaAngles": [0, 90, 180],
+    "twsSpeeds": [0, 50],
+    "speeds": [
+        [0, 0],
+        [0, 0],
+        [0, 0]
+    ]
+}

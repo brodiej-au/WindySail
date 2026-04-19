@@ -1,5 +1,8 @@
 import type { PolarData } from '../routing/types';
 
+// Motorboat sentinel (at top of dropdown, not alphabetised)
+import motorboat from './polars/motorboat.json';
+
 // Cruising Monohulls
 import bavaria38 from './polars/bavaria38.json';
 import jeanneauSO440 from './polars/jeanneau-so440.json';
@@ -39,6 +42,7 @@ import laser28 from './polars/laser-28.json';
  * Bundled polars (immutable), sorted alphabetically by name.
  */
 const BUNDLED_POLARS: PolarData[] = [
+    motorboat as PolarData,
     amel50 as PolarData,
     bavaria38 as PolarData,
     bavaria46 as PolarData,
