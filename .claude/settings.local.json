@@ -35,7 +35,14 @@
       "Bash(timeout 30 npx rollup:*)",
       "Bash(find:*)",
       "Bash(grep -A5 '\"build\"' package.json 2>/dev/null || head -30 rollup.config.* 2>/dev/null)",
-      "Bash(chmod +x:*)"
+      "Bash(chmod +x:*)",
+      "Bash(npm test *)",
+      "Bash(firebase --version)",
+      "Bash(firebase projects:list)",
+      "Bash(firebase deploy *)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only firestore:rules,functions)",
+      "Bash(FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions)"
     ]
   }
 }

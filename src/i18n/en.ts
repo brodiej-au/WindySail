@@ -209,11 +209,6 @@ export const en = {
         landWarning: 'Position is on land — try a nearby coastal point.',
         routingFailed: 'Routing failed: {reason}',
     },
-    toast: {
-        setAsStart: 'Set as Start',
-        setAsFinish: 'Set as Finish',
-        waypointAdded: 'Waypoint {n} added',
-    },
     units: {
         knots: 'kt',
         nm: 'nm',

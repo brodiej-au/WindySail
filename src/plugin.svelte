@@ -59,8 +59,6 @@
     onAccept={onDisclaimerAccept}
 />
 
-<Toast bind:message={toastMessage} />
-
 <script lang="ts">
     import bcast from '@windy/broadcast';
     import store from '@windy/store';
@@ -70,12 +68,10 @@
     import { onDestroy, onMount } from 'svelte';
 
     import config from './pluginConfig';
-    import { t } from './i18n';
     import { getOrCreateDeviceId, hasPersistedDeviceId } from './backend/deviceId';
     import { postInstall, postHeartbeat, postDisclaimerAck, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
     import { DISCLAIMER_VERSION } from './backend/config';
     import DisclaimerModal from './ui/DisclaimerModal.svelte';
-    import Toast from './ui/Toast.svelte';
     import { initAnalytics, trackEvent } from './analytics';
     import RoutingPanel from './ui/RoutingPanel.svelte';
     import { WaypointManager } from './map/WaypointManager';
@@ -131,7 +127,6 @@
     const DISCLAIMER_ACK_KEY = 'windysail-disclaimer-ack';
     let disclaimerVisible = false;
     let pendingCalculate: (() => void) | null = null;
-    let toastMessage: string | null = null;
 
     function hasAcknowledgedDisclaimer(): boolean {
         try {
@@ -755,7 +750,7 @@
         }
     }
 
-    export const onopen = (params: unknown) => {
+    export const onopen = (_params: unknown) => {
         initAnalytics();
         trackEvent('plugin_open');
         settingsStore.subscribe(onSettingsChange);
@@ -768,15 +763,6 @@
         // Sync with Windy's bottom timeline bar
         timestampSubId = store.on('timestamp', handleWindyTimestampChange);
 
-        // Right-click context menu: Windy invokes the plugin via routerPath
-        // /sail-router/:lat?/:lon? and passes the params object through to onopen.
-        // If coords are present, drop them into the next empty slot (Start → Finish → Waypoint).
-        const coordParams = extractLatLon(params);
-        if (coordParams) {
-            handleOpenWithCoords(coordParams.lat, coordParams.lon);
-            return;
-        }
-
         // Restore last route if available
         const lastRoute = routeStore.getLastRoute();
         if (lastRoute) {
@@ -786,51 +772,6 @@
             }
         }
     };
-
-    // Fires when the plugin is already open and the user right-clicks again
-    // with new lat/lon params. Without this, the prior route's S/F markers
-    // stay on the map because `onopen` only runs on first open.
-    export const paramsChanged = (params: unknown) => {
-        const coordParams = extractLatLon(params);
-        if (coordParams) {
-            handleOpenWithCoords(coordParams.lat, coordParams.lon);
-        }
-    };
-
-    function extractLatLon(params: unknown): { lat: number; lon: number } | null {
-        if (!params || typeof params !== 'object') return null;
-        const p = params as Record<string, unknown>;
-        const lat = Number(p.lat);
-        const lon = Number(p.lon);
-        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-        return { lat, lon };
-    }
-
-    async function handleOpenWithCoords(lat: number, lon: number): Promise<void> {
-        const coord: LatLon = { lat, lon };
-        // If a route is already calculated, wipe everything — including the map
-        // markers — and start a fresh placement from this coord as the new Start.
-        if (results.length > 0) {
-            handleClear();
-            waypointMgr.reset();
-        }
-        // Move into ADDING_WAYPOINTS if start+end already set so a third
-        // right-click can drop a waypoint without the user toggling UI.
-        if (waypointMgr.getStart() && waypointMgr.getEnd() && waypointState !== 'ADDING_WAYPOINTS') {
-            waypointMgr.startAddingWaypoints();
-        }
-        const slot = nextSlotLabel();
-        const ok = await waypointMgr.placePoint(coord);
-        if (ok) {
-            toastMessage = slot;
-        }
-    }
-
-    function nextSlotLabel(): string {
-        if (!waypointMgr.getStart()) return t('toast.setAsStart');
-        if (!waypointMgr.getEnd()) return t('toast.setAsFinish');
-        return t('toast.waypointAdded', { n: (waypointMgr.getWaypoints()?.length ?? 0) + 1 });
-    }
 
     onDestroy(() => {
         trackEvent('plugin_close');
