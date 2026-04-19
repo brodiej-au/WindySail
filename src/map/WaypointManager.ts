@@ -1,6 +1,7 @@
 import { map } from '@windy/map';
 import { singleclick } from '@windy/singleclick';
 import { checkPoints } from '../adapters/LandChecker';
+import { markerHtml } from './markerHtml';
 
 import type { LatLon } from '../routing/types';
 
@@ -26,24 +27,24 @@ export class WaypointManager {
     private onDrag?: StateChangeCallback;
 
     private static startIcon = L.divIcon({
-        html: '<div style="background:#2ecc71;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">S</div>',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        html: markerHtml('start', 'S', 36),
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
         className: '',
     });
 
     private static endIcon = L.divIcon({
-        html: '<div style="background:#e74c3c;color:#fff;border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;font-size:18px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">E</div>',
-        iconSize: [36, 36],
-        iconAnchor: [18, 18],
+        html: markerHtml('end', 'F', 36),
+        iconSize: [42, 42],
+        iconAnchor: [21, 21],
         className: '',
     });
 
     static waypointIcon(index: number): L.DivIcon {
         return L.divIcon({
-            html: `<div style="background:#3498db;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);">${index + 1}</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
+            html: markerHtml('waypoint', String(index + 1), 32),
+            iconSize: [38, 38],
+            iconAnchor: [19, 19],
             className: '',
         });
     }
