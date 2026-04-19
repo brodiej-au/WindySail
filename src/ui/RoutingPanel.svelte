@@ -51,7 +51,6 @@
 
                 {#if waypointState === 'ADDING_WAYPOINTS'}
                     <p class="size-xs instruction">{t('routing.waypointPrompt')}</p>
-                    <button class="button size-xs" on:click={onStopAddingWaypoints}>{t('routing.doneButton')}</button>
                 {:else}
                     <button class="button size-xs" on:click={onAddWaypoint}>{t('routing.addWaypoint')}</button>
                 {/if}
@@ -753,13 +752,19 @@
     let editLon = '';
 
     function handleEditStartFromCard(): void {
-        if (!isRouting && !isDepartureScanning) startEditCoord('start');
+        if (isRouting || isDepartureScanning) return;
+        if (waypointState === 'ADDING_WAYPOINTS') onStopAddingWaypoints();
+        startEditCoord('start');
     }
     function handleEditEndFromCard(): void {
-        if (!isRouting && !isDepartureScanning) startEditCoord('end');
+        if (isRouting || isDepartureScanning) return;
+        if (waypointState === 'ADDING_WAYPOINTS') onStopAddingWaypoints();
+        startEditCoord('end');
     }
     function handleEditWaypointFromCard(i: number): void {
-        if (!isRouting && !isDepartureScanning) startEditCoord(i);
+        if (isRouting || isDepartureScanning) return;
+        if (waypointState === 'ADDING_WAYPOINTS') onStopAddingWaypoints();
+        startEditCoord(i);
     }
 
     function startEditCoord(point: 'start' | 'end' | number): void {

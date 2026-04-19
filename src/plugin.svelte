@@ -251,6 +251,12 @@
     }
 
     async function performCalculate(): Promise<void> {
+        // Auto-exit waypoint-adding mode so Calculate never blocks on an
+        // unresolved UI transition.
+        if (waypointState === 'ADDING_WAYPOINTS') {
+            handleStopAddingWaypoints();
+        }
+
         // Read latest positions directly from WaypointManager to avoid stale state
         const liveStart = waypointMgr?.getStart() ?? start;
         const liveEnd = waypointMgr?.getEnd() ?? end;
