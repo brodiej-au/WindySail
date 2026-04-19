@@ -2,14 +2,14 @@
     <div class="modal-backdrop" on:click={handleBackdropClick}>
         <div class="modal-container">
             <div class="modal-header">
-                <h3 class="size-m">Settings</h3>
+                <h3 class="size-m">{t('settings.title')}<span hidden>{$locale}</span></h3>
                 <button class="close-btn" on:click={close}>&#10005;</button>
             </div>
 
             <div class="modal-body">
                     <!-- Wind Models -->
                     <div class="section mb-10">
-                        <span class="size-xs label">Wind Models:</span>
+                        <span class="size-xs label">{t('settings.windModels')}:</span>
                         <div class="model-list">
                             {#each ALL_MODELS as model}
                                 <label class="model-row size-s">
@@ -23,30 +23,30 @@
 
                     <!-- Routing Parameters -->
                     <div class="section mb-10">
-                        <span class="size-xs label">Routing Parameters:</span>
+                        <span class="size-xs label">{t('settings.routingParameters')}:</span>
                         <div class="param-grid">
-                            <label class="size-xs param-label" for="sm-timeStep">Time Step (h)</label>
+                            <label class="size-xs param-label" for="sm-timeStep">{t('settings.timeStep')}</label>
                             <input id="sm-timeStep" type="number" class="input size-s" min="0.5" max="3" step="0.5" value={timeStep} on:change={(e) => handleNumberChange('timeStep', e)} />
 
-                            <label class="size-xs param-label" for="sm-maxDuration">Max Duration (h)</label>
+                            <label class="size-xs param-label" for="sm-maxDuration">{t('settings.maxDuration')}</label>
                             <input id="sm-maxDuration" type="number" class="input size-s" min="24" max="336" step="24" value={maxDuration} on:change={(e) => handleNumberChange('maxDuration', e)} />
 
-                            <label class="size-xs param-label" for="sm-headingStep">Heading Step (&deg;)</label>
+                            <label class="size-xs param-label" for="sm-headingStep">{t('settings.headingStep')}</label>
                             <input id="sm-headingStep" type="number" class="input size-s" min="3" max="15" step="1" value={headingStep} on:change={(e) => handleNumberChange('headingStep', e)} />
 
-                            <label class="size-xs param-label" for="sm-numSectors">Sectors</label>
+                            <label class="size-xs param-label" for="sm-numSectors">{t('settings.sectors')}</label>
                             <input id="sm-numSectors" type="number" class="input size-s" min="36" max="144" step="12" value={numSectors} on:change={(e) => handleNumberChange('numSectors', e)} />
 
-                            <label class="size-xs param-label" for="sm-arrivalRadius">Arrival Radius (nm)</label>
+                            <label class="size-xs param-label" for="sm-arrivalRadius">{t('settings.arrivalRadius')}</label>
                             <input id="sm-arrivalRadius" type="number" class="input size-s" min="0.1" max="5" step="0.1" value={arrivalRadius} on:change={(e) => handleNumberChange('arrivalRadius', e)} />
 
-                            <label class="size-xs param-label" for="sm-landMarginNm">Min Land Margin (nm)</label>
+                            <label class="size-xs param-label" for="sm-landMarginNm">{t('settings.landMargin')}</label>
                             <input id="sm-landMarginNm" type="number" class="input size-s" min="0" max="5" step="0.5" value={landMarginNm} on:change={(e) => handleNumberChange('landMarginNm', e)} />
 
-                            <label class="size-xs param-label" for="sm-preferredLandMarginNm">Preferred Margin (nm)</label>
+                            <label class="size-xs param-label" for="sm-preferredLandMarginNm">{t('settings.preferredLandMargin')}</label>
                             <input id="sm-preferredLandMarginNm" type="number" class="input size-s" min="0" max="20" step="1" value={preferredLandMarginNm} on:change={(e) => handleNumberChange('preferredLandMarginNm', e)} />
 
-                            <label class="size-xs param-label" for="sm-estimatedVmgKt">Est. VMG (kt)</label>
+                            <label class="size-xs param-label" for="sm-estimatedVmgKt">{t('settings.estimatedVmg')}</label>
                             <input id="sm-estimatedVmgKt" type="number" class="input size-s" min="1" max="10" step="0.5" value={estimatedVmgKt} on:change={(e) => handleNumberChange('estimatedVmgKt', e)} />
                         </div>
                     </div>
@@ -55,13 +55,13 @@
                     <div class="section mb-10">
                         <label class="model-row size-s">
                             <input type="checkbox" checked={motorEnabled} on:change={toggleMotor} />
-                            <span>Motor when wind speed &lt; threshold</span>
+                            <span>{t('settings.motorEnabled')}</span>
                         </label>
                         {#if motorEnabled}
                             <div class="param-grid" style="margin-top: 6px;">
-                                <label class="size-xs param-label" for="sm-motorThreshold">Threshold (kt)</label>
+                                <label class="size-xs param-label" for="sm-motorThreshold">{t('settings.thresholdShort')}</label>
                                 <input id="sm-motorThreshold" type="number" class="input size-s" min="0.5" max="8" step="0.5" value={motorThreshold} on:change={(e) => handleNumberChange('motorThreshold', e)} />
-                                <label class="size-xs param-label" for="sm-motorSpeed">Motor Speed (kt)</label>
+                                <label class="size-xs param-label" for="sm-motorSpeed">{t('settings.motorSpeed')}</label>
                                 <input id="sm-motorSpeed" type="number" class="input size-s" min="1" max="10" step="0.5" value={motorSpeed} on:change={(e) => handleNumberChange('motorSpeed', e)} />
                             </div>
                         {/if}
@@ -69,11 +69,11 @@
 
                     <!-- Comfort vs Speed -->
                     <div class="section mb-10">
-                        <span class="size-xs label">Optimize for:</span>
+                        <span class="size-xs label">{t('settings.optimizeFor')}</span>
                         <div class="slider-row">
-                            <span class="size-xs slider-label">Speed</span>
+                            <span class="size-xs slider-label">{t('settings.sliderSpeed')}</span>
                             <input type="range" class="comfort-slider" min="0" max="1" step="0.1" value={comfortWeight} on:input={(e) => handleComfortChange(e)} />
-                            <span class="size-xs slider-label">Comfort</span>
+                            <span class="size-xs slider-label">{t('settings.sliderComfort')}</span>
                         </div>
                     </div>
 
@@ -81,7 +81,7 @@
                     <div class="section">
                         <label class="model-row size-s">
                             <input type="checkbox" checked={showIsochrones} on:change={toggleIsochrones} />
-                            <span>Show isochrone expansion</span>
+                            <span>{t('settings.showIsochronesShort')}</span>
                         </label>
                     </div>
             </div>
@@ -91,6 +91,7 @@
 
 <script lang="ts">
     import { onDestroy } from 'svelte';
+    import { t, locale } from '../i18n';
     import { settingsStore } from '../stores/SettingsStore';
     import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
     import type { WindModelId, UserSettings } from '../routing/types';
