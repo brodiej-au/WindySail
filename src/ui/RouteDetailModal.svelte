@@ -1,6 +1,6 @@
 <!-- Button to open modal -->
 <button class="open-detail-btn size-s" on:click={openModal}>
-    <span>Route Details</span>
+    <span>{t('results.routeDetails')}<span hidden>{$locale}</span></span>
     <span class="popup-icon">&#8599;</span>
 </button>
 
@@ -10,7 +10,7 @@
         <div class="modal-container">
             <!-- Header with model tabs -->
             <div class="modal-header">
-                <h3 class="size-m">Route Details</h3>
+                <h3 class="size-m">{t('results.routeDetails')}</h3>
                 <div class="model-tabs">
                     {#each results as mr, i}
                         <button
@@ -33,38 +33,38 @@
             {@const route = results[selectedIndex].route}
             <div class="trip-summary">
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Departure</span>
+                    <span class="summary-label size-xs">{t('results.departureSummary')}</span>
                     <span class="summary-value size-s">{formatDateTime(route.path[0].time)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">ETA</span>
+                    <span class="summary-label size-xs">{t('results.eta')}</span>
                     <span class="summary-value size-s">{formatDateTime(route.eta)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Duration</span>
+                    <span class="summary-label size-xs">{t('results.duration')}</span>
                     <span class="summary-value size-s">{formatDuration(route.durationHours)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Distance</span>
-                    <span class="summary-value size-s">{route.totalDistanceNm.toFixed(1)} nm</span>
+                    <span class="summary-label size-xs">{t('results.totalDistance')}</span>
+                    <span class="summary-value size-s">{route.totalDistanceNm.toFixed(1)} {t('units.nm')}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Avg SOG</span>
-                    <span class="summary-value size-s">{route.avgSpeedKt.toFixed(1)} kt</span>
+                    <span class="summary-label size-xs">{t('results.avgSog')}</span>
+                    <span class="summary-value size-s">{route.avgSpeedKt.toFixed(1)} {t('units.knots')}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Max TWS</span>
-                    <span class="summary-value size-s">{route.maxTws.toFixed(0)} kt</span>
+                    <span class="summary-label size-xs">{t('results.maxTws')}</span>
+                    <span class="summary-value size-s">{route.maxTws.toFixed(0)} {t('units.knots')}</span>
                 </div>
                 {#if results[selectedIndex].modelRunTime}
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Forecast</span>
-                    <span class="summary-value size-s">{MODEL_LABELS[results[selectedIndex].model]} run {formatModelRunTime(results[selectedIndex].modelRunTime)}</span>
+                    <span class="summary-label size-xs">{t('results.forecast')}</span>
+                    <span class="summary-value size-s">{t('results.forecastRun', { model: MODEL_LABELS[results[selectedIndex].model], time: formatModelRunTime(results[selectedIndex].modelRunTime) })}</span>
                     {#if results[selectedIndex].swellGrid?.modelRunTime}
-                    <span class="summary-sub size-xs">Swell: {formatModelRunTime(results[selectedIndex].swellGrid?.modelRunTime)}</span>
+                    <span class="summary-sub size-xs">{t('results.swellPrefix', { time: formatModelRunTime(results[selectedIndex].swellGrid?.modelRunTime) })}</span>
                     {/if}
                     {#if results[selectedIndex].currentGrid?.modelRunTime}
-                    <span class="summary-sub size-xs">Current: {formatModelRunTime(results[selectedIndex].currentGrid?.modelRunTime)}</span>
+                    <span class="summary-sub size-xs">{t('results.currentPrefix', { time: formatModelRunTime(results[selectedIndex].currentGrid?.modelRunTime) })}</span>
                     {/if}
                 </div>
                 {/if}
@@ -75,30 +75,30 @@
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.wind} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(255, 165, 0, 0.9)"></span>
-                    Wind
+                    {t('results.chartWind')}
                 </label>
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.sog} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(255, 255, 255, 0.8)"></span>
-                    SOG
+                    {t('results.chartSog')}
                 </label>
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.twa} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(233, 196, 106, 0.9)"></span>
-                    TWA
+                    {t('results.chartTwa')}
                 </label>
                 {#if hasSwell}
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.swell} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(100, 149, 237, 0.9)"></span>
-                    Swell
+                    {t('results.chartSwell')}
                 </label>
                 {/if}
                 {#if hasCurrents}
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.current} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(75, 192, 130, 0.9)"></span>
-                    Current
+                    {t('results.chartCurrent')}
                 </label>
                 {/if}
             </div>
@@ -113,20 +113,20 @@
                 <table class="leg-table size-xs">
                     <thead>
                         <tr>
-                            <th>Time</th>
-                            <th>TWS</th>
-                            <th>TWA</th>
-                            <th>HDG</th>
-                            <th>SOG</th>
-                            {#if hasSwell}<th>Swell</th>{/if}
-                            {#if hasCurrents}<th>Current</th>{/if}
+                            <th>{t('results.colTime')}</th>
+                            <th>{t('results.colTws')}</th>
+                            <th>{t('results.colTwa')}</th>
+                            <th>{t('results.colHdg')}</th>
+                            <th>{t('results.colSog')}</th>
+                            {#if hasSwell}<th>{t('results.colSwell')}</th>{/if}
+                            {#if hasCurrents}<th>{t('results.colCurrent')}</th>{/if}
                         </tr>
                     </thead>
                     <tbody>
                         {#each legPoints as pt, i}
                             {#if i > 0 && pt.legIndex != null && legPoints[i - 1].legIndex != null && pt.legIndex !== legPoints[i - 1].legIndex}
                                 <tr class="leg-divider-row">
-                                    <td colspan={columnCount}>Leg {(pt.legIndex ?? 0) + 1}</td>
+                                    <td colspan={columnCount}>{t('results.legHeading', { n: (pt.legIndex ?? 0) + 1 })}</td>
                                 </tr>
                             {/if}
                             <tr class:motoring-row={pt.isMotoring}>
@@ -149,6 +149,7 @@
 
 <script lang="ts">
     import { onDestroy, tick } from 'svelte';
+    import { t, locale } from '../i18n';
     import {
         Chart,
         LineController,

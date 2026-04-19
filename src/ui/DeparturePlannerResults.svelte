@@ -1,7 +1,8 @@
 <div class="departure-results">
+    <span hidden>{$locale}</span>
     <!-- Metric toggle -->
     <div class="metric-toggle">
-        <span class="size-xs toggle-label">Show:</span>
+        <span class="size-xs toggle-label">{t('departure.show')}</span>
         {#each metrics as m}
             <button
                 class="pill size-xs"
@@ -15,12 +16,12 @@
 
     <!-- Table header -->
     <div class="dp-header size-xs">
-        <div class="col-depart">Depart</div>
-        <div class="col-model">Model</div>
-        <div class="col-bar">Conditions ({METRIC_LABELS[activeMetric]})</div>
-        <div class="col-eta">ETA</div>
-        <div class="col-dur">Dur.</div>
-        <div class="col-motor">Mtr%</div>
+        <div class="col-depart">{t('departure.depart')}</div>
+        <div class="col-model">{t('departure.modelCol')}</div>
+        <div class="col-bar">{t('departure.conditionsCol', { metric: METRIC_LABELS[activeMetric] })}</div>
+        <div class="col-eta">{t('departure.etaCol')}</div>
+        <div class="col-dur">{t('departure.durCol')}</div>
+        <div class="col-motor">{t('departure.motorPctCol')}</div>
     </div>
 
     <!-- Grouped rows -->
@@ -57,7 +58,7 @@
                 <div class="dp-row dp-row--failed size-xs">
                     <div class="col-depart"></div>
                     <div class="col-rest">
-                        &#9888; {dep.failedModels.map(m => MODEL_LABELS[m]).join(', ')} failed
+                        &#9888; {t('departure.modelsFailed', { models: dep.failedModels.map(m => MODEL_LABELS[m]).join(', ') })}
                     </div>
                 </div>
             {/if}
@@ -65,18 +66,19 @@
     {/each}
 
     {#if results.length === 0 && !isScanning}
-        <div class="no-results size-s">No departure results yet.</div>
+        <div class="no-results size-s">{t('departure.noResults')}</div>
     {/if}
 
     <!-- Legend -->
     {#if results.length > 0}
         <div class="dp-footer size-xs">
-            Hover row to preview route &middot; Click to select
+            {t('departure.hoverHint')}
         </div>
     {/if}
 </div>
 
 <script lang="ts">
+    import { t, locale } from '../i18n';
     import type { DepartureResult, ModelRouteResult, RoutePoint, WindModelId } from '../routing/types';
     import { MODEL_LABELS } from '../map/modelColors';
     import ConditionBar from './ConditionBar.svelte';

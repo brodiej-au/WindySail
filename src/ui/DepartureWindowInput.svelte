@@ -1,23 +1,24 @@
 <div class="departure-window">
+    <span hidden>{$locale}</span>
     <div class="dw-row">
-        <label class="size-xs label" for="dw-from">From:</label>
+        <label class="size-xs label" for="dw-from">{t('departure.fromLabel')}</label>
         <input id="dw-from" type="datetime-local" bind:value={fromStr} class="input size-s" />
     </div>
     <div class="dw-row">
-        <label class="size-xs label" for="dw-to">To:</label>
+        <label class="size-xs label" for="dw-to">{t('departure.toLabel')}</label>
         <input id="dw-to" type="datetime-local" bind:value={toStr} class="input size-s" />
     </div>
     <div class="dw-row dw-row--interval">
-        <label class="size-xs label" for="dw-interval">Every:</label>
+        <label class="size-xs label" for="dw-interval">{t('departure.everyLabel')}</label>
         <select id="dw-interval" class="input size-s" bind:value={intervalHours}>
-            <option value={3}>3 hours</option>
-            <option value={6}>6 hours</option>
-            <option value={12}>12 hours</option>
-            <option value={24}>24 hours</option>
+            <option value={3}>{t('departure.threeHours')}</option>
+            <option value={6}>{t('departure.sixHours')}</option>
+            <option value={12}>{t('departure.twelveHours')}</option>
+            <option value={24}>{t('departure.twentyFourHours')}</option>
         </select>
     </div>
     <div class="dw-summary size-xs">
-        {departureCount} departures &times; {modelCount} model{modelCount !== 1 ? 's' : ''} = {departureCount * modelCount} routes
+        {t(modelCount === 1 ? 'departure.summarySingular' : 'departure.summaryPlural', { count: departureCount, modelCount, total: departureCount * modelCount })}
     </div>
     {#if warning}
         <div class="dw-warning size-xs" class:dw-warning--caution={!windowInPast}>{warning}</div>
@@ -25,6 +26,7 @@
 </div>
 
 <script lang="ts">
+    import { t, locale } from '../i18n';
     import type { DepartureWindowConfig } from '../routing/types';
 
     export let modelCount: number = 1;
@@ -44,13 +46,13 @@
     $: windowReversed = toMs < fromMs;
     $: windowInPast = windowReversed || toMs < Date.now() - 3600_000;
     $: windowBeyondForecast = !windowReversed && fromMs > Date.now() + FORECAST_HORIZON_MS;
-    $: warning = windowReversed
-        ? 'End time is before start time.'
+    $: warning = ($locale, (windowReversed
+        ? t('departure.endBeforeStart')
         : windowInPast
-            ? 'Departure window is in the past.'
+            ? t('departure.windowInPast')
             : windowBeyondForecast
-                ? 'Window starts >7 days out — forecast accuracy will be limited.'
-                : '';
+                ? t('departure.windowBeyondForecast')
+                : ''));
     $: if (onWindowInPastChange) onWindowInPastChange(windowInPast);
 
     function computeDepartureCount(from: string, to: string, interval: number): number {

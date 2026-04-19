@@ -1,20 +1,21 @@
 <!-- Interactive polar graph editor: full-screen modal with draggable SVG points + sidebar controls -->
 <div class="modal-backdrop">
     <div class="modal-container">
+        <span hidden>{$locale}</span>
         <!-- Header -->
         <div class="modal-header">
-            <h3 class="size-m">{polar ? `Edit: ${name}` : 'New Polar'}</h3>
+            <h3 class="size-m">{polar ? t('boat.editPrefix', { name }) : t('boat.newPolarTitle')}</h3>
             <button class="close-btn" on:click={onCancel}>✕</button>
         </div>
 
         <!-- Name input -->
         <div class="name-row">
-            <label class="size-xs label" for="editorPolarName">Name</label>
+            <label class="size-xs label" for="editorPolarName">{t('boat.nameLabel')}</label>
             <input
                 id="editorPolarName"
                 type="text"
                 class="input size-s"
-                placeholder="e.g. My Boat 35"
+                placeholder={t('boat.namePlaceholder')}
                 bind:value={name}
             />
         </div>
@@ -106,18 +107,18 @@
                 <!-- Selected point info -->
                 {#if activePoint}
                     <div class="section mb-10">
-                        <span class="size-xs label">Selected Point</span>
+                        <span class="size-xs label">{t('boat.selectedPoint')}</span>
                         <div class="point-info size-s">
-                            <span>TWA: {twaAngles[activePoint.twaIdx]}°</span>
-                            <span>TWS: {twsSpeeds[activePoint.twsIdx]} kt</span>
-                            <span>Speed: {speeds[activePoint.twaIdx][activePoint.twsIdx].toFixed(1)} kt</span>
+                            <span>{t('boat.pointTwa', { value: twaAngles[activePoint.twaIdx] })}</span>
+                            <span>{t('boat.pointTws', { value: twsSpeeds[activePoint.twsIdx] })}</span>
+                            <span>{t('boat.pointSpeed', { value: speeds[activePoint.twaIdx][activePoint.twsIdx].toFixed(1) })}</span>
                         </div>
                     </div>
                 {/if}
 
                 <!-- TWS values -->
                 <div class="section mb-10">
-                    <span class="size-xs label">TWS (kt)</span>
+                    <span class="size-xs label">{t('boat.twsKt')}</span>
                     <div class="value-list">
                         {#each twsSpeeds as tws, ci}
                             <div class="value-row">
@@ -132,15 +133,15 @@
                             </div>
                         {/each}
                         <div class="btn-row">
-                            <button class="icon-btn" on:click={addColumn} title="Add TWS">+</button>
-                            <button class="icon-btn" on:click={removeColumn} title="Remove TWS" disabled={twsSpeeds.length <= 2}>−</button>
+                            <button class="icon-btn" on:click={addColumn} title={t('boat.addTws')}>+</button>
+                            <button class="icon-btn" on:click={removeColumn} title={t('boat.removeTws')} disabled={twsSpeeds.length <= 2}>−</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Table toggle -->
                 <button class="icon-btn full-width mb-10" on:click={() => { showTable = !showTable; }}>
-                    {showTable ? 'Hide Table' : 'Show Table'}
+                    {showTable ? t('boat.hideTable') : t('boat.showTable')}
                 </button>
 
                 {#if showTable}
@@ -185,14 +186,15 @@
 
         <!-- Footer -->
         <div class="modal-footer">
-            <button class="button button--variant-orange size-m" on:click={handleSave}>Save</button>
-            <button class="button size-m" on:click={onCancel}>Cancel</button>
+            <button class="button button--variant-orange size-m" on:click={handleSave}>{t('boat.saveButton')}</button>
+            <button class="button size-m" on:click={onCancel}>{t('boat.cancelButton')}</button>
         </div>
     </div>
 </div>
 
 <script lang="ts">
     import { onDestroy } from 'svelte';
+    import { t, locale } from '../i18n';
     import { saveCustomPolar } from '../data/polarRegistry';
     import type { PolarData } from '../routing/types';
     import {

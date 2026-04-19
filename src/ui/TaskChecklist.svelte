@@ -1,7 +1,7 @@
 <!-- Structured task checklist showing per-step status during routing -->
 <div class="task-checklist">
     <div class="warning-banner size-xs">
-        Avoid interacting with Windy while data is being captured
+        {t('progress.avoidWindyInteraction')}<span hidden>{$locale}</span>
     </div>
 
     <div class="steps">
@@ -34,6 +34,7 @@
 </div>
 
 <script lang="ts">
+    import { t, locale } from '../i18n';
     import type { PipelineStep } from '../routing/types';
 
     export let steps: PipelineStep[] = [];
