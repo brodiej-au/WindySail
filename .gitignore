@@ -3,6 +3,7 @@ tmp
 .DS_Store
 .vscode
 .claude
+.superpowers
 .rollup.cache
 .secret-api-key.sh
 nohup.out
