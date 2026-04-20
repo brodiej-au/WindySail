@@ -9,7 +9,10 @@
             <div class="modal-body">
                     <!-- Wind Models -->
                     <div class="section mb-10">
-                        <span class="size-xs label">{t('settings.windModels')}:</span>
+                        <span class="size-xs label">
+                            {t('settings.windModels')}
+                            <span class="info-icon" title={t('settings.infoWindModels')}>ⓘ</span>
+                        </span>
                         <div class="model-list">
                             {#each ALL_MODELS as model}
                                 <label class="model-row size-s">
@@ -21,71 +24,80 @@
                         </div>
                     </div>
 
-                    <!-- Routing Parameters -->
+                    <!-- Voyage: basic cruising parameters -->
                     <div class="section mb-10">
-                        <span class="size-xs label">{t('settings.routingParameters')}:</span>
+                        <span class="size-xs label">{t('settings.sectionVoyage')}</span>
                         <div class="param-grid">
-                            <label class="size-xs param-label" for="sm-timeStep">{t('settings.timeStep')}</label>
-                            <input id="sm-timeStep" type="number" class="input size-s" min="0.5" max="3" step="0.5" value={timeStep} on:change={(e) => handleNumberChange('timeStep', e)} />
-
-                            <label class="size-xs param-label" for="sm-maxDuration">{t('settings.maxDuration')}</label>
+                            <label class="size-xs param-label" for="sm-maxDuration">
+                                {t('settings.maxDuration')}
+                                <span class="info-icon" title={t('settings.infoMaxDuration')}>ⓘ</span>
+                            </label>
                             <input id="sm-maxDuration" type="number" class="input size-s" min="24" max="336" step="24" value={maxDuration} on:change={(e) => handleNumberChange('maxDuration', e)} />
 
-                            <label class="size-xs param-label" for="sm-headingStep">{t('settings.headingStep')}</label>
-                            <input id="sm-headingStep" type="number" class="input size-s" min="3" max="15" step="1" value={headingStep} on:change={(e) => handleNumberChange('headingStep', e)} />
-
-                            <label class="size-xs param-label" for="sm-numSectors">{t('settings.sectors')}</label>
-                            <input id="sm-numSectors" type="number" class="input size-s" min="36" max="144" step="12" value={numSectors} on:change={(e) => handleNumberChange('numSectors', e)} />
-
-                            <label class="size-xs param-label" for="sm-arrivalRadius">{t('settings.arrivalRadius')}</label>
+                            <label class="size-xs param-label" for="sm-arrivalRadius">
+                                {t('settings.arrivalRadius')}
+                                <span class="info-icon" title={t('settings.infoArrivalRadius')}>ⓘ</span>
+                            </label>
                             <input id="sm-arrivalRadius" type="number" class="input size-s" min="0.1" max="5" step="0.1" value={arrivalRadius} on:change={(e) => handleNumberChange('arrivalRadius', e)} />
-
-                            <label class="size-xs param-label" for="sm-landMarginNm">{t('settings.landMargin')}</label>
-                            <input id="sm-landMarginNm" type="number" class="input size-s" min="0" max="5" step="0.5" value={landMarginNm} on:change={(e) => handleNumberChange('landMarginNm', e)} />
-
-                            <label class="size-xs param-label" for="sm-preferredLandMarginNm">{t('settings.preferredLandMargin')}</label>
-                            <input id="sm-preferredLandMarginNm" type="number" class="input size-s" min="0" max="20" step="1" value={preferredLandMarginNm} on:change={(e) => handleNumberChange('preferredLandMarginNm', e)} />
-
-                            <label class="size-xs param-label" for="sm-estimatedVmgKt">{t('settings.estimatedVmg')}</label>
-                            <input id="sm-estimatedVmgKt" type="number" class="input size-s" min="1" max="10" step="0.5" value={estimatedVmgKt} on:change={(e) => handleNumberChange('estimatedVmgKt', e)} />
                         </div>
                     </div>
 
-                    <!-- Motor Settings -->
+                    <!-- Motor: all motor-related controls grouped -->
                     <div class="section mb-10">
+                        <span class="size-xs label">{t('settings.sectionMotor')}</span>
                         <label class="model-row size-s">
                             <input type="checkbox" checked={motorEnabled} on:change={toggleMotor} />
                             <span>{t('settings.motorEnabled')}</span>
+                            <span class="info-icon" title={t('settings.infoMotorEnabled')}>ⓘ</span>
                         </label>
                         {#if motorEnabled}
                             <div class="param-grid" style="margin-top: 6px;">
-                                <label class="size-xs param-label" for="sm-motorThreshold">{t('settings.thresholdShort')}</label>
+                                <label class="size-xs param-label" for="sm-motorThreshold">
+                                    {t('settings.thresholdShort')}
+                                    <span class="info-icon" title={t('settings.infoMotorThreshold')}>ⓘ</span>
+                                </label>
                                 <input id="sm-motorThreshold" type="number" class="input size-s" min="0.5" max="8" step="0.5" value={motorThreshold} on:change={(e) => handleNumberChange('motorThreshold', e)} />
-                                <label class="size-xs param-label" for="sm-motorSpeed">{t('settings.motorSpeed')}</label>
+                                <label class="size-xs param-label" for="sm-motorSpeed">
+                                    {t('settings.motorSpeed')}
+                                    <span class="info-icon" title={t('settings.infoMotorSpeed')}>ⓘ</span>
+                                </label>
                                 <input id="sm-motorSpeed" type="number" class="input size-s" min="1" max="10" step="0.5" value={motorSpeed} on:change={(e) => handleNumberChange('motorSpeed', e)} />
+
+                                <label class="size-xs param-label" for="sm-motorAbove">
+                                    {t('settings.motorAboveTws')}
+                                    <span class="info-icon" title={t('settings.infoMotorAboveTws')}>ⓘ</span>
+                                </label>
+                                <input id="sm-motorAbove" type="number" class="input size-s" min="0" max="80" step="1"
+                                    value={advanced.motorAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorAboveTws', e, true)} placeholder="off" />
+                                <label class="size-xs param-label" for="sm-motorBelow">
+                                    {t('settings.motorBelowTws')}
+                                    <span class="info-icon" title={t('settings.infoMotorBelowTws')}>ⓘ</span>
+                                </label>
+                                <input id="sm-motorBelow" type="number" class="input size-s" min="0" max="20" step="1"
+                                    value={advanced.motorBelowTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorBelowTws', e, true)} placeholder="off" />
                             </div>
                         {/if}
                     </div>
 
-                    <!-- Comfort vs Speed -->
+                    <!-- Feel: comfort + display -->
                     <div class="section mb-10">
-                        <span class="size-xs label">{t('settings.optimizeFor')}</span>
+                        <span class="size-xs label">
+                            {t('settings.sectionFeel')}
+                            <span class="info-icon" title={t('settings.infoComfortWeight')}>ⓘ</span>
+                        </span>
                         <div class="slider-row">
                             <span class="size-xs slider-label">{t('settings.sliderSpeed')}</span>
                             <input type="range" class="comfort-slider" min="0" max="1" step="0.1" value={comfortWeight} on:input={(e) => handleComfortChange(e)} />
                             <span class="size-xs slider-label">{t('settings.sliderComfort')}</span>
                         </div>
-                    </div>
-
-                    <!-- Isochrone visualization -->
-                    <div class="section">
-                        <label class="model-row size-s">
+                        <label class="model-row size-s" style="margin-top: 6px;">
                             <input type="checkbox" checked={showIsochrones} on:change={toggleIsochrones} />
                             <span>{t('settings.showIsochronesShort')}</span>
+                            <span class="info-icon" title={t('settings.infoShowIsochrones')}>ⓘ</span>
                         </label>
                     </div>
 
-                    <!-- Advanced settings -->
+                    <!-- Advanced: algorithmic tuning + sail trim penalties -->
                     <div class="section mb-10 advanced-section">
                         <button class="advanced-header" on:click={() => advancedOpen = !advancedOpen}>
                             <span class="size-xs label">{t('settings.advanced')}</span>
@@ -96,31 +108,77 @@
                         {/if}
                         {#if advancedOpen}
                             <div class="param-grid">
-                                <label class="size-xs param-label" for="adv-tack">{t('settings.tackPenaltyS')}</label>
+                                <label class="size-xs param-label" for="adv-timeStep">
+                                    {t('settings.timeStep')}
+                                    <span class="info-icon" title={t('settings.infoTimeStep')}>ⓘ</span>
+                                </label>
+                                <input id="adv-timeStep" type="number" class="input size-s" min="0.5" max="3" step="0.5" value={timeStep} on:change={(e) => handleNumberChange('timeStep', e)} />
+
+                                <label class="size-xs param-label" for="adv-headingStep">
+                                    {t('settings.headingStep')}
+                                    <span class="info-icon" title={t('settings.infoHeadingStep')}>ⓘ</span>
+                                </label>
+                                <input id="adv-headingStep" type="number" class="input size-s" min="3" max="15" step="1" value={headingStep} on:change={(e) => handleNumberChange('headingStep', e)} />
+
+                                <label class="size-xs param-label" for="adv-numSectors">
+                                    {t('settings.sectors')}
+                                    <span class="info-icon" title={t('settings.infoSectors')}>ⓘ</span>
+                                </label>
+                                <input id="adv-numSectors" type="number" class="input size-s" min="36" max="144" step="12" value={numSectors} on:change={(e) => handleNumberChange('numSectors', e)} />
+
+                                <label class="size-xs param-label" for="adv-landMarginNm">
+                                    {t('settings.landMargin')}
+                                    <span class="info-icon" title={t('settings.infoLandMargin')}>ⓘ</span>
+                                </label>
+                                <input id="adv-landMarginNm" type="number" class="input size-s" min="0" max="5" step="0.5" value={landMarginNm} on:change={(e) => handleNumberChange('landMarginNm', e)} />
+
+                                <label class="size-xs param-label" for="adv-preferredLandMarginNm">
+                                    {t('settings.preferredLandMargin')}
+                                    <span class="info-icon" title={t('settings.infoPreferredLandMargin')}>ⓘ</span>
+                                </label>
+                                <input id="adv-preferredLandMarginNm" type="number" class="input size-s" min="0" max="20" step="1" value={preferredLandMarginNm} on:change={(e) => handleNumberChange('preferredLandMarginNm', e)} />
+
+                                <label class="size-xs param-label" for="adv-estimatedVmgKt">
+                                    {t('settings.estimatedVmg')}
+                                    <span class="info-icon" title={t('settings.infoEstimatedVmg')}>ⓘ</span>
+                                </label>
+                                <input id="adv-estimatedVmgKt" type="number" class="input size-s" min="1" max="10" step="0.5" value={estimatedVmgKt} on:change={(e) => handleNumberChange('estimatedVmgKt', e)} />
+
+                                <label class="size-xs param-label" for="adv-tack">
+                                    {t('settings.tackPenaltyS')}
+                                    <span class="info-icon" title={t('settings.infoTackPenalty')}>ⓘ</span>
+                                </label>
                                 <input id="adv-tack" type="number" class="input size-s" min="0" max="300" step="1"
                                     value={advanced.tackPenaltyS} on:change={(e) => handleAdvancedNumberChange('tackPenaltyS', e, false)} />
-                                <label class="size-xs param-label" for="adv-gybe">{t('settings.gybePenaltyS')}</label>
+
+                                <label class="size-xs param-label" for="adv-gybe">
+                                    {t('settings.gybePenaltyS')}
+                                    <span class="info-icon" title={t('settings.infoGybePenalty')}>ⓘ</span>
+                                </label>
                                 <input id="adv-gybe" type="number" class="input size-s" min="0" max="300" step="1"
                                     value={advanced.gybePenaltyS} on:change={(e) => handleAdvancedNumberChange('gybePenaltyS', e, false)} />
 
-                                <label class="size-xs param-label" for="adv-motor-above">{t('settings.motorAboveTws')}</label>
-                                <input id="adv-motor-above" type="number" class="input size-s" min="0" max="80" step="1"
-                                    value={advanced.motorAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorAboveTws', e, true)} placeholder="off" />
-                                <label class="size-xs param-label" for="adv-motor-below">{t('settings.motorBelowTws')}</label>
-                                <input id="adv-motor-below" type="number" class="input size-s" min="0" max="20" step="1"
-                                    value={advanced.motorBelowTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorBelowTws', e, true)} placeholder="off" />
-
-                                <label class="size-xs param-label" for="adv-night">{t('settings.nightSpeedFactor')}</label>
+                                <label class="size-xs param-label" for="adv-night">
+                                    {t('settings.nightSpeedFactor')}
+                                    <span class="info-icon" title={t('settings.infoNightFactor')}>ⓘ</span>
+                                </label>
                                 <div class="slider-cell">
                                     <input id="adv-night" type="range" min="0.5" max="1" step="0.05"
                                         value={advanced.nightSpeedFactor} on:change={(e) => handleAdvancedNumberChange('nightSpeedFactor', e, false)} />
                                     <span class="size-xs slider-pct">{(advanced.nightSpeedFactor * 100).toFixed(0)}%</span>
                                 </div>
 
-                                <label class="size-xs param-label" for="adv-reef-tws">{t('settings.reefAboveTws')}</label>
+                                <label class="size-xs param-label" for="adv-reef-tws">
+                                    {t('settings.reefAboveTws')}
+                                    <span class="info-icon" title={t('settings.infoReefAboveTws')}>ⓘ</span>
+                                </label>
                                 <input id="adv-reef-tws" type="number" class="input size-s" min="0" max="80" step="1"
                                     value={advanced.reefAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('reefAboveTws', e, true)} placeholder="off" />
-                                <label class="size-xs param-label" for="adv-reef-factor">{t('settings.reefFactor')}</label>
+
+                                <label class="size-xs param-label" for="adv-reef-factor">
+                                    {t('settings.reefFactor')}
+                                    <span class="info-icon" title={t('settings.infoReefFactor')}>ⓘ</span>
+                                </label>
                                 <div class="slider-cell">
                                     <input id="adv-reef-factor" type="range" min="0.5" max="1" step="0.05"
                                         value={advanced.reefFactor} on:change={(e) => handleAdvancedNumberChange('reefFactor', e, false)} />
@@ -461,5 +519,16 @@
         min-width: 40px;
         text-align: right;
         color: #8a9ab0;
+    }
+    .info-icon {
+        display: inline-block;
+        margin-left: 4px;
+        color: #6b7a90;
+        cursor: help;
+        font-size: 11px;
+        user-select: none;
+    }
+    .info-icon:hover {
+        color: #e6eef8;
     }
 </style>
