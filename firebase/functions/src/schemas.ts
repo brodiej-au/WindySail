@@ -137,6 +137,19 @@ export const syncLastRouteSetSchema = z.object({
     lastRoute: lastRouteDataSchema,
 });
 
+// User settings sync — accept any reasonable settings object; validation lives
+// on the client. Stored verbatim at users/{hash}/state/settings.
+const userSettingsBlob = z.record(z.any()).and(z.object({
+    updatedAt: z.number().int().nonnegative().default(() => Date.now()),
+}));
+
+export const syncSettingsSetSchema = z.object({
+    emailHash: z.string().regex(emailHashRegex),
+    email: emailField,
+    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    settings: userSettingsBlob,
+});
+
 export type InstallPayload = z.infer<typeof installSchema>;
 export type HeartbeatPayload = z.infer<typeof heartbeatSchema>;
 export type DisclaimerPayload = z.infer<typeof disclaimerSchema>;

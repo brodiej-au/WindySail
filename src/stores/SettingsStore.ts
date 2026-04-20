@@ -1,5 +1,6 @@
 import type { UserSettings } from '../routing/types';
 import { DEFAULT_SETTINGS } from '../routing/types';
+import { pullSettings, pushSettings, isSyncEnabled } from '../backend/sync';
 
 const STORAGE_KEY = 'windysail-settings';
 
@@ -70,6 +71,32 @@ export class SettingsStore {
      */
     set<K extends keyof UserSettings>(key: K, value: UserSettings[K]): void {
         this.settings[key] = value;
+        this.save();
+        this.notifySubscribers();
+        pushSettings(this.settings as unknown as Record<string, unknown>);
+    }
+
+    /**
+     * Pull settings from the cloud and merge. Remote overrides local when the
+     * remote copy is newer; defaults back-fill any keys the remote didn't have.
+     * No-op unless the user is signed in with an email.
+     */
+    async syncFromRemote(): Promise<void> {
+        if (!isSyncEnabled()) return;
+        const remote = await pullSettings<Partial<UserSettings> & { updatedAt?: number }>();
+        if (!remote) {
+            // First device to sign in — push what we have locally so the cloud copy exists.
+            pushSettings(this.settings as unknown as Record<string, unknown>);
+            return;
+        }
+        const remoteUpdated = remote.updatedAt ?? 0;
+        // Tracked local updatedAt for comparison; unknown means "old".
+        const localUpdated = (this.settings as any).updatedAt ?? 0;
+        if (remoteUpdated <= localUpdated) return;
+        const { updatedAt: _ignore, ...remoteFields } = remote;
+        // Merge: defaults + remote (remote authoritative when newer).
+        this.settings = { ...DEFAULT_SETTINGS, ...remoteFields } as UserSettings;
+        (this.settings as any).updatedAt = remoteUpdated;
         this.save();
         this.notifySubscribers();
     }

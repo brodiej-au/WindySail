@@ -130,3 +130,27 @@ export async function pushLastRoute(lastRoute: LastRoutePayload): Promise<void> 
         });
     } catch {}
 }
+
+// User settings -----------------------------------------------------------
+
+export async function pullSettings<T extends Record<string, unknown>>(): Promise<T | null> {
+    const ident = await buildIdentity();
+    if (!ident) return null;
+    try {
+        const res = await post('/sync/settings/get', ident);
+        return (res?.settings as T | null) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export async function pushSettings(settings: Record<string, unknown>): Promise<void> {
+    const ident = await buildIdentity();
+    if (!ident) return;
+    try {
+        await post('/sync/settings/set', {
+            ...ident,
+            settings: { ...settings, updatedAt: Date.now() },
+        });
+    } catch {}
+}

@@ -5,6 +5,7 @@ import {
     syncPolarUpsertSchema,
     syncPolarDeleteSchema,
     syncLastRouteSetSchema,
+    syncSettingsSetSchema,
 } from './schemas';
 import { db, serverTimestamp } from './_shared';
 
@@ -128,6 +129,31 @@ export async function handleSetLastRoute(req: any, res: any): Promise<void> {
     const { emailHash, email, deviceId, lastRoute } = parsed.data;
     await ensureUserDoc(emailHash, email, deviceId);
     await userDoc(emailHash).collection('state').doc('lastRoute').set(lastRoute, { merge: false });
+    res.status(200).json({ ok: true });
+}
+
+export async function handleGetSettings(req: any, res: any): Promise<void> {
+    const parsed = syncListSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: 'invalid payload', details: parsed.error.flatten() });
+        return;
+    }
+    const { emailHash, email, deviceId } = parsed.data;
+    await ensureUserDoc(emailHash, email, deviceId);
+    const snap = await userDoc(emailHash).collection('state').doc('settings').get();
+    const settings = snap.exists ? snap.data() : null;
+    res.status(200).json({ ok: true, settings });
+}
+
+export async function handleSetSettings(req: any, res: any): Promise<void> {
+    const parsed = syncSettingsSetSchema.safeParse(req.body);
+    if (!parsed.success) {
+        res.status(400).json({ error: 'invalid payload', details: parsed.error.flatten() });
+        return;
+    }
+    const { emailHash, email, deviceId, settings } = parsed.data;
+    await ensureUserDoc(emailHash, email, deviceId);
+    await userDoc(emailHash).collection('state').doc('settings').set(settings, { merge: false });
     res.status(200).json({ ok: true });
 }
 

@@ -14,6 +14,8 @@ import {
     handleDeletePolar,
     handleGetLastRoute,
     handleSetLastRoute,
+    handleGetSettings,
+    handleSetSettings,
 } from './sync';
 
 admin.initializeApp();
@@ -84,6 +86,12 @@ export const api = onRequest(
                     return;
                 case '/sync/last-route/set':
                     await handleSetLastRoute(req, res);
+                    return;
+                case '/sync/settings/get':
+                    await handleGetSettings(req, res);
+                    return;
+                case '/sync/settings/set':
+                    await handleSetSettings(req, res);
                     return;
                 default:
                     res.status(404).json({ error: 'not found' });

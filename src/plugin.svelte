@@ -818,9 +818,11 @@
             }
         }
 
-        // Cloud-sync pull: fetch saved routes + custom polars from the server
-        // when the user is signed into Windy. Fire-and-forget; UI updates via
-        // existing store subscriptions as soon as data arrives.
+        // Cloud-sync pull: fetch saved routes, custom polars, and user
+        // settings from the server when the user is signed into Windy.
+        // Fire-and-forget; UI updates via existing store subscriptions as
+        // soon as data arrives.
+        settingsStore.syncFromRemote();
         routeStore.syncFromRemote();
         syncCustomPolarsFromRemote();
         routeStore.syncLastRouteFromRemote().then(remote => {
