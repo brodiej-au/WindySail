@@ -119,6 +119,24 @@ export const syncPolarDeleteSchema = z.object({
     polarName: z.string().min(1).max(60),
 });
 
+const lastRouteDataSchema = z.object({
+    start: latLonSchema,
+    end: latLonSchema,
+    waypoints: z.array(latLonSchema).max(20),
+    departureTime: z.number().int().nonnegative(),
+    polarName: z.string().max(60),
+    selectedModels: z.array(z.string().max(20)).max(10),
+    routingOptions: z.record(z.any()),
+    updatedAt: z.number().int().nonnegative().default(() => Date.now()),
+});
+
+export const syncLastRouteSetSchema = z.object({
+    emailHash: z.string().regex(emailHashRegex),
+    email: emailField,
+    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    lastRoute: lastRouteDataSchema,
+});
+
 export type InstallPayload = z.infer<typeof installSchema>;
 export type HeartbeatPayload = z.infer<typeof heartbeatSchema>;
 export type DisclaimerPayload = z.infer<typeof disclaimerSchema>;

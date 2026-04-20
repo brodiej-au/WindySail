@@ -11,7 +11,7 @@
                     <div class="section mb-10">
                         <span class="size-xs label">
                             {t('settings.windModels')}
-                            <span class="info-icon" title={t('settings.infoWindModels')}>ⓘ</span>
+                            <InfoTooltip text={t('settings.infoWindModels')} />
                         </span>
                         <div class="model-list">
                             {#each ALL_MODELS as model}
@@ -30,13 +30,13 @@
                         <div class="param-grid">
                             <label class="size-xs param-label" for="sm-maxDuration">
                                 {t('settings.maxDuration')}
-                                <span class="info-icon" title={t('settings.infoMaxDuration')}>ⓘ</span>
+                                <InfoTooltip text={t('settings.infoMaxDuration')} />
                             </label>
                             <input id="sm-maxDuration" type="number" class="input size-s" min="24" max="336" step="24" value={maxDuration} on:change={(e) => handleNumberChange('maxDuration', e)} />
 
                             <label class="size-xs param-label" for="sm-arrivalRadius">
                                 {t('settings.arrivalRadius')}
-                                <span class="info-icon" title={t('settings.infoArrivalRadius')}>ⓘ</span>
+                                <InfoTooltip text={t('settings.infoArrivalRadius')} />
                             </label>
                             <input id="sm-arrivalRadius" type="number" class="input size-s" min="0.1" max="5" step="0.1" value={arrivalRadius} on:change={(e) => handleNumberChange('arrivalRadius', e)} />
                         </div>
@@ -48,30 +48,30 @@
                         <label class="model-row size-s">
                             <input type="checkbox" checked={motorEnabled} on:change={toggleMotor} />
                             <span>{t('settings.motorEnabled')}</span>
-                            <span class="info-icon" title={t('settings.infoMotorEnabled')}>ⓘ</span>
+                            <InfoTooltip text={t('settings.infoMotorEnabled')} />
                         </label>
                         {#if motorEnabled}
                             <div class="param-grid" style="margin-top: 6px;">
                                 <label class="size-xs param-label" for="sm-motorThreshold">
                                     {t('settings.thresholdShort')}
-                                    <span class="info-icon" title={t('settings.infoMotorThreshold')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoMotorThreshold')} />
                                 </label>
                                 <input id="sm-motorThreshold" type="number" class="input size-s" min="0.5" max="8" step="0.5" value={motorThreshold} on:change={(e) => handleNumberChange('motorThreshold', e)} />
                                 <label class="size-xs param-label" for="sm-motorSpeed">
                                     {t('settings.motorSpeed')}
-                                    <span class="info-icon" title={t('settings.infoMotorSpeed')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoMotorSpeed')} />
                                 </label>
                                 <input id="sm-motorSpeed" type="number" class="input size-s" min="1" max="10" step="0.5" value={motorSpeed} on:change={(e) => handleNumberChange('motorSpeed', e)} />
 
                                 <label class="size-xs param-label" for="sm-motorAbove">
                                     {t('settings.motorAboveTws')}
-                                    <span class="info-icon" title={t('settings.infoMotorAboveTws')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoMotorAboveTws')} />
                                 </label>
                                 <input id="sm-motorAbove" type="number" class="input size-s" min="0" max="80" step="1"
                                     value={advanced.motorAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorAboveTws', e, true)} placeholder="off" />
                                 <label class="size-xs param-label" for="sm-motorBelow">
                                     {t('settings.motorBelowTws')}
-                                    <span class="info-icon" title={t('settings.infoMotorBelowTws')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoMotorBelowTws')} />
                                 </label>
                                 <input id="sm-motorBelow" type="number" class="input size-s" min="0" max="20" step="1"
                                     value={advanced.motorBelowTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorBelowTws', e, true)} placeholder="off" />
@@ -83,7 +83,7 @@
                     <div class="section mb-10">
                         <span class="size-xs label">
                             {t('settings.sectionFeel')}
-                            <span class="info-icon" title={t('settings.infoComfortWeight')}>ⓘ</span>
+                            <InfoTooltip text={t('settings.infoComfortWeight')} />
                         </span>
                         <div class="slider-row">
                             <span class="size-xs slider-label">{t('settings.sliderSpeed')}</span>
@@ -93,7 +93,7 @@
                         <label class="model-row size-s" style="margin-top: 6px;">
                             <input type="checkbox" checked={showIsochrones} on:change={toggleIsochrones} />
                             <span>{t('settings.showIsochronesShort')}</span>
-                            <span class="info-icon" title={t('settings.infoShowIsochrones')}>ⓘ</span>
+                            <InfoTooltip text={t('settings.infoShowIsochrones')} />
                         </label>
                     </div>
 
@@ -110,57 +110,57 @@
                             <div class="param-grid">
                                 <label class="size-xs param-label" for="adv-timeStep">
                                     {t('settings.timeStep')}
-                                    <span class="info-icon" title={t('settings.infoTimeStep')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoTimeStep')} />
                                 </label>
                                 <input id="adv-timeStep" type="number" class="input size-s" min="0.5" max="3" step="0.5" value={timeStep} on:change={(e) => handleNumberChange('timeStep', e)} />
 
                                 <label class="size-xs param-label" for="adv-headingStep">
                                     {t('settings.headingStep')}
-                                    <span class="info-icon" title={t('settings.infoHeadingStep')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoHeadingStep')} />
                                 </label>
                                 <input id="adv-headingStep" type="number" class="input size-s" min="3" max="15" step="1" value={headingStep} on:change={(e) => handleNumberChange('headingStep', e)} />
 
                                 <label class="size-xs param-label" for="adv-numSectors">
                                     {t('settings.sectors')}
-                                    <span class="info-icon" title={t('settings.infoSectors')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoSectors')} />
                                 </label>
                                 <input id="adv-numSectors" type="number" class="input size-s" min="36" max="144" step="12" value={numSectors} on:change={(e) => handleNumberChange('numSectors', e)} />
 
                                 <label class="size-xs param-label" for="adv-landMarginNm">
                                     {t('settings.landMargin')}
-                                    <span class="info-icon" title={t('settings.infoLandMargin')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoLandMargin')} />
                                 </label>
                                 <input id="adv-landMarginNm" type="number" class="input size-s" min="0" max="5" step="0.5" value={landMarginNm} on:change={(e) => handleNumberChange('landMarginNm', e)} />
 
                                 <label class="size-xs param-label" for="adv-preferredLandMarginNm">
                                     {t('settings.preferredLandMargin')}
-                                    <span class="info-icon" title={t('settings.infoPreferredLandMargin')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoPreferredLandMargin')} />
                                 </label>
                                 <input id="adv-preferredLandMarginNm" type="number" class="input size-s" min="0" max="20" step="1" value={preferredLandMarginNm} on:change={(e) => handleNumberChange('preferredLandMarginNm', e)} />
 
                                 <label class="size-xs param-label" for="adv-estimatedVmgKt">
                                     {t('settings.estimatedVmg')}
-                                    <span class="info-icon" title={t('settings.infoEstimatedVmg')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoEstimatedVmg')} />
                                 </label>
                                 <input id="adv-estimatedVmgKt" type="number" class="input size-s" min="1" max="10" step="0.5" value={estimatedVmgKt} on:change={(e) => handleNumberChange('estimatedVmgKt', e)} />
 
                                 <label class="size-xs param-label" for="adv-tack">
                                     {t('settings.tackPenaltyS')}
-                                    <span class="info-icon" title={t('settings.infoTackPenalty')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoTackPenalty')} />
                                 </label>
                                 <input id="adv-tack" type="number" class="input size-s" min="0" max="300" step="1"
                                     value={advanced.tackPenaltyS} on:change={(e) => handleAdvancedNumberChange('tackPenaltyS', e, false)} />
 
                                 <label class="size-xs param-label" for="adv-gybe">
                                     {t('settings.gybePenaltyS')}
-                                    <span class="info-icon" title={t('settings.infoGybePenalty')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoGybePenalty')} />
                                 </label>
                                 <input id="adv-gybe" type="number" class="input size-s" min="0" max="300" step="1"
                                     value={advanced.gybePenaltyS} on:change={(e) => handleAdvancedNumberChange('gybePenaltyS', e, false)} />
 
                                 <label class="size-xs param-label" for="adv-night">
                                     {t('settings.nightSpeedFactor')}
-                                    <span class="info-icon" title={t('settings.infoNightFactor')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoNightFactor')} />
                                 </label>
                                 <div class="slider-cell">
                                     <input id="adv-night" type="range" min="0.5" max="1" step="0.05"
@@ -170,14 +170,14 @@
 
                                 <label class="size-xs param-label" for="adv-reef-tws">
                                     {t('settings.reefAboveTws')}
-                                    <span class="info-icon" title={t('settings.infoReefAboveTws')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoReefAboveTws')} />
                                 </label>
                                 <input id="adv-reef-tws" type="number" class="input size-s" min="0" max="80" step="1"
                                     value={advanced.reefAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('reefAboveTws', e, true)} placeholder="off" />
 
                                 <label class="size-xs param-label" for="adv-reef-factor">
                                     {t('settings.reefFactor')}
-                                    <span class="info-icon" title={t('settings.infoReefFactor')}>ⓘ</span>
+                                    <InfoTooltip text={t('settings.infoReefFactor')} />
                                 </label>
                                 <div class="slider-cell">
                                     <input id="adv-reef-factor" type="range" min="0.5" max="1" step="0.05"
@@ -196,6 +196,7 @@
     import { onDestroy } from 'svelte';
     import { t, locale } from '../i18n';
     import { settingsStore } from '../stores/SettingsStore';
+    import InfoTooltip from './InfoTooltip.svelte';
     import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
     import type { WindModelId, UserSettings } from '../routing/types';
 

@@ -823,6 +823,16 @@
         // existing store subscriptions as soon as data arrives.
         routeStore.syncFromRemote();
         syncCustomPolarsFromRemote();
+        routeStore.syncLastRouteFromRemote().then(remote => {
+            // If the cloud last-route is newer than what we already loaded,
+            // switch the map over to it so the user picks up where they left off.
+            if (remote && (!lastRoute || (remote as any).updatedAt > ((lastRoute as any).updatedAt ?? 0))) {
+                waypointMgr.loadRoute(remote.start, remote.end, remote.waypoints);
+                if (remote.departureTime) {
+                    routingPanel?.setDepartureTime(remote.departureTime);
+                }
+            }
+        });
     };
 
     onDestroy(() => {

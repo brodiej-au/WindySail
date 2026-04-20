@@ -96,3 +96,37 @@ export async function deleteRemotePolar(polarName: string): Promise<void> {
 export function isSyncEnabled(): boolean {
     return getEmail() !== null;
 }
+
+// Last route (the most recent calculation — restored automatically on open) ----
+
+export interface LastRoutePayload {
+    start: { lat: number; lon: number };
+    end: { lat: number; lon: number };
+    waypoints: { lat: number; lon: number }[];
+    departureTime: number;
+    polarName: string;
+    selectedModels: string[];
+    routingOptions: Record<string, unknown>;
+}
+
+export async function pullLastRoute(): Promise<LastRoutePayload | null> {
+    const ident = await buildIdentity();
+    if (!ident) return null;
+    try {
+        const res = await post('/sync/last-route/get', ident);
+        return (res?.lastRoute as LastRoutePayload | null) ?? null;
+    } catch {
+        return null;
+    }
+}
+
+export async function pushLastRoute(lastRoute: LastRoutePayload): Promise<void> {
+    const ident = await buildIdentity();
+    if (!ident) return;
+    try {
+        await post('/sync/last-route/set', {
+            ...ident,
+            lastRoute: { ...lastRoute, updatedAt: Date.now() },
+        });
+    } catch {}
+}

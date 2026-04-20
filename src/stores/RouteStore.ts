@@ -1,5 +1,5 @@
 import type { SavedRoute, LatLon, WindModelId } from '../routing/types';
-import { pushRoute, deleteRemoteRoute, pullRoutes, isSyncEnabled } from '../backend/sync';
+import { pushRoute, deleteRemoteRoute, pullRoutes, pushLastRoute, pullLastRoute, isSyncEnabled } from '../backend/sync';
 
 const STORAGE_KEY = 'windysail-routes';
 const LAST_ROUTE_KEY = 'windysail-last-route';
@@ -105,6 +105,7 @@ export class RouteStore {
         } catch {
             // Silently fail
         }
+        pushLastRoute(data as any);
     }
 
     getLastRoute(): LastRouteData | null {
@@ -115,6 +116,26 @@ export class RouteStore {
         } catch {
             return null;
         }
+    }
+
+    /**
+     * Pull the cloud-stored "last route" and overwrite the local cache when
+     * the remote copy is newer (or when the local cache is empty).
+     */
+    async syncLastRouteFromRemote(): Promise<LastRouteData | null> {
+        if (!isSyncEnabled()) return null;
+        const remote = await pullLastRoute();
+        if (!remote) return null;
+        const local = this.getLastRoute();
+        const localUpdated = (local as any)?.updatedAt ?? 0;
+        const remoteUpdated = (remote as any)?.updatedAt ?? 0;
+        if (!local || remoteUpdated > localUpdated) {
+            try {
+                localStorage.setItem(LAST_ROUTE_KEY, JSON.stringify(remote));
+            } catch {}
+            return remote as LastRouteData;
+        }
+        return local;
     }
 
     createRoute(

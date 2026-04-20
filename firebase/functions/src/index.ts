@@ -12,6 +12,8 @@ import {
     handleListPolars,
     handleUpsertPolar,
     handleDeletePolar,
+    handleGetLastRoute,
+    handleSetLastRoute,
 } from './sync';
 
 admin.initializeApp();
@@ -76,6 +78,12 @@ export const api = onRequest(
                     return;
                 case '/sync/polars/delete':
                     await handleDeletePolar(req, res);
+                    return;
+                case '/sync/last-route/get':
+                    await handleGetLastRoute(req, res);
+                    return;
+                case '/sync/last-route/set':
+                    await handleSetLastRoute(req, res);
                     return;
                 default:
                     res.status(404).json({ error: 'not found' });
