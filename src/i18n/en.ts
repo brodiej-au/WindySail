@@ -149,6 +149,8 @@ export const en = {
         mbCruise: 'Cruise speed (kt)',
         mbHeavy: 'Heavy-weather speed (kt)',
         mbSwell: 'Swell threshold (m)',
+        motorboatTitle: 'Motorboat speeds',
+        motorboatHint: 'Cruise is used in calm or moderate seas. Heavy-weather speed kicks in when swell exceeds the threshold.',
     },
     disclaimer: {
         title: 'Before we route',

@@ -85,24 +85,6 @@
                         </label>
                     </div>
 
-                    <!-- Motorboat inputs (visible when Motorboat polar is selected) -->
-                    {#if motorboatMode}
-                        <div class="section mb-10">
-                            <span class="size-xs label">{t('boat.motorboat')}</span>
-                            <div class="param-grid">
-                                <label class="size-xs param-label" for="mb-cruise">{t('settings.mbCruise')}</label>
-                                <input id="mb-cruise" type="number" class="input size-s" min="1" max="50" step="0.5"
-                                    value={motorboatCruiseKt} on:change={(e) => handleNumberChange('motorboatCruiseKt', e)} />
-                                <label class="size-xs param-label" for="mb-heavy">{t('settings.mbHeavy')}</label>
-                                <input id="mb-heavy" type="number" class="input size-s" min="1" max="50" step="0.5"
-                                    value={motorboatHeavyKt} on:change={(e) => handleNumberChange('motorboatHeavyKt', e)} />
-                                <label class="size-xs param-label" for="mb-swell">{t('settings.mbSwell')}</label>
-                                <input id="mb-swell" type="number" class="input size-s" min="0.5" max="10" step="0.5"
-                                    value={motorboatSwellThresholdM} on:change={(e) => handleNumberChange('motorboatSwellThresholdM', e)} />
-                            </div>
-                        </div>
-                    {/if}
-
                     <!-- Advanced settings -->
                     <div class="section mb-10 advanced-section">
                         <button class="advanced-header" on:click={() => advancedOpen = !advancedOpen}>
@@ -129,17 +111,21 @@
                                     value={advanced.motorBelowTws ?? ''} on:change={(e) => handleAdvancedNumberChange('motorBelowTws', e, true)} placeholder="off" />
 
                                 <label class="size-xs param-label" for="adv-night">{t('settings.nightSpeedFactor')}</label>
-                                <input id="adv-night" type="range" min="0.5" max="1" step="0.05"
-                                    value={advanced.nightSpeedFactor} on:change={(e) => handleAdvancedNumberChange('nightSpeedFactor', e, false)} />
-                                <span class="size-xs">{(advanced.nightSpeedFactor * 100).toFixed(0)}%</span>
+                                <div class="slider-cell">
+                                    <input id="adv-night" type="range" min="0.5" max="1" step="0.05"
+                                        value={advanced.nightSpeedFactor} on:change={(e) => handleAdvancedNumberChange('nightSpeedFactor', e, false)} />
+                                    <span class="size-xs slider-pct">{(advanced.nightSpeedFactor * 100).toFixed(0)}%</span>
+                                </div>
 
                                 <label class="size-xs param-label" for="adv-reef-tws">{t('settings.reefAboveTws')}</label>
                                 <input id="adv-reef-tws" type="number" class="input size-s" min="0" max="80" step="1"
                                     value={advanced.reefAboveTws ?? ''} on:change={(e) => handleAdvancedNumberChange('reefAboveTws', e, true)} placeholder="off" />
                                 <label class="size-xs param-label" for="adv-reef-factor">{t('settings.reefFactor')}</label>
-                                <input id="adv-reef-factor" type="range" min="0.5" max="1" step="0.05"
-                                    value={advanced.reefFactor} on:change={(e) => handleAdvancedNumberChange('reefFactor', e, false)} />
-                                <span class="size-xs">{(advanced.reefFactor * 100).toFixed(0)}%</span>
+                                <div class="slider-cell">
+                                    <input id="adv-reef-factor" type="range" min="0.5" max="1" step="0.05"
+                                        value={advanced.reefFactor} on:change={(e) => handleAdvancedNumberChange('reefFactor', e, false)} />
+                                    <span class="size-xs slider-pct">{(advanced.reefFactor * 100).toFixed(0)}%</span>
+                                </div>
                             </div>
                         {/if}
                     </div>
@@ -174,10 +160,6 @@
     let motorSpeed: number = settingsStore.get('motorSpeed');
     let comfortWeight: number = settingsStore.get('comfortWeight');
     let showIsochrones: boolean = settingsStore.get('showIsochrones');
-    let motorboatMode: boolean = settingsStore.get('motorboatMode');
-    let motorboatCruiseKt: number = settingsStore.get('motorboatCruiseKt');
-    let motorboatHeavyKt: number = settingsStore.get('motorboatHeavyKt');
-    let motorboatSwellThresholdM: number = settingsStore.get('motorboatSwellThresholdM');
     let advanced: import('../routing/types').AdvancedSettings = settingsStore.get('advanced');
     let advancedOpen = false;
 
@@ -215,7 +197,7 @@
     }
 
     function handleNumberChange(
-        key: keyof Pick<UserSettings, 'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'preferredLandMarginNm' | 'estimatedVmgKt' | 'motorThreshold' | 'motorSpeed' | 'motorboatCruiseKt' | 'motorboatHeavyKt' | 'motorboatSwellThresholdM'>,
+        key: keyof Pick<UserSettings, 'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'preferredLandMarginNm' | 'estimatedVmgKt' | 'motorThreshold' | 'motorSpeed'>,
         e: Event,
     ): void {
         const raw = (e.target as HTMLInputElement).value;
@@ -233,9 +215,6 @@
                 case 'estimatedVmgKt': estimatedVmgKt = value; break;
                 case 'motorThreshold': motorThreshold = value; break;
                 case 'motorSpeed': motorSpeed = value; break;
-                case 'motorboatCruiseKt': motorboatCruiseKt = value; break;
-                case 'motorboatHeavyKt': motorboatHeavyKt = value; break;
-                case 'motorboatSwellThresholdM': motorboatSwellThresholdM = value; break;
             }
         }
     }
@@ -466,5 +445,21 @@
         color: #8a9ab0;
         font-style: italic;
         margin-top: 4px;
+    }
+    .slider-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+    .slider-cell input[type="range"] {
+        flex: 1;
+        min-width: 0;
+    }
+    .slider-pct {
+        flex: none;
+        min-width: 40px;
+        text-align: right;
+        color: #8a9ab0;
     }
 </style>

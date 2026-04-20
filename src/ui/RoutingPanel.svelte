@@ -111,7 +111,7 @@
             {#if motorboatMode}
                 <button
                     class="motor-summary size-xs"
-                    on:click={() => settingsModal.open()}
+                    on:click={() => motorboatModal.open()}
                     title={t('boat.editMotorSpeedsTitle')}
                 >
                     {t('boat.motorSummary', { cruise: motorboatCruiseKt, heavy: motorboatHeavyKt, swell: motorboatSwellThresholdM })}
@@ -512,6 +512,7 @@
         {/if}
     </div>
     <SettingsModal bind:this={settingsModal} />
+    <MotorboatEditModal bind:this={motorboatModal} />
 </div>
 
 <script lang="ts">
@@ -522,6 +523,7 @@
     import ProgressBar from './ProgressBar.svelte';
     import TaskChecklist from './TaskChecklist.svelte';
     import SettingsModal from './SettingsModal.svelte';
+    import MotorboatEditModal from './MotorboatEditModal.svelte';
     import PolarDiagram from './PolarDiagram.svelte';
     import PolarViewEditModal from './PolarViewEditModal.svelte';
     import PlayerControls from './PlayerControls.svelte';
@@ -687,6 +689,7 @@
     }
 
     let settingsModal: SettingsModal;
+    let motorboatModal: MotorboatEditModal;
     let polarModal: PolarViewEditModal;
     let playerControls: PlayerControls;
 
