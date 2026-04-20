@@ -7,15 +7,17 @@
         </button>
     </div>
 
-    <!-- Row 2: Time scrubber with Start/Finish/waypoint dots -->
+    <!-- Row 2: Time scrubber with Start/Finish/waypoint dots just above -->
     <div class="row mb-10">
         <div class="scrubber-wrap">
             {#if results.length > 0}
-                <div class="track-dot track-dot--start" title="Start">S</div>
-                {#each waypointFractions as f, i}
-                    <div class="track-dot track-dot--wpt" style="left: {f * 100}%" title="Waypoint {i + 1}">{i + 1}</div>
-                {/each}
-                <div class="track-dot track-dot--end" title="Finish">F</div>
+                <div class="track-dots">
+                    <div class="track-dot track-dot--start" title="Start">S</div>
+                    {#each waypointFractions as f, i}
+                        <div class="track-dot track-dot--wpt" style="left: {f * 100}%" title="Waypoint {i + 1}">{i + 1}</div>
+                    {/each}
+                    <div class="track-dot track-dot--end" title="Finish">F</div>
+                </div>
             {/if}
             <input
                 type="range"
@@ -192,26 +194,33 @@
     .scrubber-wrap {
         position: relative;
         width: 100%;
-        padding: 6px 0;
+        padding-top: 22px; /* leave room for the S/F/waypoint row above */
+    }
+
+    .track-dots {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 16px;
+        pointer-events: none;
     }
 
     .track-dot {
         position: absolute;
-        top: 50%;
+        top: 0;
         width: 16px;
         height: 16px;
         border-radius: 50%;
         color: #fff;
         font-size: 9px;
         font-weight: 700;
-        letter-spacing: 0;
+        line-height: 1;
         display: flex;
         align-items: center;
         justify-content: center;
         box-shadow: 0 0 0 2px rgba(27, 36, 51, 0.95), 0 1px 3px rgba(0, 0, 0, 0.5);
-        pointer-events: none;
-        z-index: 2;
-        transform: translate(-50%, -50%);
+        transform: translateX(-50%);
     }
     .track-dot--start {
         left: 0;

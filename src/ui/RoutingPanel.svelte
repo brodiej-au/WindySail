@@ -268,7 +268,13 @@
 
             <!-- Comparison table (multi-model only) -->
             {#if results.length > 1}
-                <h3 class="size-s mb-5">{t('results.routeComparison')}</h3>
+                <div class="comparison-header mb-5">
+                    <h3 class="size-s">{t('results.routeComparison')}</h3>
+                    <button class="button size-xs detail-inline-btn" on:click={() => routeDetailModal?.openModal()}>
+                        {t('results.routeDetails')}
+                        <span class="popup-icon">&#8599;</span>
+                    </button>
+                </div>
                 <table class="comparison-table size-xs">
                     <thead>
                         <tr>
@@ -457,7 +463,14 @@
 
     <!-- Route Detail Modal button + Player controls (post-calculation) -->
     {#if results.length > 0}
-        <RouteDetailModal {results} {waypoints} />
+        <RouteDetailModal bind:this={routeDetailModal} {results} {waypoints} />
+
+        {#if results.length === 1}
+            <button class="button size-xs detail-inline-btn mt-10" on:click={() => routeDetailModal?.openModal()}>
+                {t('results.routeDetails')}
+                <span class="popup-icon">&#8599;</span>
+            </button>
+        {/if}
 
         <PlayerControls
             {results}
@@ -690,6 +703,7 @@
 
     let settingsModal: SettingsModal;
     let motorboatModal: MotorboatEditModal;
+    let routeDetailModal: RouteDetailModal;
     let polarModal: PolarViewEditModal;
     let playerControls: PlayerControls;
 
@@ -1157,6 +1171,39 @@
     }
 
     /* Comparison table */
+    .comparison-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    .detail-inline-btn {
+        flex: none;
+        padding: 4px 10px;
+        background: rgba(42, 157, 143, 0.18);
+        border: 1px solid rgba(42, 157, 143, 0.45);
+        color: #bfe4dc;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+
+        &:hover {
+            background: rgba(42, 157, 143, 0.3);
+            color: #e6eef8;
+            border-color: rgba(42, 157, 143, 0.7);
+        }
+
+        .popup-icon {
+            opacity: 0.8;
+        }
+    }
+
     .comparison-table {
         width: 100%;
         border-collapse: collapse;

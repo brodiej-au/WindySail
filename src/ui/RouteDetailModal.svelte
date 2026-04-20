@@ -1,10 +1,14 @@
-<!-- Button to open modal -->
-<button class="button size-s open-detail-btn" style="width:100%" on:click={openModal}>
-    <span class="open-detail-label">
-        {t('results.routeDetails')}<span hidden>{$locale}</span>
-        <span class="popup-icon">&#8599;</span>
-    </span>
-</button>
+<!-- Trigger is rendered by the parent (so it can be placed in context) — we
+     only expose openModal() via bind:this. If `inlineTrigger` is true, we
+     render our own fallback button below the chart. -->
+{#if inlineTrigger}
+    <button class="button size-xs open-detail-btn" on:click={openModal}>
+        <span class="open-detail-label">
+            {t('results.routeDetails')}<span hidden>{$locale}</span>
+            <span class="popup-icon">&#8599;</span>
+        </span>
+    </button>
+{/if}
 
 <!-- Modal overlay -->
 {#if showModal}
@@ -181,6 +185,8 @@
 
     export let results: ModelRouteResult[] = [];
     export let waypoints: LatLon[] = [];
+    /** When true, the component renders its own trigger button (legacy path). */
+    export let inlineTrigger: boolean = false;
 
     let canvasEl: HTMLCanvasElement;
     let chart: Chart | null = null;
@@ -220,7 +226,7 @@
         return sampled;
     }
 
-    async function openModal(): Promise<void> {
+    export async function openModal(): Promise<void> {
         showModal = true;
         await tick();
         if (canvasEl) buildChart(selectedPath);
