@@ -788,21 +788,22 @@
         }
     }
 
+    // Tracks whether initialisation has already run. Windy may invoke onopen
+    // again when the plugin is already mounted (e.g. context-menu click while
+    // the panel is open); in that case we no-op so the user's existing route,
+    // results, and UI state stay intact.
+    let isInitialised = false;
+
     export const onopen = (_params: unknown) => {
+        if (isInitialised) return;
+        isInitialised = true;
+
         initAnalytics();
         trackEvent('plugin_open');
         settingsStore.subscribe(onSettingsChange);
         originalTimestamp = store.get('timestamp');
         originalProduct = store.get('product');
         originalOverlay = store.get('overlay');
-        // Tear down any prior WaypointManager (e.g. when re-opened via context
-        // menu while already mounted) so we don't end up with two listeners
-        // and duplicate map markers.
-        if (waypointMgr) {
-            waypointMgr.destroy();
-        }
-        renderer.clear();
-        boatMarkers.clear();
         waypointMgr = new WaypointManager(name, handleWaypointChange, handleWarning, handleDrag);
         waypointMgr.activate();
 
@@ -838,6 +839,7 @@
     };
 
     onDestroy(() => {
+        isInitialised = false;
         trackEvent('plugin_close');
         if (timestampSubId !== null) {
             store.off(timestampSubId);
