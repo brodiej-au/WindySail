@@ -222,16 +222,37 @@
         box-shadow: 0 0 0 2px rgba(27, 36, 51, 0.95), 0 1px 3px rgba(0, 0, 0, 0.5);
         transform: translateX(-50%);
     }
+    /* Vertical drop line from each dot down to the slider rail. */
+    .track-dot::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        width: 2px;
+        height: 14px;
+        border-radius: 1px;
+        transform: translateX(-50%);
+        pointer-events: none;
+    }
     .track-dot--start {
         left: 0;
         background: radial-gradient(circle at 30% 30%, #22c55e, #15803d);
+    }
+    .track-dot--start::after {
+        background: linear-gradient(to bottom, rgba(34, 197, 94, 0.9), rgba(34, 197, 94, 0.05));
     }
     .track-dot--end {
         left: 100%;
         background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b);
     }
+    .track-dot--end::after {
+        background: linear-gradient(to bottom, rgba(239, 68, 68, 0.9), rgba(239, 68, 68, 0.05));
+    }
     .track-dot--wpt {
         background: radial-gradient(circle at 30% 30%, #60a5fa, #1d4ed8);
+    }
+    .track-dot--wpt::after {
+        background: linear-gradient(to bottom, rgba(96, 165, 250, 0.9), rgba(96, 165, 250, 0.05));
     }
 
     .scrubber {
