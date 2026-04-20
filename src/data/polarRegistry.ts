@@ -1,4 +1,5 @@
 import type { PolarData } from '../routing/types';
+import { pushPolar, deleteRemotePolar, pullPolars, isSyncEnabled } from '../backend/sync';
 
 // Motorboat sentinel (at top of dropdown, not alphabetised)
 import motorboat from './polars/motorboat.json';
@@ -136,6 +137,7 @@ export function saveCustomPolar(polar: PolarData): void {
     } catch {
         // Silently fail if localStorage is unavailable
     }
+    pushPolar(polar);
 }
 
 /**
@@ -148,5 +150,30 @@ export function deleteCustomPolar(name: string): void {
         localStorage.setItem(CUSTOM_POLARS_STORAGE_KEY, JSON.stringify(filtered));
     } catch {
         // Silently fail if localStorage is unavailable
+    }
+    deleteRemotePolar(name);
+}
+
+/**
+ * Pull remote custom polars and merge into localStorage. Remote is authoritative
+ * for names it covers; local-only polars are preserved and pushed up so the
+ * server picks them up on first sync. No-op if the user isn't signed in.
+ */
+export async function syncCustomPolarsFromRemote(): Promise<void> {
+    if (!isSyncEnabled()) return;
+    const remote = await pullPolars();
+    if (!remote) return;
+    const local = getCustomPolars();
+    const byName = new Map<string, PolarData>();
+    for (const p of local) byName.set(p.name, p);
+    for (const p of remote) byName.set(p.name, p);
+    const merged = Array.from(byName.values());
+    try {
+        localStorage.setItem(CUSTOM_POLARS_STORAGE_KEY, JSON.stringify(merged));
+    } catch {}
+    // Push local-only polars up.
+    const remoteNames = new Set(remote.map(p => p.name));
+    for (const p of local) {
+        if (!remoteNames.has(p.name)) pushPolar(p);
     }
 }

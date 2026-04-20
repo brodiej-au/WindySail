@@ -83,7 +83,7 @@
     import { settingsStore } from './stores/SettingsStore';
     import { routeStore } from './stores/RouteStore';
     import type { SavedRoute } from './routing/types';
-    import { getPolarByName } from './data/polarRegistry';
+    import { getPolarByName, syncCustomPolarsFromRemote } from './data/polarRegistry';
     import { interpolateAtTime } from './routing/RouteInterpolator';
     import { distance } from './routing/geo';
 
@@ -817,6 +817,12 @@
                 routingPanel?.setDepartureTime(lastRoute.departureTime);
             }
         }
+
+        // Cloud-sync pull: fetch saved routes + custom polars from the server
+        // when the user is signed into Windy. Fire-and-forget; UI updates via
+        // existing store subscriptions as soon as data arrives.
+        routeStore.syncFromRemote();
+        syncCustomPolarsFromRemote();
     };
 
     onDestroy(() => {

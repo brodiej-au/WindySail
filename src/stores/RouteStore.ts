@@ -1,4 +1,5 @@
 import type { SavedRoute, LatLon, WindModelId } from '../routing/types';
+import { pushRoute, deleteRemoteRoute, pullRoutes, isSyncEnabled } from '../backend/sync';
 
 const STORAGE_KEY = 'windysail-routes';
 const LAST_ROUTE_KEY = 'windysail-last-route';
@@ -55,12 +56,14 @@ export class RouteStore {
         }
         this.save();
         this.notifySubscribers();
+        pushRoute(route);
     }
 
     delete(id: string): void {
         this.routes = this.routes.filter(r => r.id !== id);
         this.save();
         this.notifySubscribers();
+        deleteRemoteRoute(id);
     }
 
     rename(id: string, name: string): void {
@@ -69,6 +72,30 @@ export class RouteStore {
             route.name = name;
             this.save();
             this.notifySubscribers();
+            pushRoute(route);
+        }
+    }
+
+    /**
+     * Pull remote routes and merge by id — remote is authoritative. Only runs
+     * when the user is signed in with an email; otherwise no-ops.
+     */
+    async syncFromRemote(): Promise<void> {
+        if (!isSyncEnabled()) return;
+        const remote = await pullRoutes();
+        if (!remote) return;
+        // Merge: remote overrides local for matching ids, local-only routes kept
+        // and pushed up so the server picks up anything created before sign-in.
+        const byId = new Map<string, SavedRoute>();
+        for (const r of this.routes) byId.set(r.id, r);
+        for (const r of remote) byId.set(r.id, r);
+        this.routes = Array.from(byId.values());
+        this.save();
+        this.notifySubscribers();
+        // Push any local-only routes the server didn't have yet.
+        const remoteIds = new Set(remote.map(r => r.id));
+        for (const r of this.routes) {
+            if (!remoteIds.has(r.id)) pushRoute(r);
         }
     }
 

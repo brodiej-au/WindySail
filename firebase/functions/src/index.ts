@@ -5,6 +5,14 @@ import { handleInstall } from './install';
 import { handleHeartbeat } from './heartbeat';
 import { handleDisclaimer } from './disclaimer';
 import { handleRoute } from './route';
+import {
+    handleListRoutes,
+    handleUpsertRoute,
+    handleDeleteRoute,
+    handleListPolars,
+    handleUpsertPolar,
+    handleDeletePolar,
+} from './sync';
 
 admin.initializeApp();
 setGlobalOptions({ region: 'australia-southeast1' });
@@ -50,6 +58,24 @@ export const api = onRequest(
                     return;
                 case '/route':
                     await handleRoute(req, res);
+                    return;
+                case '/sync/routes/list':
+                    await handleListRoutes(req, res);
+                    return;
+                case '/sync/routes/upsert':
+                    await handleUpsertRoute(req, res);
+                    return;
+                case '/sync/routes/delete':
+                    await handleDeleteRoute(req, res);
+                    return;
+                case '/sync/polars/list':
+                    await handleListPolars(req, res);
+                    return;
+                case '/sync/polars/upsert':
+                    await handleUpsertPolar(req, res);
+                    return;
+                case '/sync/polars/delete':
+                    await handleDeletePolar(req, res);
                     return;
                 default:
                     res.status(404).json({ error: 'not found' });
