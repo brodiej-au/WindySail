@@ -69,7 +69,7 @@
 
     import config from './pluginConfig';
     import { getOrCreateDeviceId, hasPersistedDeviceId } from './backend/deviceId';
-    import { postInstall, postHeartbeat, postDisclaimerAck, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
+    import { postInstall, postHeartbeat, postDisclaimerAck, postRoute, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
     import { DISCLAIMER_VERSION } from './backend/config';
     import DisclaimerModal from './ui/DisclaimerModal.svelte';
     import { initAnalytics, trackEvent } from './analytics';
@@ -408,6 +408,34 @@
                     distance_nm: Math.round(fastest.route.totalDistanceNm),
                     avg_sog: Math.round(fastest.route.avgSpeedKt * 10) / 10,
                     compute_time_ms: Date.now() - computeStart,
+                });
+
+                // Server-side route log — fire and forget.
+                postRoute({
+                    deviceId: getOrCreateDeviceId(),
+                    email: (store.get('user') as any)?.email ?? null,
+                    pluginVersion: config.version,
+                    usedLang: (store.get('usedLang') as string) ?? 'en',
+                    mode: 'single',
+                    startedAt: new Date(computeStart).toISOString(),
+                    completedAt: new Date().toISOString(),
+                    departureTime: new Date(departureTime).toISOString(),
+                    polarName: settings.selectedPolarName,
+                    motorboatMode: !!settings.motorboatMode,
+                    selectedModels: settings.selectedModels,
+                    start: { lat: liveStart.lat, lon: liveStart.lon, name: startName || undefined },
+                    end: { lat: liveEnd.lat, lon: liveEnd.lon, name: endName || undefined },
+                    waypointCount: liveWaypoints.length,
+                    waypoints: liveWaypoints.map(wp => ({ lat: wp.lat, lon: wp.lon })),
+                    results: routeResults.map(r => ({
+                        model: r.model,
+                        durationHours: r.route.durationHours,
+                        totalDistanceNm: r.route.totalDistanceNm,
+                        avgSpeedKt: r.route.avgSpeedKt,
+                        maxTws: r.route.maxTws,
+                        etaMs: r.route.eta,
+                    })),
+                    failedReason: null,
                 });
             }
 

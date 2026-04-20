@@ -14,6 +14,41 @@ export interface DisclaimerBody {
     deviceId: string; email: string | null; pluginVersion: string; disclaimerVersion: string; acceptedAt: string;
 }
 
+export interface RoutePoint {
+    lat: number;
+    lon: number;
+    name?: string;
+}
+
+export interface RouteResultSummary {
+    model: string;
+    durationHours: number;
+    totalDistanceNm: number;
+    avgSpeedKt: number;
+    maxTws: number;
+    etaMs: number;
+}
+
+export interface RouteBody {
+    deviceId: string;
+    email: string | null;
+    pluginVersion: string;
+    usedLang: string;
+    mode: 'single' | 'departure';
+    startedAt: string;
+    completedAt: string;
+    departureTime: string;
+    polarName: string;
+    motorboatMode: boolean;
+    selectedModels: string[];
+    start: RoutePoint;
+    end: RoutePoint;
+    waypointCount: number;
+    waypoints: RoutePoint[];
+    results: RouteResultSummary[];
+    failedReason: string | null;
+}
+
 async function send(path: QueuedEvent['path'], body: unknown): Promise<void> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), POST_TIMEOUT_MS);
@@ -53,6 +88,10 @@ export async function postHeartbeat(body: HeartbeatBody): Promise<void> {
 
 export async function postDisclaimerAck(body: DisclaimerBody): Promise<void> {
     return sendOrQueue('/disclaimer-ack', body as unknown as Record<string, unknown>);
+}
+
+export async function postRoute(body: RouteBody): Promise<void> {
+    return sendOrQueue('/route', body as unknown as Record<string, unknown>);
 }
 
 export function shouldSendHeartbeat(): boolean {

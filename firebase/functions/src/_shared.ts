@@ -20,7 +20,7 @@ export function serverTimestamp() {
 }
 
 export async function recordEvent(
-    type: 'install' | 'heartbeat' | 'disclaimer-ack' | 'coffee',
+    type: 'install' | 'heartbeat' | 'disclaimer-ack' | 'coffee' | 'route',
     deviceId: string,
     payload: Record<string, unknown>,
     ipHash: string,

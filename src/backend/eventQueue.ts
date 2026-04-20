@@ -2,7 +2,7 @@ const STORAGE_KEY = 'windysail-pending-events';
 export const MAX_QUEUE_SIZE = 50;
 
 export interface QueuedEvent {
-    path: '/install' | '/heartbeat' | '/disclaimer-ack';
+    path: '/install' | '/heartbeat' | '/disclaimer-ack' | '/route';
     body: Record<string, unknown>;
     queuedAt: number;
 }

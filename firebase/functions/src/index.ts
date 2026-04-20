@@ -4,6 +4,7 @@ import * as admin from 'firebase-admin';
 import { handleInstall } from './install';
 import { handleHeartbeat } from './heartbeat';
 import { handleDisclaimer } from './disclaimer';
+import { handleRoute } from './route';
 
 admin.initializeApp();
 setGlobalOptions({ region: 'australia-southeast1' });
@@ -46,6 +47,9 @@ export const api = onRequest(
                     return;
                 case '/disclaimer-ack':
                     await handleDisclaimer(req, res);
+                    return;
+                case '/route':
+                    await handleRoute(req, res);
                     return;
                 default:
                     res.status(404).json({ error: 'not found' });
