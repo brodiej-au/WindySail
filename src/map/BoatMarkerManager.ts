@@ -34,9 +34,7 @@ export class BoatMarkerManager {
      * Tooltip shows SOG, TWS, TWD, TWA.
      */
     updateMarker(model: WindModelId, point: BoatMarkerPoint, color: string): void {
-        const tooltipContent = `SOG: ${point.boatSpeed.toFixed(1)} kt | TWS: ${point.tws.toFixed(
-            1,
-        )} kt<br>TWD: ${Math.round(point.twd)}\u00B0 | TWA: ${Math.round(point.twa)}\u00B0`;
+        const tooltipContent = this.buildTooltipHtml(point, color);
 
         const heading = Math.round(point.heading);
         const existingMarker = this.markers.get(model);
@@ -64,10 +62,24 @@ export class BoatMarkerManager {
                 permanent: true,
                 direction: 'top',
                 offset: [0, -14],
+                className: 'boat-info-tooltip',
             });
 
             this.markers.set(model, marker);
         }
+    }
+
+    private buildTooltipHtml(point: BoatMarkerPoint, color: string): string {
+        return `
+            <div class="bi-wrap" style="--bi-accent:${color}">
+                <div class="bi-grid">
+                    <div class="bi-cell"><span class="bi-k">SOG</span><span class="bi-v">${point.boatSpeed.toFixed(1)}<span class="bi-u">kt</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">TWS</span><span class="bi-v">${point.tws.toFixed(1)}<span class="bi-u">kt</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">TWA</span><span class="bi-v">${Math.round(point.twa)}<span class="bi-u">&deg;</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">TWD</span><span class="bi-v">${Math.round(point.twd)}<span class="bi-u">&deg;</span></span></div>
+                </div>
+            </div>
+        `.trim();
     }
 
     /**

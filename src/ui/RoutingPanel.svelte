@@ -466,7 +466,7 @@
             bind:this={playerControls}
         />
 
-        <button class="button size-xs mt-10" style="width:100%" on:click={handleExportGpx}>
+        <button class="button size-s mt-10 export-btn" style="width:100%" on:click={handleExportGpx}>
             {t('routing.exportGpx')}
         </button>
 
@@ -1142,6 +1142,17 @@
         opacity: 0.8;
         &:hover {
             opacity: 1;
+        }
+    }
+
+    .export-btn {
+        background: rgba(69, 123, 157, 0.18);
+        border: 1px solid rgba(69, 123, 157, 0.45);
+        color: #a8c4dc;
+        &:hover {
+            background: rgba(69, 123, 157, 0.28);
+            color: #e6eef8;
+            border-color: rgba(69, 123, 157, 0.7);
         }
     }
 

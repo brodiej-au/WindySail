@@ -860,4 +860,53 @@
 </script>
 
 <style lang="less">
+    /* Boat info bubble on the map — Leaflet tooltip lives outside Svelte's
+       scoped-css tree, so these rules must be global. */
+    :global(.leaflet-tooltip.boat-info-tooltip) {
+        background: rgba(15, 23, 32, 0.94);
+        color: #e6eef8;
+        border: none;
+        border-radius: 10px;
+        padding: 0;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+        font-family: inherit;
+        white-space: normal;
+    }
+    :global(.leaflet-tooltip.boat-info-tooltip::before) {
+        border-top-color: rgba(15, 23, 32, 0.94);
+    }
+    :global(.boat-info-tooltip .bi-wrap) {
+        padding: 8px 10px;
+        border-left: 3px solid var(--bi-accent, #457b9d);
+        border-radius: 8px 10px 10px 8px;
+    }
+    :global(.boat-info-tooltip .bi-grid) {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 4px 14px;
+        line-height: 1.1;
+    }
+    :global(.boat-info-tooltip .bi-cell) {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    :global(.boat-info-tooltip .bi-k) {
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8a9ab0;
+        margin-bottom: 2px;
+    }
+    :global(.boat-info-tooltip .bi-v) {
+        font-size: 13px;
+        font-weight: 600;
+        color: #e6eef8;
+    }
+    :global(.boat-info-tooltip .bi-u) {
+        font-size: 10px;
+        font-weight: 400;
+        color: #8a9ab0;
+        margin-left: 2px;
+    }
 </style>
