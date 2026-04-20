@@ -1,7 +1,9 @@
 <!-- Button to open modal -->
-<button class="open-detail-btn size-s" on:click={openModal}>
-    <span>{t('results.routeDetails')}<span hidden>{$locale}</span></span>
-    <span class="popup-icon">&#8599;</span>
+<button class="button size-s open-detail-btn" style="width:100%" on:click={openModal}>
+    <span class="open-detail-label">
+        {t('results.routeDetails')}<span hidden>{$locale}</span>
+        <span class="popup-icon">&#8599;</span>
+    </span>
 </button>
 
 <!-- Modal overlay -->
@@ -593,23 +595,25 @@
 
 <style lang="less">
     .open-detail-btn {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
         margin-top: 10px;
-        padding: 8px 12px;
-        background: rgba(42, 157, 143, 0.2);
-        border: 1px solid rgba(42, 157, 143, 0.5);
-        border-radius: 4px;
-        color: inherit;
-        cursor: pointer;
+        background: rgba(42, 157, 143, 0.18);
+        border: 1px solid rgba(42, 157, 143, 0.45);
+        color: #bfe4dc;
         font-weight: 600;
-        transition: all 0.2s ease;
 
         &:hover {
-            background: rgba(42, 157, 143, 0.35);
+            background: rgba(42, 157, 143, 0.3);
+            color: #e6eef8;
+            border-color: rgba(42, 157, 143, 0.7);
         }
+    }
+    .open-detail-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .popup-icon {
+        opacity: 0.8;
     }
 
     .popup-icon {

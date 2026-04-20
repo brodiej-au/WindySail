@@ -7,12 +7,16 @@
         </button>
     </div>
 
-    <!-- Row 2: Time scrubber -->
+    <!-- Row 2: Time scrubber with Start/Finish/waypoint dots -->
     <div class="row mb-10">
         <div class="scrubber-wrap">
-            {#each waypointFractions as f, i}
-                <div class="wp-tick" style="left: {f * 100}%" title="Waypoint {i + 1}"></div>
-            {/each}
+            {#if results.length > 0}
+                <div class="track-dot track-dot--start" title="Start">S</div>
+                {#each waypointFractions as f, i}
+                    <div class="track-dot track-dot--wpt" style="left: {f * 100}%" title="Waypoint {i + 1}">{i + 1}</div>
+                {/each}
+                <div class="track-dot track-dot--end" title="Finish">F</div>
+            {/if}
             <input
                 type="range"
                 class="scrubber"
@@ -188,18 +192,37 @@
     .scrubber-wrap {
         position: relative;
         width: 100%;
+        padding: 6px 0;
     }
 
-    .wp-tick {
+    .track-dot {
         position: absolute;
-        top: -6px;
-        width: 8px;
-        height: 8px;
-        background: #3b82f6;
+        top: 50%;
+        width: 16px;
+        height: 16px;
         border-radius: 50%;
-        transform: translateX(-4px);
+        color: #fff;
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 0 0 2px rgba(27, 36, 51, 0.95), 0 1px 3px rgba(0, 0, 0, 0.5);
         pointer-events: none;
-        z-index: 1;
+        z-index: 2;
+        transform: translate(-50%, -50%);
+    }
+    .track-dot--start {
+        left: 0;
+        background: radial-gradient(circle at 30% 30%, #22c55e, #15803d);
+    }
+    .track-dot--end {
+        left: 100%;
+        background: radial-gradient(circle at 30% 30%, #ef4444, #991b1b);
+    }
+    .track-dot--wpt {
+        background: radial-gradient(circle at 30% 30%, #60a5fa, #1d4ed8);
     }
 
     .scrubber {
