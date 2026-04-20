@@ -109,9 +109,14 @@
                 {/if}
             </div>
             {#if motorboatMode}
-                <div class="motor-summary size-xs">
+                <button
+                    class="motor-summary size-xs"
+                    on:click={() => settingsModal.open()}
+                    title={t('boat.editMotorSpeedsTitle')}
+                >
                     {t('boat.motorSummary', { cruise: motorboatCruiseKt, heavy: motorboatHeavyKt, swell: motorboatSwellThresholdM })}
-                </div>
+                    <span class="motor-summary-edit">✎</span>
+                </button>
             {/if}
             <!-- Row 2: action buttons -->
             {#if !motorboatMode}
@@ -998,6 +1003,10 @@
 
     function onSettingsChange(settings: UserSettings): void {
         selectedPolarName = settings.selectedPolarName;
+        motorboatMode = settings.motorboatMode;
+        motorboatCruiseKt = settings.motorboatCruiseKt;
+        motorboatHeavyKt = settings.motorboatHeavyKt;
+        motorboatSwellThresholdM = settings.motorboatSwellThresholdM;
         allPolars = getAllPolars();
     }
 
@@ -1488,9 +1497,26 @@
         color: #8a9ab0;
         padding: 6px 10px;
         background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
         border-radius: 6px;
         line-height: 1.35;
         margin-top: 6px;
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font: inherit;
+    }
+    .motor-summary:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #e6eef8;
+    }
+    .motor-summary-edit {
+        opacity: 0.6;
+        font-size: 12px;
     }
 
     .btn {

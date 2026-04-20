@@ -55,6 +55,7 @@ export const en = {
         delete: 'Delete',
         motorboat: 'Motorboat',
         motorSummary: 'Motorboat · cruise {cruise} kt · heavy-weather {heavy} kt above {swell} m swell',
+        editMotorSpeedsTitle: 'Edit motor speeds',
         polarDiagram: 'Polar Diagram',
         editPrefix: 'Edit: {name}',
         duplicateAndEdit: 'Duplicate & Edit',

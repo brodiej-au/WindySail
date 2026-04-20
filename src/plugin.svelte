@@ -767,6 +767,14 @@
         originalTimestamp = store.get('timestamp');
         originalProduct = store.get('product');
         originalOverlay = store.get('overlay');
+        // Tear down any prior WaypointManager (e.g. when re-opened via context
+        // menu while already mounted) so we don't end up with two listeners
+        // and duplicate map markers.
+        if (waypointMgr) {
+            waypointMgr.destroy();
+        }
+        renderer.clear();
+        boatMarkers.clear();
         waypointMgr = new WaypointManager(name, handleWaypointChange, handleWarning, handleDrag);
         waypointMgr.activate();
 
