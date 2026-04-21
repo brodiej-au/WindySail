@@ -5,7 +5,7 @@ WINDY_API_KEY="EvgBIKK4OTuAJlNLD2A0gvGi809hWkR2"
 
 OWNER="BrodieJ"
 SHA=$(git rev-parse --short HEAD)
-REPOSITORY=""
+REPOSITORY="WindySail"
 DIR=dist
 
 # Build first
@@ -16,9 +16,11 @@ cd ./$DIR
 
 echo "Creating plugin archive..."
 node -e "
-const a = JSON.parse(require('fs').readFileSync('plugin.json','utf8'));
+const fs = require('fs');
+const a = JSON.parse(fs.readFileSync('plugin.json','utf8'));
+delete a.repository; // repositoryName + repositoryOwner replace this
 Object.assign(a, {repositoryName:'${REPOSITORY}',commitSha:'${SHA}',repositoryOwner:'${OWNER}'});
-require('fs').writeFileSync('plugin.json', JSON.stringify(a));
+fs.writeFileSync('plugin.json', JSON.stringify(a));
 "
 tar cf ./plugin.tar --exclude='./plugin.tar' --exclude='*.map' --exclude='plugin.js' .
 
