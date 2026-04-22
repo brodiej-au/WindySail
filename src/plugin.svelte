@@ -474,7 +474,7 @@
         error = null;
         departureResults = [];
         progressPercent = 0;
-        progressStatus = 'Starting departure scan...';
+        progressStatus = 'Starting multi plan…';
         // Fall back to the flat ProgressBar — the single-route TaskChecklist
         // steps don't describe what a multi-departure scan is doing.
         pipelineSteps = [];
@@ -554,7 +554,7 @@
             if (err instanceof DOMException && err.name === 'AbortError') {
                 // User cancelled — not an error
             } else {
-                error = err instanceof Error ? err.message : 'Departure scan failed.';
+                error = err instanceof Error ? err.message : 'Multi plan failed.';
             }
         } finally {
             isDepartureScanning = false;

@@ -171,7 +171,7 @@ export class DeparturePlanner {
             const routingBase = 40;
             const routingRange = 60;
             onStatus?.(
-                `Computing departure ${i + 1}/${totalDepartures}`,
+                `Scanning ${i + 1}/${totalDepartures}`,
                 Math.round(routingBase + (i / totalDepartures) * routingRange),
                 i,
                 totalDepartures,
@@ -191,7 +191,7 @@ export class DeparturePlanner {
                         const depProgress = (i + percent / 100) / totalDepartures;
                         const overallPercent = Math.round(routingBase + depProgress * routingRange);
                         onStatus?.(
-                            `Departure ${i + 1}/${totalDepartures} — ${status}`,
+                            `Scan ${i + 1}/${totalDepartures} — ${status}`,
                             overallPercent,
                             i,
                             totalDepartures,
