@@ -4,6 +4,14 @@
         {#if waypointState === 'WAITING_START'}
             <p class="size-m instruction">{t('routing.startPrompt', { what: t('routing.startWhat') })}<span hidden>{$locale}</span></p>
             <button class="button size-xs location-btn" on:click={handleUseMyLocationAsStart}>{t('routing.useMyLocation')}</button>
+            <button class="button size-xs location-btn" on:click={() => importFileInput?.click()}>{t('routing.importFile')}</button>
+            <input
+                bind:this={importFileInput}
+                type="file"
+                accept=".gpx,.rtz"
+                style="display:none"
+                on:change={handleImportFile}
+            />
         {:else if waypointState === 'WAITING_END'}
             <p class="size-m instruction">{t('routing.startPrompt', { what: t('routing.endWhat') })}</p>
         {:else if waypointState === 'READY' || waypointState === 'ADDING_WAYPOINTS'}
@@ -533,6 +541,7 @@
     import { t, locale } from '../i18n';
     import pkg from '../../package.json';
     import { triggerGpxDownload } from '../export/gpxExport';
+    import { parseRouteFile, RouteImportError } from '../import/routeImport';
     import ProgressBar from './ProgressBar.svelte';
     import TaskChecklist from './TaskChecklist.svelte';
     import SettingsModal from './SettingsModal.svelte';
@@ -597,6 +606,66 @@
     let departureWindowInput: DepartureWindowInput;
     let departureWindowInPast = false;
     let showAboutModal = false;
+
+    let importFileInput: HTMLInputElement | null = null;
+
+    async function handleImportFile(e: Event): Promise<void> {
+        const input = e.target as HTMLInputElement;
+        const file = input.files?.[0];
+        // Reset so re-selecting the same file still triggers change.
+        input.value = '';
+        if (!file) return;
+
+        let xml: string;
+        try {
+            xml = await file.text();
+        } catch {
+            error = t('routing.importErrorInvalidXml');
+            return;
+        }
+
+        let imported;
+        try {
+            imported = parseRouteFile(file.name, xml);
+        } catch (err) {
+            if (err instanceof RouteImportError) {
+                const key = `routing.importError${pascal(err.code)}`;
+                const msg = t(key);
+                error = msg && msg !== key ? msg : err.message;
+            } else {
+                error = t('routing.importErrorInvalidXml');
+            }
+            return;
+        }
+
+        if (imported.warning && !confirm(t('routing.importWaypointWarning', { count: imported.waypoints.length }))) {
+            return;
+        }
+
+        error = null;
+
+        // Drive the same handlers a manual click would.
+        const startOk = await onEditStart(imported.start);
+        if (!startOk) {
+            error = t('routing.importErrorOutOfRange');
+            return;
+        }
+        const endOk = await onEditEnd(imported.end);
+        if (!endOk) {
+            error = t('routing.importErrorOutOfRange');
+            return;
+        }
+        for (let i = 0; i < imported.waypoints.length; i++) {
+            await onEditWaypoint(i, imported.waypoints[i]);
+        }
+        if (imported.name) {
+            saveRouteName = imported.name;
+        }
+    }
+
+    function pascal(s: string): string {
+        return s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+    }
 
     function handleWindowInPastChange(v: boolean): void {
         departureWindowInPast = v;
