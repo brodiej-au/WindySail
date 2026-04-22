@@ -42,7 +42,11 @@
       "Bash(firebase deploy *)",
       "Bash(echo \"exit: $?\")",
       "Bash(FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only firestore:rules,functions)",
-      "Bash(FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions)"
+      "Bash(FUNCTIONS_DISCOVERY_TIMEOUT=60 firebase deploy --only functions)",
+      "Bash(./deploy.sh)",
+      "Bash(tar tvf *)",
+      "Bash(tar cf *)",
+      "Bash(tar uf *)"
     ]
   }
 }
