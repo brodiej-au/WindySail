@@ -43,6 +43,13 @@ export const en = {
         departureInPast: 'Departure time is in the past.',
         departureBeyondForecast: 'Departure is >7 days out — forecast accuracy will be limited.',
         depart: 'Depart: {time}',
+        importFile: 'Import GPX / RTZ',
+        importWaypointWarning: 'This route has {count} waypoints — more than usual. Import anyway?',
+        importErrorInvalidXml: 'Could not read file — not valid GPX or RTZ.',
+        importErrorNoPoints: 'File contains no route points.',
+        importErrorTooFewPoints: 'File must contain at least a start and finish point.',
+        importErrorOutOfRange: 'File contains invalid coordinates.',
+        importErrorUnknownFormat: 'Unrecognized file format — expected .gpx or .rtz.',
     },
     boat: {
         sectionLabel: 'Boat',
