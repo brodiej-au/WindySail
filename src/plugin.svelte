@@ -475,6 +475,9 @@
         departureResults = [];
         progressPercent = 0;
         progressStatus = 'Starting departure scan...';
+        // Fall back to the flat ProgressBar — the single-route TaskChecklist
+        // steps don't describe what a multi-departure scan is doing.
+        pipelineSteps = [];
 
         const scanStart = Date.now();
 
@@ -615,6 +618,7 @@
         renderer.clear();
         boatMarkers.clear();
         previewDistanceNm = 0;
+        pipelineSteps = [];
     }
 
     // Guard to prevent store.on('timestamp') -> handlePlayerTimeChange -> store.set('timestamp') loop
