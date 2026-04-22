@@ -66,3 +66,23 @@ describe('parseGpx — <rte> routes', () => {
         expect(r.warning).toBeTruthy();
     });
 });
+
+describe('parseGpx — <wpt>-only fallback', () => {
+    it('parses waypoints in document order when no <rte>', () => {
+        const xml = readFileSync(resolve(__dirname, '../fixtures/import-wpt-only.gpx'), 'utf8');
+        const r = parseGpx(xml);
+        expect(r.start).toEqual({ lat: -33.6012, lon: 151.3098 });
+        expect(r.end).toEqual({ lat: -33.8523, lon: 151.2108 });
+        expect(r.waypoints).toEqual([{ lat: -33.8210, lon: 151.4400 }]);
+    });
+
+    it('prefers <rte> over <wpt> when both are present', () => {
+        const xml = `<?xml version="1.0"?><gpx>
+            <wpt lat="10" lon="10"/><wpt lat="11" lon="11"/>
+            <rte><rtept lat="0" lon="0"/><rtept lat="1" lon="1"/></rte>
+        </gpx>`;
+        const r = parseGpx(xml);
+        expect(r.start).toEqual({ lat: 0, lon: 0 });
+        expect(r.end).toEqual({ lat: 1, lon: 1 });
+    });
+});

@@ -97,6 +97,15 @@ export function parseGpx(xml: string): ImportedRoute {
             if (p) points.push(p);
         }
     }
+    if (points.length === 0) {
+        // Fallback: <wpt> list in document order
+        const wptRe = /<wpt\b[^>]*?(?:\/>|>[\s\S]*?<\/wpt>)/gi;
+        let m: RegExpExecArray | null;
+        while ((m = wptRe.exec(xml)) !== null) {
+            const p = extractLatLon(m[0]);
+            if (p) points.push(p);
+        }
+    }
     let name: string | undefined;
     const metaMatch = xml.match(/<metadata\b[\s\S]*?<\/metadata>/i);
     if (metaMatch) {
