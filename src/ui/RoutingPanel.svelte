@@ -656,7 +656,11 @@
             return;
         }
         for (let i = 0; i < imported.waypoints.length; i++) {
-            await onEditWaypoint(i, imported.waypoints[i]);
+            const ok = await onEditWaypoint(i, imported.waypoints[i]);
+            if (!ok) {
+                error = t('routing.importErrorOutOfRange');
+                return;
+            }
         }
         if (imported.name) {
             saveRouteName = imported.name;
