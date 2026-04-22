@@ -187,6 +187,16 @@
                             </div>
                         {/if}
                     </div>
+
+                    <!-- Privacy -->
+                    <div class="section mb-10">
+                        <span class="size-xs label">{t('settings.sectionPrivacy')}</span>
+                        <label class="model-row size-s">
+                            <input type="checkbox" checked={analyticsEnabled} on:change={toggleAnalytics} />
+                            <span>{t('settings.analyticsEnabled')}</span>
+                            <InfoTooltip text={t('settings.infoAnalyticsEnabled')} />
+                        </label>
+                    </div>
             </div>
         </div>
     </div>
@@ -198,6 +208,7 @@
     import { settingsStore } from '../stores/SettingsStore';
     import InfoTooltip from './InfoTooltip.svelte';
     import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
+    import { applyAnalyticsOptOut } from '../analytics';
     import type { WindModelId, UserSettings } from '../routing/types';
 
     const ALL_MODELS: WindModelId[] = ['gfs', 'ecmwf', 'icon', 'bomAccess'];
@@ -219,6 +230,7 @@
     let motorSpeed: number = settingsStore.get('motorSpeed');
     let comfortWeight: number = settingsStore.get('comfortWeight');
     let showIsochrones: boolean = settingsStore.get('showIsochrones');
+    let analyticsEnabled: boolean = settingsStore.get('analyticsEnabled');
     let advanced: import('../routing/types').AdvancedSettings = settingsStore.get('advanced');
     let advancedOpen = false;
 
@@ -253,6 +265,14 @@
     function toggleIsochrones(): void {
         showIsochrones = !showIsochrones;
         settingsStore.set('showIsochrones', showIsochrones);
+    }
+
+    function toggleAnalytics(): void {
+        analyticsEnabled = !analyticsEnabled;
+        settingsStore.set('analyticsEnabled', analyticsEnabled);
+        if (!analyticsEnabled) {
+            applyAnalyticsOptOut();
+        }
     }
 
     function handleNumberChange(
@@ -320,6 +340,7 @@
         motorSpeed = settings.motorSpeed;
         comfortWeight = settings.comfortWeight;
         showIsochrones = settings.showIsochrones;
+        analyticsEnabled = settings.analyticsEnabled;
     }
 
     settingsStore.subscribe(onSettingsChange);
