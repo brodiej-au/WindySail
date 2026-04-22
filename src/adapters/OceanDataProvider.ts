@@ -519,6 +519,10 @@ async function _sampleSwellInner(
     let dataUpdateTime: number | undefined;
     let lastNonEmptyIdx = -1;
 
+    // Give the UI a label during the otherwise-silent product-switch wait
+    // (waitForProductReady can take up to 5s with no progress callback).
+    onProgress?.('Switching to swell forecast…', 0);
+
     store.set('overlay', 'waves');
     store.set('product', 'ecmwfWaves');
     store.set('timestamp', timestamps[0]);
@@ -650,6 +654,9 @@ async function _sampleCurrentInner(
     let hasAnyData = false;
     let modelRunTime: number | undefined;
     let dataUpdateTime: number | undefined;
+
+    // Give the UI a label during the otherwise-silent product-switch wait.
+    onProgress?.('Switching to currents forecast…', 0);
 
     store.set('overlay', 'currents');
     store.set('product', 'cmems');

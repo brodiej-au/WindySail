@@ -89,6 +89,11 @@ export async function fetchWindGrid(
 
     try {
         // Ensure wind overlay is active and switch to the requested model.
+        // Emit progress immediately — waitForProductReady below can take up
+        // to 5s with no inner progress callback, and the UI would otherwise
+        // show the step as active with no detail for that whole window.
+        onProgress?.(`Switching to ${model} forecast…`, 0);
+
         store.set('overlay', 'wind');
         store.set('product', model);
 

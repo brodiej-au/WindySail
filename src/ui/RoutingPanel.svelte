@@ -1,11 +1,31 @@
 <div class="routing-panel">
-    <!-- Global settings gear — always accessible -->
-    <button
-        class="gear-btn gear-btn--global"
-        on:click={() => settingsModal.open()}
-        title={t('routing.settingsTitle')}
-        disabled={isRouting || isDepartureScanning}
-    >&#9881;</button>
+    <!-- Mode toggle + Settings — always visible -->
+    <div class="section mb-10 mode-bar" class:section--disabled={isRouting || isDepartureScanning}>
+        <div class="mode-toggle">
+            <button
+                class="pill size-xs"
+                class:pill--active={mode === 'single'}
+                on:click={() => mode = 'single'}
+                disabled={results.length > 0}
+            >
+                {t('routing.singleRoute')}
+            </button>
+            <button
+                class="pill size-xs"
+                class:pill--active={mode === 'departure'}
+                on:click={() => mode = 'departure'}
+                disabled={results.length > 0}
+            >
+                {t('routing.departurePlanner')}
+            </button>
+        </div>
+        <button
+            class="gear-btn"
+            on:click={() => settingsModal.open()}
+            title={t('routing.settingsTitle')}
+            disabled={isRouting || isDepartureScanning}
+        >&#9881;</button>
+    </div>
 
     <!-- Waypoint instructions -->
     <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
@@ -184,23 +204,6 @@
             {/if}
         {/if}
 
-        <!-- Mode toggle -->
-        <div class="section mb-10 mt-10 mode-toggle" class:section--disabled={isRouting || isDepartureScanning}>
-            <button
-                class="pill size-xs"
-                class:pill--active={mode === 'single'}
-                on:click={() => mode = 'single'}
-            >
-                {t('routing.singleRoute')}
-            </button>
-            <button
-                class="pill size-xs"
-                class:pill--active={mode === 'departure'}
-                on:click={() => mode = 'departure'}
-            >
-                {t('routing.departurePlanner')}
-            </button>
-        </div>
 
         <!-- Departure time / window -->
         {#if mode === 'single'}
@@ -1735,8 +1738,13 @@
         opacity: 0.7;
         transition: all 0.15s;
 
-        &:hover {
+        &:hover:not(:disabled) {
             opacity: 1;
+        }
+
+        &:disabled {
+            cursor: default;
+            opacity: 0.4;
         }
 
         &.pill--active {
@@ -1746,28 +1754,18 @@
         }
     }
 
-    .gear-btn--global {
-        position: absolute;
-        top: 4px;
-        right: 4px;
-        z-index: 10;
-        background: none;
-        border: none;
-        color: rgba(255, 255, 255, 0.45);
-        font-size: 18px;
-        cursor: pointer;
-        padding: 4px 6px;
-        line-height: 1;
-        border-radius: 3px;
+    .mode-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
 
-        &:hover:not(:disabled) {
-            color: rgba(255, 255, 255, 0.9);
-            background: rgba(255, 255, 255, 0.06);
+        .mode-toggle {
+            flex: 1;
         }
 
-        &:disabled {
-            opacity: 0.3;
-            cursor: default;
+        .gear-btn {
+            flex: none;
+            margin-bottom: 0;
         }
     }
 
