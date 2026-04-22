@@ -759,19 +759,23 @@
     }
 
     async function handleEditStart(latLon: LatLon): Promise<boolean> {
-        if (!waypointMgr) return false;
+        if (!waypointMgr || results.length > 0) return false;
         return waypointMgr.updateStart(latLon);
     }
 
     async function handleEditEnd(latLon: LatLon): Promise<boolean> {
-        if (!waypointMgr) return false;
+        if (!waypointMgr || results.length > 0) return false;
         return waypointMgr.updateEnd(latLon);
     }
 
     async function handleEditWaypoint(index: number, latLon: LatLon): Promise<boolean> {
-        if (!waypointMgr) return false;
+        if (!waypointMgr || results.length > 0) return false;
         return waypointMgr.updateWaypoint(index, latLon);
     }
+
+    // Lock/unlock map marker dragging whenever results change — an active
+    // calculated route makes the pins read-only until the user clears.
+    $: if (waypointMgr) waypointMgr.setLocked(results.length > 0);
 
     function onRoutesChanged(routes: SavedRoute[]): void {
         savedRoutes = routes;

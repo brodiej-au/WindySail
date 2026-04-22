@@ -285,6 +285,25 @@ export class WaypointManager {
     }
 
     /**
+     * Lock or unlock all markers on the map. Locked markers cannot be dragged;
+     * used to prevent route edits while a calculated route is active — the user
+     * must Clear first.
+     */
+    setLocked(locked: boolean): void {
+        const enable = !locked;
+        const apply = (marker: L.Marker | null) => {
+            if (!marker) return;
+            const d = marker.dragging;
+            if (!d) return;
+            if (enable) d.enable();
+            else d.disable();
+        };
+        apply(this.startMarker);
+        apply(this.endMarker);
+        for (const m of this.waypointMarkers) apply(m);
+    }
+
+    /**
      * Load a saved route onto the map: creates markers for start, end, and all
      * intermediate waypoints, then transitions to READY state.
      */
