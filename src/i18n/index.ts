@@ -1,12 +1,22 @@
 import { readable } from 'svelte/store';
 import store from '@windy/store';
 import { en } from './en';
+import { fr } from './fr';
+import { de } from './de';
+import { es } from './es';
+import { it } from './it';
+import { nl } from './nl';
+import { pt } from './pt';
+import { cs } from './cs';
+import { pl } from './pl';
+import { sv } from './sv';
+import { ru } from './ru';
 import type { Translations, TranslationKey } from './types';
 
 const FALLBACK: Translations = en;
 
 const REGISTERED: Record<string, Translations> = {
-    en,
+    en, fr, de, es, it, nl, pt, cs, pl, sv, ru,
 };
 
 let currentLocale: string = 'en';

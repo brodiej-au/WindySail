@@ -10,7 +10,8 @@ vi.mock('@windy/store', () => ({
     },
 }));
 
-import { t, setLocale, available } from '../../src/i18n';
+import { t, setLocale, available, register } from '../../src/i18n';
+import { en } from '../../src/i18n/en';
 
 describe('t()', () => {
     beforeEach(() => { usedLang = 'en'; setLocale('en'); });
@@ -40,13 +41,76 @@ describe('t()', () => {
     });
 
     it('falls back to English when the selected locale is missing a key', () => {
-        // Simulate a fr locale with only one translated key
-        setLocale('fr');
-        // Because no fr.ts exists yet, every key falls through to en
-        expect(t('routing.calculateButton')).toBe('Calculate Route');
+        // Register a partial locale — only one key defined. Missing keys must fall through to en.
+        register('xx', { routing: { calculateButton: 'Calcular' } } as any);
+        setLocale('xx');
+        expect(t('routing.calculateButton')).toBe('Calcular');
+        expect(t('routing.cancelButton')).toBe('Cancel'); // falls through to en
     });
 
     it('available() returns the list of registered locale codes', () => {
-        expect(available()).toContain('en');
+        const codes = available();
+        for (const c of ['en', 'fr', 'de', 'es', 'it', 'nl', 'pt', 'cs', 'pl', 'sv', 'ru']) {
+            expect(codes).toContain(c);
+        }
+    });
+});
+
+describe('locale key parity', () => {
+    /** Collect every dotted leaf key from a nested object. */
+    function collectKeys(obj: Record<string, unknown>, prefix = ''): string[] {
+        const keys: string[] = [];
+        for (const [k, v] of Object.entries(obj)) {
+            const path = prefix ? `${prefix}.${k}` : k;
+            if (v !== null && typeof v === 'object') {
+                keys.push(...collectKeys(v as Record<string, unknown>, path));
+            } else {
+                keys.push(path);
+            }
+        }
+        return keys.sort();
+    }
+
+    const expected = collectKeys(en as unknown as Record<string, unknown>);
+
+    // Build fixture list lazily so the async imports resolve in test context
+    const locales: [string, Record<string, unknown>][] = [];
+    beforeEach(async () => {
+        if (locales.length > 0) return;
+        const mods = await Promise.all([
+            import('../../src/i18n/fr').then(m => ['fr', m.fr]),
+            import('../../src/i18n/de').then(m => ['de', m.de]),
+            import('../../src/i18n/es').then(m => ['es', m.es]),
+            import('../../src/i18n/it').then(m => ['it', m.it]),
+            import('../../src/i18n/nl').then(m => ['nl', m.nl]),
+            import('../../src/i18n/pt').then(m => ['pt', m.pt]),
+            import('../../src/i18n/cs').then(m => ['cs', m.cs]),
+            import('../../src/i18n/pl').then(m => ['pl', m.pl]),
+            import('../../src/i18n/sv').then(m => ['sv', m.sv]),
+            import('../../src/i18n/ru').then(m => ['ru', m.ru]),
+        ]);
+        for (const [code, dict] of mods as [string, Record<string, unknown>][]) {
+            locales.push([code, dict]);
+        }
+    });
+
+    it('every locale has the same key set as en', () => {
+        for (const [code, dict] of locales) {
+            const actual = collectKeys(dict);
+            expect(actual, `${code} key parity`).toEqual(expected);
+        }
+    });
+
+    it('every translation is a non-empty string', () => {
+        for (const [code, dict] of locales) {
+            const keys = collectKeys(dict);
+            for (const path of keys) {
+                const parts = path.split('.');
+                let node: any = dict;
+                for (const p of parts) node = node[p];
+                expect(typeof node, `${code}:${path} type`).toBe('string');
+                expect((node as string).length, `${code}:${path} non-empty`).toBeGreaterThan(0);
+            }
+        }
     });
 });
