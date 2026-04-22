@@ -236,6 +236,9 @@ export interface UserSettings {
     selectedModels: WindModelId[];
     selectedPolarName: string;
 
+    // Privacy
+    analyticsEnabled: boolean; // send anonymous usage analytics
+
     // Motorboat mode (sub-project C)
     motorboatMode: boolean;
     motorboatCruiseKt: number;
@@ -260,6 +263,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     motorSpeed: 4,
     comfortWeight: 0.3,
     showIsochrones: false,
+    analyticsEnabled: true,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',
     motorboatMode: false,
