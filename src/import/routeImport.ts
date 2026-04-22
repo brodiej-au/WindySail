@@ -139,3 +139,23 @@ export function parseRtz(xml: string): ImportedRoute {
     const name = nameAttrMatch ? decodeEntities(nameAttrMatch[1]).trim() : undefined;
     return buildRoute(points, name);
 }
+
+/**
+ * Pick parser by filename extension, falling back to root-element sniffing.
+ * Throws RouteImportError('invalid-xml') if the input doesn't look like XML,
+ * or 'unknown-format' if the root element is neither <gpx> nor <route>.
+ */
+export function parseRouteFile(filename: string, xml: string): ImportedRoute {
+    if (!/<\s*\?xml/i.test(xml) && !/<\s*[A-Za-z]/.test(xml)) {
+        throw new RouteImportError('invalid-xml', 'File is not valid XML.');
+    }
+    const ext = (filename.toLowerCase().match(/\.([a-z0-9]+)$/) || [])[1];
+    if (ext === 'gpx') return parseGpx(xml);
+    if (ext === 'rtz') return parseRtz(xml);
+    // Sniff: look at the first element name after any XML prolog.
+    const rootMatch = xml.match(/<\s*([A-Za-z][\w:-]*)\b/);
+    const root = rootMatch?.[1]?.toLowerCase();
+    if (root === 'gpx') return parseGpx(xml);
+    if (root === 'route') return parseRtz(xml);
+    throw new RouteImportError('unknown-format', `Unrecognized format (root: <${root ?? '?'}>)`);
+}

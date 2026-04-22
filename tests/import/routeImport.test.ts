@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { parseGpx, parseRtz, RouteImportError } from '../../src/import/routeImport';
+import { parseGpx, parseRtz, parseRouteFile, RouteImportError } from '../../src/import/routeImport';
 
 describe('parseGpx — <rte> routes', () => {
     it('parses the exporter round-trip fixture', () => {
@@ -113,6 +113,39 @@ describe('parseRtz', () => {
         </route>`;
         try { parseRtz(xml); } catch (e) {
             expect((e as RouteImportError).code).toBe('too-few-points');
+        }
+    });
+});
+
+describe('parseRouteFile — dispatcher', () => {
+    it('picks GPX parser for .gpx extension', () => {
+        const xml = readFileSync(resolve(__dirname, '../fixtures/route-3wpt.gpx'), 'utf8');
+        const r = parseRouteFile('plan.gpx', xml);
+        expect(r.waypoints).toHaveLength(1);
+    });
+
+    it('picks RTZ parser for .rtz extension', () => {
+        const xml = readFileSync(resolve(__dirname, '../fixtures/import-route.rtz'), 'utf8');
+        const r = parseRouteFile('plan.rtz', xml);
+        expect(r.waypoints).toHaveLength(1);
+    });
+
+    it('sniffs by root element when extension is unknown', () => {
+        const xml = readFileSync(resolve(__dirname, '../fixtures/import-route.rtz'), 'utf8');
+        const r = parseRouteFile('plan.bin', xml);
+        expect(r.start).toEqual({ lat: -33.6012, lon: 151.3098 });
+    });
+
+    it('throws unknown-format when root is neither gpx nor route', () => {
+        const xml = `<?xml version="1.0"?><foo/>`;
+        try { parseRouteFile('unknown.xml', xml); } catch (e) {
+            expect((e as RouteImportError).code).toBe('unknown-format');
+        }
+    });
+
+    it('throws invalid-xml for garbage input', () => {
+        try { parseRouteFile('x.gpx', 'not xml at all'); } catch (e) {
+            expect((e as RouteImportError).code).toBe('invalid-xml');
         }
     });
 });
