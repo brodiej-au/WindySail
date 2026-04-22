@@ -1,4 +1,12 @@
 <div class="routing-panel">
+    <!-- Global settings gear — always accessible -->
+    <button
+        class="gear-btn gear-btn--global"
+        on:click={() => settingsModal.open()}
+        title={t('routing.settingsTitle')}
+        disabled={isRouting || isDepartureScanning}
+    >&#9881;</button>
+
     <!-- Waypoint instructions -->
     <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
         {#if waypointState === 'WAITING_START'}
@@ -207,7 +215,6 @@
                         disabled={isRouting || isDepartureScanning}
                     />
                 </div>
-                <button class="gear-btn" on:click={() => settingsModal.open()} title={t('routing.settingsTitle')} disabled={isRouting || isDepartureScanning}>&#9881;</button>
             </div>
             {#if departureInPast}
                 <div class="section mb-10 warning-text size-xs">{t('routing.departureInPast')}</div>
@@ -221,7 +228,6 @@
                     bind:this={departureWindowInput}
                     onWindowInPastChange={handleWindowInPastChange}
                 />
-                <button class="gear-btn gear-btn--float" on:click={() => settingsModal.open()} title={t('routing.settingsTitle')} disabled={isRouting || isDepartureScanning}>&#9881;</button>
             </div>
         {/if}
 
@@ -1109,6 +1115,7 @@
         display: flex;
         flex-direction: column;
         min-height: 100%;
+        position: relative;
     }
     .section {
         padding: 0;
@@ -1739,20 +1746,28 @@
         }
     }
 
-    .gear-btn--float {
+    .gear-btn--global {
         position: absolute;
-        right: 0;
-        top: 0;
+        top: 4px;
+        right: 4px;
+        z-index: 10;
         background: none;
         border: none;
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 20px;
+        color: rgba(255, 255, 255, 0.45);
+        font-size: 18px;
         cursor: pointer;
-        padding: 4px;
+        padding: 4px 6px;
         line-height: 1;
+        border-radius: 3px;
 
-        &:hover {
+        &:hover:not(:disabled) {
             color: rgba(255, 255, 255, 0.9);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        &:disabled {
+            opacity: 0.3;
+            cursor: default;
         }
     }
 
