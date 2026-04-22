@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<route version="1.2" xmlns="http://www.cirm.org/RTZ/1/2" routeName="Harbour Run">
+  <routeInfo vesselName="TestBoat"/>
+  <waypoints>
+    <defaultWaypoint><leg/></defaultWaypoint>
+    <waypoint id="1" name="Start">
+      <position lat="-33.6012" lon="151.3098"/>
+    </waypoint>
+    <waypoint id="2" name="Turn">
+      <position lat="-33.8210" lon="151.4400"/>
+    </waypoint>
+    <waypoint id="3" name="Finish">
+      <position lat="-33.8523" lon="151.2108"/>
+    </waypoint>
+  </waypoints>
+</route>

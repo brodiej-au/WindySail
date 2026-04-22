@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { parseGpx, RouteImportError } from '../../src/import/routeImport';
+import { parseGpx, parseRtz, RouteImportError } from '../../src/import/routeImport';
 
 describe('parseGpx — <rte> routes', () => {
     it('parses the exporter round-trip fixture', () => {
@@ -84,5 +84,35 @@ describe('parseGpx — <wpt>-only fallback', () => {
         const r = parseGpx(xml);
         expect(r.start).toEqual({ lat: 0, lon: 0 });
         expect(r.end).toEqual({ lat: 1, lon: 1 });
+    });
+});
+
+describe('parseRtz', () => {
+    it('parses minimal RTZ with start, waypoint, finish', () => {
+        const xml = readFileSync(resolve(__dirname, '../fixtures/import-route.rtz'), 'utf8');
+        const r = parseRtz(xml);
+        expect(r.start).toEqual({ lat: -33.6012, lon: 151.3098 });
+        expect(r.end).toEqual({ lat: -33.8523, lon: 151.2108 });
+        expect(r.waypoints).toEqual([{ lat: -33.8210, lon: 151.4400 }]);
+        expect(r.name).toBe('Harbour Run');
+    });
+
+    it('reads name from <route routeName="...">', () => {
+        const xml = `<?xml version="1.0"?><route routeName="Alpha">
+            <waypoints>
+                <waypoint><position lat="0" lon="0"/></waypoint>
+                <waypoint><position lat="1" lon="1"/></waypoint>
+            </waypoints>
+        </route>`;
+        expect(parseRtz(xml).name).toBe('Alpha');
+    });
+
+    it('throws too-few-points when only one <position>', () => {
+        const xml = `<?xml version="1.0"?><route>
+            <waypoints><waypoint><position lat="0" lon="0"/></waypoint></waypoints>
+        </route>`;
+        try { parseRtz(xml); } catch (e) {
+            expect((e as RouteImportError).code).toBe('too-few-points');
+        }
     });
 });

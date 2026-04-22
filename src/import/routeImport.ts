@@ -118,3 +118,24 @@ export function parseGpx(xml: string): ImportedRoute {
     }
     return buildRoute(points, name);
 }
+
+export function parseRtz(xml: string): ImportedRoute {
+    const wpBlockMatch = xml.match(/<waypoints\b[\s\S]*?<\/waypoints>/i);
+    const points: LatLon[] = [];
+    if (wpBlockMatch) {
+        // Each <waypoint>...</waypoint> block contains a <position lat=".." lon=".."/>.
+        // We also tolerate self-closing <position/>.
+        const wpRe = /<waypoint\b[\s\S]*?<\/waypoint>/gi;
+        let m: RegExpExecArray | null;
+        while ((m = wpRe.exec(wpBlockMatch[0])) !== null) {
+            const posMatch = m[0].match(/<position\b[^>]*?\/?>/i);
+            if (!posMatch) continue;
+            const p = extractLatLon(posMatch[0]);
+            if (p) points.push(p);
+        }
+    }
+    // Name: <route routeName="...">
+    const nameAttrMatch = xml.match(/<route\b[^>]*?\brouteName\s*=\s*["']([^"']+)["']/i);
+    const name = nameAttrMatch ? decodeEntities(nameAttrMatch[1]).trim() : undefined;
+    return buildRoute(points, name);
+}
