@@ -272,6 +272,12 @@
             <!-- Compact route reference -->
             <div class="route-ref size-xs mb-10">
                 <div>{t('routing.depart', { time: formatEta(results[0].route.path[0]?.time ?? Date.now()) })}</div>
+                {#if results.length === 1}
+                    <button class="button size-xs detail-inline-btn" on:click={() => routeDetailModal?.openModal()}>
+                        {t('results.routeDetails')}
+                        <span class="popup-icon">&#8599;</span>
+                    </button>
+                {/if}
             </div>
 
             <!-- Comparison table (multi-model only) -->
@@ -472,13 +478,6 @@
     <!-- Route Detail Modal button + Player controls (post-calculation) -->
     {#if results.length > 0}
         <RouteDetailModal bind:this={routeDetailModal} {results} {waypoints} />
-
-        {#if results.length === 1}
-            <button class="button size-xs detail-inline-btn mt-10" on:click={() => routeDetailModal?.openModal()}>
-                {t('results.routeDetails')}
-                <span class="popup-icon">&#8599;</span>
-            </button>
-        {/if}
 
         <PlayerControls
             {results}
@@ -1208,8 +1207,16 @@
 
     /* Route reference (compact coords) */
     .route-ref {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         opacity: 0.6;
         line-height: 1.5;
+
+        .detail-inline-btn {
+            opacity: 1;
+        }
     }
 
     /* Selected route stats */
