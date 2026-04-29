@@ -2,14 +2,15 @@
 {#if showModal}
     <div class="modal-backdrop" on:click={handleBackdropClick}>
         <div class="modal-container" class:editing={isEditing}>
+            <span hidden>{$locale}</span>
             <div class="modal-header">
-                <h3 class="size-m">{isEditing ? `Edit: ${editName}` : polar.name}</h3>
+                <h3 class="size-m">{isEditing ? t('boat.editPrefix', { name: editName }) : polar.name}</h3>
                 <div class="header-actions">
                     {#if !isEditing}
                         {#if isCustom}
-                            <button class="action-btn size-xs" on:click={startEditing}>Edit</button>
+                            <button class="action-btn size-xs" on:click={startEditing}>{t('boat.edit')}</button>
                         {:else}
-                            <button class="action-btn size-xs" on:click={duplicateAndEdit}>Duplicate & Edit</button>
+                            <button class="action-btn size-xs" on:click={duplicateAndEdit}>{t('boat.duplicateAndEdit')}</button>
                         {/if}
                     {/if}
                     <button class="close-btn" on:click={handleClose}>✕</button>
@@ -19,12 +20,12 @@
             {#if isEditing}
                 <!-- Edit mode -->
                 <div class="name-row">
-                    <label class="size-xs label" for="editPolarName">Name</label>
+                    <label class="size-xs label" for="editPolarName">{t('boat.nameLabel')}</label>
                     <input
                         id="editPolarName"
                         type="text"
                         class="input size-s"
-                        placeholder="e.g. My Boat 35"
+                        placeholder={t('boat.namePlaceholder')}
                         bind:value={editName}
                     />
                 </div>
@@ -46,9 +47,10 @@
     </div>
 {/if}
 
-<button class="button size-s" on:click={openModal}>Polar Diagram</button>
+<button class="button size-s" on:click={openModal}>{t('boat.polarDiagram')}</button>
 
 <script lang="ts">
+    import { t, locale } from '../i18n';
     import type { PolarData } from '../routing/types';
     import PolarDiagram from './PolarDiagram.svelte';
     import PolarGraphEditor from './PolarGraphEditor.svelte';

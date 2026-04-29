@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Windy Sail Router v0.3.0" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>Pittwater to Sydney Harbour</name>
+    <time>2026-04-19T09:15:00.000Z</time>
+  </metadata>
+  <rte>
+    <name>Sail Router plan</name>
+    <rtept lat="-33.6012" lon="151.3098"><name>Start &#8212; Pittwater</name></rtept>
+    <rtept lat="-33.8210" lon="151.4400"><name>Waypoint 1</name></rtept>
+    <rtept lat="-33.8523" lon="151.2108"><name>Finish &#8212; Sydney Harbour</name></rtept>
+  </rte>
+</gpx>

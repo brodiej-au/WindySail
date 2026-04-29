@@ -4,9 +4,16 @@ import products from '@windy/products';
 import type { LatLonBounds, SwellGridData, CurrentGridData } from '../routing/types';
 import { waitForRedraw, waitForProductReady } from './windyHelpers';
 import { buildOceanCacheKey, getSwell, setSwell, getCurrent, setCurrent } from './OceanCache';
+import { withTimeout, retryWithBackoff } from './asyncGuards';
 
 const GRID_STEP = 1.0; // degrees — same as WindProvider
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
+/** Per-timestep wall-clock budget. If Windy hasn't answered by this deadline, retry. */
+const STEP_TIMEOUT_MS = 15_000;
+/** Number of retry attempts after the initial try for a single timestep. */
+const STEP_RETRIES = 2;
+/** Delay between retry attempts for the same timestep. */
+const STEP_RETRY_BACKOFF_MS = 500;
 
 /**
  * Build lat/lon arrays and timestamps for the given bounds and time range.
@@ -96,6 +103,10 @@ export async function fetchSwellGrid(
     let lastNonEmptyIdx = -1;
 
     try {
+        // Give the UI a label during the otherwise-silent product-switch wait
+        // (waitForProductReady can take up to 5s with no progress callback).
+        onProgress?.('Switching to swell forecast…', 0);
+
         store.set('overlay', 'waves');
         store.set('product', 'ecmwfWaves');
         store.set('timestamp', timestamps[0]);
@@ -124,22 +135,38 @@ export async function fetchSwellGrid(
                 Math.round((ti / timestamps.length) * 100),
             );
 
-            if (ti > 0) {
-                store.set('timestamp', timestamps[ti]);
-                await waitForRedraw(150);
-            }
-
-            const interpolate = await getLatLonInterpolator();
-
-            let anyNonZero = false;
-            if (interpolate) {
+            const sampleOneStep = async (): Promise<any[] | null> => {
+                if (ti > 0) {
+                    store.set('timestamp', timestamps[ti]);
+                    await waitForRedraw(150);
+                }
+                const interpolate = await getLatLonInterpolator();
+                if (!interpolate) return null;
                 const jobs: Promise<any>[] = [];
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
                         jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
                     }
                 }
-                const batchResults = await Promise.all(jobs);
+                return await Promise.all(jobs);
+            };
+
+            let batchResults: any[] | null = null;
+            try {
+                batchResults = await retryWithBackoff(
+                    () => withTimeout(sampleOneStep(), STEP_TIMEOUT_MS, `swell ts=${ti}`),
+                    STEP_RETRIES,
+                    STEP_RETRY_BACKOFF_MS,
+                    signal,
+                );
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') throw err;
+                console.warn(`[OceanDataProvider] Swell step ${ti + 1}/${timestamps.length} failed after ${STEP_RETRIES} retries — skipping.`, err);
+                batchResults = null;
+            }
+
+            let anyNonZero = false;
+            if (batchResults) {
                 let idx = 0;
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
@@ -254,6 +281,9 @@ export async function fetchCurrentGrid(
     const refLon = (bounds.west + bounds.east) / 2;
 
     try {
+        // Give the UI a label during the otherwise-silent product-switch wait.
+        onProgress?.('Switching to currents forecast…', 0);
+
         store.set('overlay', 'currents');
         store.set('product', 'cmems');
         store.set('timestamp', timestamps[0]);
@@ -283,22 +313,38 @@ export async function fetchCurrentGrid(
                 Math.round((ti / timestamps.length) * 100),
             );
 
-            if (ti > 0) {
-                store.set('timestamp', timestamps[ti]);
-                await waitForRedraw(150);
-            }
-
-            const interpolate = await getLatLonInterpolator();
-
-            let anyNonZero = false;
-            if (interpolate) {
+            const sampleOneStep = async (): Promise<any[] | null> => {
+                if (ti > 0) {
+                    store.set('timestamp', timestamps[ti]);
+                    await waitForRedraw(150);
+                }
+                const interpolate = await getLatLonInterpolator();
+                if (!interpolate) return null;
                 const jobs: Promise<any>[] = [];
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
                         jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
                     }
                 }
-                const batchResults = await Promise.all(jobs);
+                return await Promise.all(jobs);
+            };
+
+            let batchResults: any[] | null = null;
+            try {
+                batchResults = await retryWithBackoff(
+                    () => withTimeout(sampleOneStep(), STEP_TIMEOUT_MS, `current ts=${ti}`),
+                    STEP_RETRIES,
+                    STEP_RETRY_BACKOFF_MS,
+                    signal,
+                );
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') throw err;
+                console.warn(`[OceanDataProvider] Current step ${ti + 1}/${timestamps.length} failed after ${STEP_RETRIES} retries — skipping.`, err);
+                batchResults = null;
+            }
+
+            let anyNonZero = false;
+            if (batchResults) {
                 let idx = 0;
                 for (let li = 0; li < lats.length; li++) {
                     for (let lo = 0; lo < lons.length; lo++) {
@@ -384,7 +430,7 @@ export async function fetchOceanGrids(
     const cachedSwell = getSwell(swellCacheKey);
     const cachedCurrent = getCurrent(currentCacheKey);
 
-    if (cachedSwell && cachedCurrent !== undefined) {
+    if (cachedSwell && cachedCurrent !== null) {
         console.log('[OceanDataProvider] Both ocean grids cached');
         return { swellGrid: cachedSwell, currentGrid: cachedCurrent };
     }
@@ -394,7 +440,7 @@ export async function fetchOceanGrids(
         const currentGrid = await fetchCurrentGrid(bounds, departureTime, maxDurationHours, onCurrentProgress, signal);
         return { swellGrid: cachedSwell, currentGrid };
     }
-    if (cachedCurrent !== undefined) {
+    if (cachedCurrent !== null) {
         const swellGrid = await fetchSwellGrid(bounds, departureTime, maxDurationHours, onSwellProgress, signal);
         return { swellGrid, currentGrid: cachedCurrent };
     }
@@ -480,6 +526,10 @@ async function _sampleSwellInner(
     let dataUpdateTime: number | undefined;
     let lastNonEmptyIdx = -1;
 
+    // Give the UI a label during the otherwise-silent product-switch wait
+    // (waitForProductReady can take up to 5s with no progress callback).
+    onProgress?.('Switching to swell forecast…', 0);
+
     store.set('overlay', 'waves');
     store.set('product', 'ecmwfWaves');
     store.set('timestamp', timestamps[0]);
@@ -508,22 +558,38 @@ async function _sampleSwellInner(
             Math.round((ti / timestamps.length) * 100),
         );
 
-        if (ti > 0) {
-            store.set('timestamp', timestamps[ti]);
-            await waitForRedraw(150);
-        }
-
-        const interpolate = await getLatLonInterpolator();
-
-        let anyNonZero = false;
-        if (interpolate) {
+        const sampleOneStep = async (): Promise<any[] | null> => {
+            if (ti > 0) {
+                store.set('timestamp', timestamps[ti]);
+                await waitForRedraw(150);
+            }
+            const interpolate = await getLatLonInterpolator();
+            if (!interpolate) return null;
             const jobs: Promise<any>[] = [];
             for (let li = 0; li < lats.length; li++) {
                 for (let lo = 0; lo < lons.length; lo++) {
                     jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
                 }
             }
-            const batchResults = await Promise.all(jobs);
+            return await Promise.all(jobs);
+        };
+
+        let batchResults: any[] | null = null;
+        try {
+            batchResults = await retryWithBackoff(
+                () => withTimeout(sampleOneStep(), STEP_TIMEOUT_MS, `swell ts=${ti}`),
+                STEP_RETRIES,
+                STEP_RETRY_BACKOFF_MS,
+                signal,
+            );
+        } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') throw err;
+            console.warn(`[OceanDataProvider] Swell step ${ti + 1}/${timestamps.length} failed after ${STEP_RETRIES} retries — skipping.`, err);
+            batchResults = null;
+        }
+
+        let anyNonZero = false;
+        if (batchResults) {
             let idx = 0;
             for (let li = 0; li < lats.length; li++) {
                 for (let lo = 0; lo < lons.length; lo++) {
@@ -596,6 +662,9 @@ async function _sampleCurrentInner(
     let modelRunTime: number | undefined;
     let dataUpdateTime: number | undefined;
 
+    // Give the UI a label during the otherwise-silent product-switch wait.
+    onProgress?.('Switching to currents forecast…', 0);
+
     store.set('overlay', 'currents');
     store.set('product', 'cmems');
     store.set('timestamp', timestamps[0]);
@@ -625,22 +694,38 @@ async function _sampleCurrentInner(
             Math.round((ti / timestamps.length) * 100),
         );
 
-        if (ti > 0) {
-            store.set('timestamp', timestamps[ti]);
-            await waitForRedraw(150);
-        }
-
-        const interpolate = await getLatLonInterpolator();
-
-        let anyNonZero = false;
-        if (interpolate) {
+        const sampleOneStep = async (): Promise<any[] | null> => {
+            if (ti > 0) {
+                store.set('timestamp', timestamps[ti]);
+                await waitForRedraw(150);
+            }
+            const interpolate = await getLatLonInterpolator();
+            if (!interpolate) return null;
             const jobs: Promise<any>[] = [];
             for (let li = 0; li < lats.length; li++) {
                 for (let lo = 0; lo < lons.length; lo++) {
                     jobs.push(interpolate({ lat: lats[li], lon: lons[lo] }).catch(() => null));
                 }
             }
-            const batchResults = await Promise.all(jobs);
+            return await Promise.all(jobs);
+        };
+
+        let batchResults: any[] | null = null;
+        try {
+            batchResults = await retryWithBackoff(
+                () => withTimeout(sampleOneStep(), STEP_TIMEOUT_MS, `current ts=${ti}`),
+                STEP_RETRIES,
+                STEP_RETRY_BACKOFF_MS,
+                signal,
+            );
+        } catch (err) {
+            if (err instanceof DOMException && err.name === 'AbortError') throw err;
+            console.warn(`[OceanDataProvider] Current step ${ti + 1}/${timestamps.length} failed after ${STEP_RETRIES} retries — skipping.`, err);
+            batchResults = null;
+        }
+
+        let anyNonZero = false;
+        if (batchResults) {
             let idx = 0;
             for (let li = 0; li < lats.length; li++) {
                 for (let lo = 0; lo < lons.length; lo++) {

@@ -2,14 +2,17 @@
     <div class="modal-backdrop" on:click={handleBackdropClick}>
         <div class="modal-container">
             <div class="modal-header">
-                <h3 class="size-m">Settings</h3>
+                <h3 class="size-m">{t('settings.title')}<span hidden>{$locale}</span></h3>
                 <button class="close-btn" on:click={close}>&#10005;</button>
             </div>
 
             <div class="modal-body">
                     <!-- Wind Models -->
                     <div class="section mb-10">
-                        <span class="size-xs label">Wind Models:</span>
+                        <span class="size-xs label">
+                            {t('settings.windModels')}
+                            <InfoTooltip text={t('settings.infoWindModels')} />
+                        </span>
                         <div class="model-list">
                             {#each ALL_MODELS as model}
                                 <label class="model-row size-s">
@@ -21,67 +24,247 @@
                         </div>
                     </div>
 
-                    <!-- Routing Parameters -->
+                    <!-- Units (label + compact pill selector per dimension) -->
                     <div class="section mb-10">
-                        <span class="size-xs label">Routing Parameters:</span>
-                        <div class="param-grid">
-                            <label class="size-xs param-label" for="sm-timeStep">Time Step (h)</label>
-                            <input id="sm-timeStep" type="number" class="input size-s" min="0.5" max="3" step="0.5" value={timeStep} on:change={(e) => handleNumberChange('timeStep', e)} />
-
-                            <label class="size-xs param-label" for="sm-maxDuration">Max Duration (h)</label>
-                            <input id="sm-maxDuration" type="number" class="input size-s" min="24" max="336" step="24" value={maxDuration} on:change={(e) => handleNumberChange('maxDuration', e)} />
-
-                            <label class="size-xs param-label" for="sm-headingStep">Heading Step (&deg;)</label>
-                            <input id="sm-headingStep" type="number" class="input size-s" min="3" max="15" step="1" value={headingStep} on:change={(e) => handleNumberChange('headingStep', e)} />
-
-                            <label class="size-xs param-label" for="sm-numSectors">Sectors</label>
-                            <input id="sm-numSectors" type="number" class="input size-s" min="36" max="144" step="12" value={numSectors} on:change={(e) => handleNumberChange('numSectors', e)} />
-
-                            <label class="size-xs param-label" for="sm-arrivalRadius">Arrival Radius (nm)</label>
-                            <input id="sm-arrivalRadius" type="number" class="input size-s" min="0.1" max="5" step="0.1" value={arrivalRadius} on:change={(e) => handleNumberChange('arrivalRadius', e)} />
-
-                            <label class="size-xs param-label" for="sm-landMarginNm">Min Land Margin (nm)</label>
-                            <input id="sm-landMarginNm" type="number" class="input size-s" min="0" max="5" step="0.5" value={landMarginNm} on:change={(e) => handleNumberChange('landMarginNm', e)} />
-
-                            <label class="size-xs param-label" for="sm-preferredLandMarginNm">Preferred Margin (nm)</label>
-                            <input id="sm-preferredLandMarginNm" type="number" class="input size-s" min="0" max="20" step="1" value={preferredLandMarginNm} on:change={(e) => handleNumberChange('preferredLandMarginNm', e)} />
-
-                            <label class="size-xs param-label" for="sm-estimatedVmgKt">Est. VMG (kt)</label>
-                            <input id="sm-estimatedVmgKt" type="number" class="input size-s" min="1" max="10" step="0.5" value={estimatedVmgKt} on:change={(e) => handleNumberChange('estimatedVmgKt', e)} />
+                        <span class="size-xs label">{t('settings.sectionUnits')}</span>
+                        <div class="unit-row">
+                            <span class="size-xs unit-label">{t('settings.distanceUnit')}</span>
+                            <div class="unit-pills">
+                                <button class="unit-pill" class:unit-pill--active={distanceUnit === 'nm'} on:click={() => setUnit('distanceUnit', 'nm')}>nm</button>
+                                <button class="unit-pill" class:unit-pill--active={distanceUnit === 'km'} on:click={() => setUnit('distanceUnit', 'km')}>km</button>
+                                <button class="unit-pill" class:unit-pill--active={distanceUnit === 'mi'} on:click={() => setUnit('distanceUnit', 'mi')}>mi</button>
+                            </div>
+                        </div>
+                        <div class="unit-row">
+                            <span class="size-xs unit-label">{t('settings.speedUnit')}</span>
+                            <div class="unit-pills">
+                                <button class="unit-pill" class:unit-pill--active={speedUnit === 'kt'} on:click={() => setUnit('speedUnit', 'kt')}>kt</button>
+                                <button class="unit-pill" class:unit-pill--active={speedUnit === 'kmh'} on:click={() => setUnit('speedUnit', 'kmh')}>km/h</button>
+                                <button class="unit-pill" class:unit-pill--active={speedUnit === 'mph'} on:click={() => setUnit('speedUnit', 'mph')}>mph</button>
+                            </div>
+                        </div>
+                        <div class="unit-row">
+                            <span class="size-xs unit-label">{t('settings.heightUnit')}</span>
+                            <div class="unit-pills">
+                                <button class="unit-pill" class:unit-pill--active={heightUnit === 'm'} on:click={() => setUnit('heightUnit', 'm')}>m</button>
+                                <button class="unit-pill" class:unit-pill--active={heightUnit === 'ft'} on:click={() => setUnit('heightUnit', 'ft')}>ft</button>
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Motor Settings -->
+                    <!-- Voyage: basic cruising parameters -->
                     <div class="section mb-10">
+                        <span class="size-xs label">{t('settings.sectionVoyage')}</span>
+                        <div class="param-grid">
+                            <label class="size-xs param-label" for="sm-maxDuration">
+                                {t('settings.maxDuration')}
+                                <InfoTooltip text={t('settings.infoMaxDuration')} />
+                            </label>
+                            <input id="sm-maxDuration" type="number" class="input size-s" min="24" max="336" step="24" value={maxDuration} on:change={(e) => handleNumberChange('maxDuration', e)} />
+
+                            <label class="size-xs param-label" for="sm-arrivalRadius">
+                                {t('settings.arrivalRadius')} ({distanceLabel(distanceUnit)})
+                                <InfoTooltip text={t('settings.infoArrivalRadius')} />
+                            </label>
+                            <input id="sm-arrivalRadius" type="number" class="input size-s"
+                                min={convertDistance(0.1, distanceUnit).toFixed(2)}
+                                max={convertDistance(5, distanceUnit).toFixed(2)}
+                                step="0.1"
+                                value={convertDistance(arrivalRadius, distanceUnit).toFixed(2)}
+                                on:change={(e) => handleDistChange('arrivalRadius', e)} />
+                        </div>
+                    </div>
+
+                    <!-- Motor: all motor-related controls grouped -->
+                    <div class="section mb-10">
+                        <span class="size-xs label">{t('settings.sectionMotor')}</span>
                         <label class="model-row size-s">
                             <input type="checkbox" checked={motorEnabled} on:change={toggleMotor} />
-                            <span>Motor when wind speed &lt; threshold</span>
+                            <span>{t('settings.motorEnabled')}</span>
+                            <InfoTooltip text={t('settings.infoMotorEnabled')} />
                         </label>
                         {#if motorEnabled}
                             <div class="param-grid" style="margin-top: 6px;">
-                                <label class="size-xs param-label" for="sm-motorThreshold">Threshold (kt)</label>
-                                <input id="sm-motorThreshold" type="number" class="input size-s" min="0.5" max="8" step="0.5" value={motorThreshold} on:change={(e) => handleNumberChange('motorThreshold', e)} />
-                                <label class="size-xs param-label" for="sm-motorSpeed">Motor Speed (kt)</label>
-                                <input id="sm-motorSpeed" type="number" class="input size-s" min="1" max="10" step="0.5" value={motorSpeed} on:change={(e) => handleNumberChange('motorSpeed', e)} />
+                                <label class="size-xs param-label" for="sm-motorThreshold">
+                                    {t('settings.thresholdShort')} ({speedLabel(speedUnit)})
+                                    <InfoTooltip text={t('settings.infoMotorThreshold')} />
+                                </label>
+                                <input id="sm-motorThreshold" type="number" class="input size-s"
+                                    min={convertSpeed(0.5, speedUnit).toFixed(1)}
+                                    max={convertSpeed(8, speedUnit).toFixed(1)}
+                                    step="0.5"
+                                    value={convertSpeed(motorThreshold, speedUnit).toFixed(1)}
+                                    on:change={(e) => handleSpdChange('motorThreshold', e)} />
+                                <label class="size-xs param-label" for="sm-motorSpeed">
+                                    {t('settings.motorSpeed')} ({speedLabel(speedUnit)})
+                                    <InfoTooltip text={t('settings.infoMotorSpeed')} />
+                                </label>
+                                <input id="sm-motorSpeed" type="number" class="input size-s"
+                                    min={convertSpeed(1, speedUnit).toFixed(1)}
+                                    max={convertSpeed(10, speedUnit).toFixed(1)}
+                                    step="0.5"
+                                    value={convertSpeed(motorSpeed, speedUnit).toFixed(1)}
+                                    on:change={(e) => handleSpdChange('motorSpeed', e)} />
+
+                                <label class="size-xs param-label" for="sm-motorAbove">
+                                    {t('settings.motorAboveTws')} ({speedLabel(speedUnit)})
+                                    <InfoTooltip text={t('settings.infoMotorAboveTws')} />
+                                </label>
+                                <input id="sm-motorAbove" type="number" class="input size-s"
+                                    min="0"
+                                    max={convertSpeed(80, speedUnit).toFixed(0)}
+                                    step="1"
+                                    value={advanced.motorAboveTws == null ? '' : convertSpeed(advanced.motorAboveTws, speedUnit).toFixed(0)}
+                                    on:change={(e) => handleAdvSpdChange('motorAboveTws', e)} placeholder="off" />
+                                <label class="size-xs param-label" for="sm-motorBelow">
+                                    {t('settings.motorBelowTws')} ({speedLabel(speedUnit)})
+                                    <InfoTooltip text={t('settings.infoMotorBelowTws')} />
+                                </label>
+                                <input id="sm-motorBelow" type="number" class="input size-s"
+                                    min="0"
+                                    max={convertSpeed(20, speedUnit).toFixed(0)}
+                                    step="1"
+                                    value={advanced.motorBelowTws == null ? '' : convertSpeed(advanced.motorBelowTws, speedUnit).toFixed(0)}
+                                    on:change={(e) => handleAdvSpdChange('motorBelowTws', e)} placeholder="off" />
                             </div>
                         {/if}
                     </div>
 
-                    <!-- Comfort vs Speed -->
+                    <!-- Feel: comfort + display -->
                     <div class="section mb-10">
-                        <span class="size-xs label">Optimize for:</span>
+                        <span class="size-xs label">
+                            {t('settings.sectionFeel')}
+                            <InfoTooltip text={t('settings.infoComfortWeight')} />
+                        </span>
                         <div class="slider-row">
-                            <span class="size-xs slider-label">Speed</span>
+                            <span class="size-xs slider-label">{t('settings.sliderSpeed')}</span>
                             <input type="range" class="comfort-slider" min="0" max="1" step="0.1" value={comfortWeight} on:input={(e) => handleComfortChange(e)} />
-                            <span class="size-xs slider-label">Comfort</span>
+                            <span class="size-xs slider-label">{t('settings.sliderComfort')}</span>
                         </div>
+                        <label class="model-row size-s" style="margin-top: 6px;">
+                            <input type="checkbox" checked={showIsochrones} on:change={toggleIsochrones} />
+                            <span>{t('settings.showIsochronesShort')}</span>
+                            <InfoTooltip text={t('settings.infoShowIsochrones')} />
+                        </label>
                     </div>
 
-                    <!-- Isochrone visualization -->
-                    <div class="section">
+                    <!-- Advanced: algorithmic tuning + sail trim penalties -->
+                    <div class="section mb-10 advanced-section">
+                        <button class="advanced-header" on:click={() => advancedOpen = !advancedOpen}>
+                            <span class="size-xs label">{t('settings.advanced')}</span>
+                            <span class="chev">{advancedOpen ? '▾' : '▸'}</span>
+                        </button>
+                        {#if !advancedOpen}
+                            <div class="size-xs advanced-summary">{t('settings.advancedSummary')}</div>
+                        {/if}
+                        {#if advancedOpen}
+                            <div class="param-grid">
+                                <label class="size-xs param-label" for="adv-timeStep">
+                                    {t('settings.timeStep')}
+                                    <InfoTooltip text={t('settings.infoTimeStep')} />
+                                </label>
+                                <input id="adv-timeStep" type="number" class="input size-s" min="0.5" max="3" step="0.5" value={timeStep} on:change={(e) => handleNumberChange('timeStep', e)} />
+
+                                <label class="size-xs param-label" for="adv-headingStep">
+                                    {t('settings.headingStep')}
+                                    <InfoTooltip text={t('settings.infoHeadingStep')} />
+                                </label>
+                                <input id="adv-headingStep" type="number" class="input size-s" min="3" max="15" step="1" value={headingStep} on:change={(e) => handleNumberChange('headingStep', e)} />
+
+                                <label class="size-xs param-label" for="adv-numSectors">
+                                    {t('settings.sectors')}
+                                    <InfoTooltip text={t('settings.infoSectors')} />
+                                </label>
+                                <input id="adv-numSectors" type="number" class="input size-s" min="36" max="144" step="12" value={numSectors} on:change={(e) => handleNumberChange('numSectors', e)} />
+
+                                <label class="size-xs param-label" for="adv-landMarginNm">
+                                    {t('settings.landMargin')} ({distanceLabel(distanceUnit)})
+                                    <InfoTooltip text={t('settings.infoLandMargin')} />
+                                </label>
+                                <input id="adv-landMarginNm" type="number" class="input size-s"
+                                    min="0"
+                                    max={convertDistance(5, distanceUnit).toFixed(1)}
+                                    step="0.5"
+                                    value={convertDistance(landMarginNm, distanceUnit).toFixed(1)}
+                                    on:change={(e) => handleDistChange('landMarginNm', e)} />
+
+                                <label class="size-xs param-label" for="adv-preferredLandMarginNm">
+                                    {t('settings.preferredLandMargin')} ({distanceLabel(distanceUnit)})
+                                    <InfoTooltip text={t('settings.infoPreferredLandMargin')} />
+                                </label>
+                                <input id="adv-preferredLandMarginNm" type="number" class="input size-s"
+                                    min="0"
+                                    max={convertDistance(20, distanceUnit).toFixed(0)}
+                                    step="1"
+                                    value={convertDistance(preferredLandMarginNm, distanceUnit).toFixed(0)}
+                                    on:change={(e) => handleDistChange('preferredLandMarginNm', e)} />
+
+                                <label class="size-xs param-label" for="adv-estimatedVmgKt">
+                                    {t('settings.estimatedVmg')} ({speedLabel(speedUnit)})
+                                    <InfoTooltip text={t('settings.infoEstimatedVmg')} />
+                                </label>
+                                <input id="adv-estimatedVmgKt" type="number" class="input size-s"
+                                    min={convertSpeed(1, speedUnit).toFixed(1)}
+                                    max={convertSpeed(10, speedUnit).toFixed(1)}
+                                    step="0.5"
+                                    value={convertSpeed(estimatedVmgKt, speedUnit).toFixed(1)}
+                                    on:change={(e) => handleSpdChange('estimatedVmgKt', e)} />
+
+                                <label class="size-xs param-label" for="adv-tack">
+                                    {t('settings.tackPenaltyS')}
+                                    <InfoTooltip text={t('settings.infoTackPenalty')} />
+                                </label>
+                                <input id="adv-tack" type="number" class="input size-s" min="0" max="300" step="1"
+                                    value={advanced.tackPenaltyS} on:change={(e) => handleAdvancedNumberChange('tackPenaltyS', e, false)} />
+
+                                <label class="size-xs param-label" for="adv-gybe">
+                                    {t('settings.gybePenaltyS')}
+                                    <InfoTooltip text={t('settings.infoGybePenalty')} />
+                                </label>
+                                <input id="adv-gybe" type="number" class="input size-s" min="0" max="300" step="1"
+                                    value={advanced.gybePenaltyS} on:change={(e) => handleAdvancedNumberChange('gybePenaltyS', e, false)} />
+
+                                <label class="size-xs param-label" for="adv-night">
+                                    {t('settings.nightSpeedFactor')}
+                                    <InfoTooltip text={t('settings.infoNightFactor')} />
+                                </label>
+                                <div class="slider-cell">
+                                    <input id="adv-night" type="range" min="0.5" max="1" step="0.05"
+                                        value={advanced.nightSpeedFactor} on:change={(e) => handleAdvancedNumberChange('nightSpeedFactor', e, false)} />
+                                    <span class="size-xs slider-pct">{(advanced.nightSpeedFactor * 100).toFixed(0)}%</span>
+                                </div>
+
+                                <label class="size-xs param-label" for="adv-reef-tws">
+                                    {t('settings.reefAboveTws')} ({speedLabel(speedUnit)})
+                                    <InfoTooltip text={t('settings.infoReefAboveTws')} />
+                                </label>
+                                <input id="adv-reef-tws" type="number" class="input size-s"
+                                    min="0"
+                                    max={convertSpeed(80, speedUnit).toFixed(0)}
+                                    step="1"
+                                    value={advanced.reefAboveTws == null ? '' : convertSpeed(advanced.reefAboveTws, speedUnit).toFixed(0)}
+                                    on:change={(e) => handleAdvSpdChange('reefAboveTws', e)} placeholder="off" />
+
+                                <label class="size-xs param-label" for="adv-reef-factor">
+                                    {t('settings.reefFactor')}
+                                    <InfoTooltip text={t('settings.infoReefFactor')} />
+                                </label>
+                                <div class="slider-cell">
+                                    <input id="adv-reef-factor" type="range" min="0.5" max="1" step="0.05"
+                                        value={advanced.reefFactor} on:change={(e) => handleAdvancedNumberChange('reefFactor', e, false)} />
+                                    <span class="size-xs slider-pct">{(advanced.reefFactor * 100).toFixed(0)}%</span>
+                                </div>
+                            </div>
+                        {/if}
+                    </div>
+
+                    <!-- Privacy -->
+                    <div class="section mb-10">
+                        <span class="size-xs label">{t('settings.sectionPrivacy')}</span>
                         <label class="model-row size-s">
-                            <input type="checkbox" checked={showIsochrones} on:change={toggleIsochrones} />
-                            <span>Show isochrone expansion</span>
+                            <input type="checkbox" checked={analyticsEnabled} on:change={toggleAnalytics} />
+                            <span>{t('settings.analyticsEnabled')}</span>
+                            <InfoTooltip text={t('settings.infoAnalyticsEnabled')} />
                         </label>
                     </div>
             </div>
@@ -91,9 +274,17 @@
 
 <script lang="ts">
     import { onDestroy } from 'svelte';
+    import { t, locale } from '../i18n';
     import { settingsStore } from '../stores/SettingsStore';
+    import InfoTooltip from './InfoTooltip.svelte';
     import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
+    import { applyAnalyticsOptOut } from '../analytics';
     import type { WindModelId, UserSettings } from '../routing/types';
+    import {
+        convertDistance, distanceToNm, distanceLabel,
+        convertSpeed, speedToKt, speedLabel,
+        convertHeight, heightToM, heightLabel,
+    } from '../data/units';
 
     const ALL_MODELS: WindModelId[] = ['gfs', 'ecmwf', 'icon', 'bomAccess'];
 
@@ -114,6 +305,12 @@
     let motorSpeed: number = settingsStore.get('motorSpeed');
     let comfortWeight: number = settingsStore.get('comfortWeight');
     let showIsochrones: boolean = settingsStore.get('showIsochrones');
+    let analyticsEnabled: boolean = settingsStore.get('analyticsEnabled');
+    let distanceUnit = settingsStore.get('distanceUnit');
+    let speedUnit = settingsStore.get('speedUnit');
+    let heightUnit = settingsStore.get('heightUnit');
+    let advanced: import('../routing/types').AdvancedSettings = settingsStore.get('advanced');
+    let advancedOpen = false;
 
     export function open(): void {
         showModal = true;
@@ -148,6 +345,14 @@
         settingsStore.set('showIsochrones', showIsochrones);
     }
 
+    function toggleAnalytics(): void {
+        analyticsEnabled = !analyticsEnabled;
+        settingsStore.set('analyticsEnabled', analyticsEnabled);
+        if (!analyticsEnabled) {
+            applyAnalyticsOptOut();
+        }
+    }
+
     function handleNumberChange(
         key: keyof Pick<UserSettings, 'timeStep' | 'maxDuration' | 'headingStep' | 'numSectors' | 'arrivalRadius' | 'landMarginNm' | 'preferredLandMarginNm' | 'estimatedVmgKt' | 'motorThreshold' | 'motorSpeed'>,
         e: Event,
@@ -169,6 +374,76 @@
                 case 'motorSpeed': motorSpeed = value; break;
             }
         }
+    }
+
+    function handleAdvancedNumberChange(
+        key: keyof import('../routing/types').AdvancedSettings,
+        e: Event,
+        nullable: boolean,
+    ): void {
+        const raw = (e.target as HTMLInputElement).value.trim();
+        let value: number | null;
+        if (nullable && raw === '') {
+            value = null;
+        } else {
+            const parsed = parseFloat(raw);
+            if (isNaN(parsed)) return;
+            value = parsed;
+        }
+        const next = { ...advanced, [key]: value } as import('../routing/types').AdvancedSettings;
+        advanced = next;
+        settingsStore.set('advanced', next);
+    }
+
+    function handleDistChange(
+        key: 'arrivalRadius' | 'landMarginNm' | 'preferredLandMarginNm',
+        e: Event,
+    ): void {
+        const raw = parseFloat((e.target as HTMLInputElement).value);
+        if (isNaN(raw)) return;
+        const nm = distanceToNm(raw, distanceUnit);
+        settingsStore.set(key, nm);
+        if (key === 'arrivalRadius') arrivalRadius = nm;
+        else if (key === 'landMarginNm') landMarginNm = nm;
+        else if (key === 'preferredLandMarginNm') preferredLandMarginNm = nm;
+    }
+
+    function handleSpdChange(
+        key: 'motorThreshold' | 'motorSpeed' | 'estimatedVmgKt',
+        e: Event,
+    ): void {
+        const raw = parseFloat((e.target as HTMLInputElement).value);
+        if (isNaN(raw)) return;
+        const kt = speedToKt(raw, speedUnit);
+        settingsStore.set(key, kt);
+        if (key === 'motorThreshold') motorThreshold = kt;
+        else if (key === 'motorSpeed') motorSpeed = kt;
+        else if (key === 'estimatedVmgKt') estimatedVmgKt = kt;
+    }
+
+    function handleAdvSpdChange(
+        key: 'motorAboveTws' | 'motorBelowTws' | 'reefAboveTws',
+        e: Event,
+    ): void {
+        const raw = (e.target as HTMLInputElement).value.trim();
+        let value: number | null;
+        if (raw === '') {
+            value = null;
+        } else {
+            const parsed = parseFloat(raw);
+            if (isNaN(parsed)) return;
+            value = speedToKt(parsed, speedUnit);
+        }
+        const next = { ...advanced, [key]: value } as import('../routing/types').AdvancedSettings;
+        advanced = next;
+        settingsStore.set('advanced', next);
+    }
+
+    function setUnit(key: 'distanceUnit' | 'speedUnit' | 'heightUnit', v: any): void {
+        settingsStore.set(key, v);
+        if (key === 'distanceUnit') distanceUnit = v;
+        else if (key === 'speedUnit') speedUnit = v;
+        else if (key === 'heightUnit') heightUnit = v;
     }
 
     function handleComfortChange(e: Event): void {
@@ -194,6 +469,10 @@
         motorSpeed = settings.motorSpeed;
         comfortWeight = settings.comfortWeight;
         showIsochrones = settings.showIsochrones;
+        analyticsEnabled = settings.analyticsEnabled;
+        distanceUnit = settings.distanceUnit;
+        speedUnit = settings.speedUnit;
+        heightUnit = settings.heightUnit;
     }
 
     settingsStore.subscribe(onSettingsChange);
@@ -286,6 +565,43 @@
 
     select.input { cursor: pointer; }
 
+    /* Compact pill-style unit selector — lighter than dropdowns. */
+    .unit-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        padding: 4px 0;
+    }
+    .unit-label {
+        opacity: 0.7;
+    }
+    .unit-pills {
+        display: inline-flex;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        padding: 2px;
+        gap: 2px;
+    }
+    .unit-pill {
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.65);
+        font-size: 12px;
+        font-weight: 500;
+        padding: 4px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+        min-width: 36px;
+    }
+    .unit-pill:hover { color: #fff; }
+    .unit-pill--active {
+        background: rgba(233, 196, 106, 0.18);
+        color: #e9c46a;
+    }
+
     .model-list {
         display: flex;
         flex-direction: column;
@@ -357,5 +673,53 @@
         .input {
             padding: 8px 10px;
         }
+    }
+
+    .advanced-section {
+        border-top: 1px solid #2a3547;
+        padding-top: 10px;
+    }
+    .advanced-header {
+        background: transparent;
+        border: none;
+        color: #e6eef8;
+        cursor: pointer;
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 4px 0;
+    }
+    .advanced-summary {
+        color: #8a9ab0;
+        font-style: italic;
+        margin-top: 4px;
+    }
+    .slider-cell {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+    }
+    .slider-cell input[type="range"] {
+        flex: 1;
+        min-width: 0;
+    }
+    .slider-pct {
+        flex: none;
+        min-width: 40px;
+        text-align: right;
+        color: #8a9ab0;
+    }
+    .info-icon {
+        display: inline-block;
+        margin-left: 4px;
+        color: #6b7a90;
+        cursor: help;
+        font-size: 11px;
+        user-select: none;
+    }
+    .info-icon:hover {
+        color: #e6eef8;
     }
 </style>

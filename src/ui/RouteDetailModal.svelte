@@ -1,8 +1,14 @@
-<!-- Button to open modal -->
-<button class="open-detail-btn size-s" on:click={openModal}>
-    <span>Route Details</span>
-    <span class="popup-icon">&#8599;</span>
-</button>
+<!-- Trigger is rendered by the parent (so it can be placed in context) — we
+     only expose openModal() via bind:this. If `inlineTrigger` is true, we
+     render our own fallback button below the chart. -->
+{#if inlineTrigger}
+    <button class="button size-xs open-detail-btn" on:click={openModal}>
+        <span class="open-detail-label">
+            {t('results.routeDetails')}<span hidden>{$locale}</span>
+            <span class="popup-icon">&#8599;</span>
+        </span>
+    </button>
+{/if}
 
 <!-- Modal overlay -->
 {#if showModal}
@@ -10,7 +16,14 @@
         <div class="modal-container">
             <!-- Header with model tabs -->
             <div class="modal-header">
-                <h3 class="size-m">Route Details</h3>
+                <h3 class="size-m">
+                    {#if results[selectedIndex]}
+                        {MODEL_LABELS[results[selectedIndex].model]} {t('results.routeWord')}
+                        <span class="header-depart size-xs">· {t('routing.depart', { time: formatDateTime(results[selectedIndex].route.path[0].time) })}</span>
+                    {:else}
+                        {t('results.routeDetails')}
+                    {/if}
+                </h3>
                 <div class="model-tabs">
                     {#each results as mr, i}
                         <button
@@ -33,38 +46,38 @@
             {@const route = results[selectedIndex].route}
             <div class="trip-summary">
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Departure</span>
+                    <span class="summary-label size-xs">{t('results.departureSummary')}</span>
                     <span class="summary-value size-s">{formatDateTime(route.path[0].time)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">ETA</span>
+                    <span class="summary-label size-xs">{t('results.eta')}</span>
                     <span class="summary-value size-s">{formatDateTime(route.eta)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Duration</span>
+                    <span class="summary-label size-xs">{t('results.duration')}</span>
                     <span class="summary-value size-s">{formatDuration(route.durationHours)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Distance</span>
-                    <span class="summary-value size-s">{route.totalDistanceNm.toFixed(1)} nm</span>
+                    <span class="summary-label size-xs">{t('results.totalDistance')}</span>
+                    <span class="summary-value size-s">{formatDistance(route.totalDistanceNm, $settings.distanceUnit, 1)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Avg SOG</span>
-                    <span class="summary-value size-s">{route.avgSpeedKt.toFixed(1)} kt</span>
+                    <span class="summary-label size-xs">{t('results.avgSog')}</span>
+                    <span class="summary-value size-s">{formatSpeed(route.avgSpeedKt, $settings.speedUnit, 1)}</span>
                 </div>
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Max TWS</span>
-                    <span class="summary-value size-s">{route.maxTws.toFixed(0)} kt</span>
+                    <span class="summary-label size-xs">{t('results.maxTws')}</span>
+                    <span class="summary-value size-s">{formatSpeed(route.maxTws, $settings.speedUnit, 0)}</span>
                 </div>
                 {#if results[selectedIndex].modelRunTime}
                 <div class="summary-item">
-                    <span class="summary-label size-xs">Forecast</span>
-                    <span class="summary-value size-s">{MODEL_LABELS[results[selectedIndex].model]} run {formatModelRunTime(results[selectedIndex].modelRunTime)}</span>
+                    <span class="summary-label size-xs">{t('results.forecast')}</span>
+                    <span class="summary-value size-s">{t('results.forecastRun', { model: MODEL_LABELS[results[selectedIndex].model], time: formatModelRunTime(results[selectedIndex].modelRunTime) })}</span>
                     {#if results[selectedIndex].swellGrid?.modelRunTime}
-                    <span class="summary-sub size-xs">Swell: {formatModelRunTime(results[selectedIndex].swellGrid?.modelRunTime)}</span>
+                    <span class="summary-sub size-xs">{t('results.swellPrefix', { time: formatModelRunTime(results[selectedIndex].swellGrid?.modelRunTime) })}</span>
                     {/if}
                     {#if results[selectedIndex].currentGrid?.modelRunTime}
-                    <span class="summary-sub size-xs">Current: {formatModelRunTime(results[selectedIndex].currentGrid?.modelRunTime)}</span>
+                    <span class="summary-sub size-xs">{t('results.currentPrefix', { time: formatModelRunTime(results[selectedIndex].currentGrid?.modelRunTime) })}</span>
                     {/if}
                 </div>
                 {/if}
@@ -75,30 +88,30 @@
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.wind} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(255, 165, 0, 0.9)"></span>
-                    Wind
+                    {t('results.chartWind')}
                 </label>
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.sog} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(255, 255, 255, 0.8)"></span>
-                    SOG
+                    {t('results.chartSog')}
                 </label>
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.twa} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(233, 196, 106, 0.9)"></span>
-                    TWA
+                    {t('results.chartTwa')}
                 </label>
                 {#if hasSwell}
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.swell} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(100, 149, 237, 0.9)"></span>
-                    Swell
+                    {t('results.chartSwell')}
                 </label>
                 {/if}
                 {#if hasCurrents}
                 <label class="dataset-toggle size-xs">
                     <input type="checkbox" bind:checked={visibleDatasets.current} on:change={rebuildChart} />
                     <span class="toggle-dot" style="background: rgba(75, 192, 130, 0.9)"></span>
-                    Current
+                    {t('results.chartCurrent')}
                 </label>
                 {/if}
             </div>
@@ -113,30 +126,30 @@
                 <table class="leg-table size-xs">
                     <thead>
                         <tr>
-                            <th>Time</th>
-                            <th>TWS</th>
-                            <th>TWA</th>
-                            <th>HDG</th>
-                            <th>SOG</th>
-                            {#if hasSwell}<th>Swell</th>{/if}
-                            {#if hasCurrents}<th>Current</th>{/if}
+                            <th>{t('results.colTime')}</th>
+                            <th>{t('results.colTws')} ({speedLabel($settings.speedUnit)})</th>
+                            <th>{t('results.colTwa')}</th>
+                            <th>{t('results.colHdg')}</th>
+                            <th>{t('results.colSog')} ({speedLabel($settings.speedUnit)})</th>
+                            {#if hasSwell}<th>{t('results.colSwell')} ({heightLabel($settings.heightUnit)})</th>{/if}
+                            {#if hasCurrents}<th>{t('results.colCurrent')} ({speedLabel($settings.speedUnit)})</th>{/if}
                         </tr>
                     </thead>
                     <tbody>
                         {#each legPoints as pt, i}
                             {#if i > 0 && pt.legIndex != null && legPoints[i - 1].legIndex != null && pt.legIndex !== legPoints[i - 1].legIndex}
                                 <tr class="leg-divider-row">
-                                    <td colspan={columnCount}>Leg {(pt.legIndex ?? 0) + 1}</td>
+                                    <td colspan={columnCount}>{t('results.legHeading', { n: (pt.legIndex ?? 0) + 1 })}</td>
                                 </tr>
                             {/if}
                             <tr class:motoring-row={pt.isMotoring}>
                                 <td>{formatTime(pt.time)}</td>
-                                <td>{pt.tws.toFixed(1)}</td>
+                                <td>{convertSpeed(pt.tws, $settings.speedUnit).toFixed(1)}</td>
                                 <td>{pt.twa.toFixed(0)}°</td>
                                 <td>{pt.heading.toFixed(0)}°</td>
-                                <td>{pt.boatSpeed.toFixed(1)}{pt.isMotoring ? ' ⚙' : ''}</td>
-                                {#if hasSwell}<td>{pt.swell ? pt.swell.height.toFixed(1) + 'm' : '-'}</td>{/if}
-                                {#if hasCurrents}<td>{pt.current ? pt.current.speed.toFixed(1) + 'kt' : '-'}</td>{/if}
+                                <td>{convertSpeed(pt.boatSpeed, $settings.speedUnit).toFixed(1)}{pt.isMotoring ? ' ⚙' : ''}</td>
+                                {#if hasSwell}<td>{pt.swell ? convertHeight(pt.swell.height, $settings.heightUnit).toFixed(1) : '-'}</td>{/if}
+                                {#if hasCurrents}<td>{pt.current ? convertSpeed(pt.current.speed, $settings.speedUnit).toFixed(1) : '-'}</td>{/if}
                             </tr>
                         {/each}
                     </tbody>
@@ -149,6 +162,7 @@
 
 <script lang="ts">
     import { onDestroy, tick } from 'svelte';
+    import { t, locale } from '../i18n';
     import {
         Chart,
         LineController,
@@ -161,8 +175,11 @@
         Filler,
     } from 'chart.js';
     import 'chartjs-adapter-date-fns';
-    import type { ModelRouteResult, RoutePoint } from '../routing/types';
+    import type { LatLon, ModelRouteResult, RoutePoint } from '../routing/types';
     import { MODEL_LABELS } from '../map/modelColors';
+    import { waypointEtas } from '../routing/waypointEta';
+    import { settings } from '../stores/SettingsStore';
+    import { formatDistance, formatSpeed, convertSpeed, convertHeight, speedLabel, heightLabel } from '../data/units';
 
     Chart.register(
         LineController,
@@ -176,9 +193,13 @@
     );
 
     export let results: ModelRouteResult[] = [];
+    export let waypoints: LatLon[] = [];
+    /** When true, the component renders its own trigger button (legacy path). */
+    export let inlineTrigger: boolean = false;
 
     let canvasEl: HTMLCanvasElement;
     let chart: Chart | null = null;
+    let waypointTimes: number[] = [];
     let showModal = false;
     let selectedIndex = 0;
     let visibleDatasets: Record<string, boolean> = {
@@ -214,7 +235,7 @@
         return sampled;
     }
 
-    async function openModal(): Promise<void> {
+    export async function openModal(): Promise<void> {
         showModal = true;
         await tick();
         if (canvasEl) buildChart(selectedPath);
@@ -310,12 +331,50 @@
         },
     };
 
+    const waypointAnnotationsPlugin = {
+        id: 'waypointAnnotations',
+        afterDatasetsDraw(chart: Chart) {
+            const ts = waypointTimes;
+            if (!ts || !ts.length) return;
+            const xScale = chart.scales['x'];
+            if (!xScale) return;
+            const { ctx } = chart;
+            const { top, bottom } = chart.chartArea;
+            ctx.save();
+            for (let i = 0; i < ts.length; i++) {
+                const x = xScale.getPixelForValue(ts[i]);
+                if (!Number.isFinite(x)) continue;
+                // Dashed vertical line
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(96,165,250,0.8)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(x, top);
+                ctx.lineTo(x, bottom);
+                ctx.stroke();
+                // Numbered badge
+                ctx.setLineDash([]);
+                ctx.fillStyle = '#3b82f6';
+                ctx.beginPath();
+                ctx.arc(x, top + 10, 9, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 11px system-ui, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(String(i + 1), x, top + 10);
+            }
+            ctx.restore();
+        },
+    };
+
     function buildChart(pts: RoutePoint[]): void {
         destroyChart();
         if (!canvasEl || pts.length < 2) return;
 
         // Store route points for the motoring bands plugin and tooltip access
         chartRoutePoints = pts;
+        waypointTimes = waypointEtas(pts, waypoints);
 
         const labels = pts.map(p => p.time);
         const datasets: any[] = [];
@@ -505,7 +564,7 @@
                     },
                 },
             },
-            plugins: [motoringBandsPlugin],
+            plugins: [motoringBandsPlugin, waypointAnnotationsPlugin],
         });
     }
 
@@ -551,23 +610,25 @@
 
 <style lang="less">
     .open-detail-btn {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        width: 100%;
         margin-top: 10px;
-        padding: 8px 12px;
-        background: rgba(42, 157, 143, 0.2);
-        border: 1px solid rgba(42, 157, 143, 0.5);
-        border-radius: 4px;
-        color: inherit;
-        cursor: pointer;
+        background: rgba(42, 157, 143, 0.18);
+        border: 1px solid rgba(42, 157, 143, 0.45);
+        color: #bfe4dc;
         font-weight: 600;
-        transition: all 0.2s ease;
 
         &:hover {
-            background: rgba(42, 157, 143, 0.35);
+            background: rgba(42, 157, 143, 0.3);
+            color: #e6eef8;
+            border-color: rgba(42, 157, 143, 0.7);
         }
+    }
+    .open-detail-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+    .popup-icon {
+        opacity: 0.8;
     }
 
     .popup-icon {
@@ -612,6 +673,11 @@
             margin: 0;
             opacity: 0.9;
             white-space: nowrap;
+        }
+        .header-depart {
+            opacity: 0.7;
+            font-weight: 400;
+            margin-left: 4px;
         }
     }
 

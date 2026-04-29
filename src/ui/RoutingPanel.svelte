@@ -1,73 +1,143 @@
 <div class="routing-panel">
-    <!-- Waypoint instructions -->
-    <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
+    <!-- Mode toggle + Settings — only shown pre-results; once a route is calculated
+         the bar is removed entirely (no value in showing a disabled toggle). -->
+    {#if results.length === 0}
+        <div class="section mb-10 mode-bar" class:section--disabled={isRouting || isDepartureScanning}>
+            <div class="mode-toggle">
+                <button
+                    class="pill size-xs"
+                    class:pill--active={mode === 'single'}
+                    on:click={() => mode = 'single'}
+                >
+                    {t('routing.singleRoute')}
+                </button>
+                <button
+                    class="pill size-xs"
+                    class:pill--active={mode === 'departure'}
+                    on:click={() => mode = 'departure'}
+                >
+                    {t('routing.departurePlanner')}
+                </button>
+            </div>
+            <button
+                class="gear-btn"
+                on:click={() => settingsModal.open()}
+                title={t('routing.settingsTitle')}
+                disabled={isRouting || isDepartureScanning}
+            >&#9881;</button>
+        </div>
+    {/if}
+
+    <!-- Results tab bar — lifted above the route section so the active tab's
+         content (Route / Models / Stats) sits visually below it. -->
+    {#if needsTabs && results.length > 0}
+        <Tabs tabs={resultsTabDefs} active={resultsTab} onSelect={selectResultsTab} />
+    {/if}
+
+    <!-- Waypoint instructions / Route status — always-on on setup, Route tab on mobile-results -->
+    <div
+        class="section mb-15 results-tab results-tab--route"
+        class:section--disabled={isRouting || isDepartureScanning}
+        class:tab-hidden={needsTabs && results.length > 0 && resultsTab !== 'route'}
+    >
         {#if waypointState === 'WAITING_START'}
-            <p class="size-m instruction">Click the map to set your <strong>start point</strong>.</p>
-            <button class="button size-xs location-btn" on:click={handleUseMyLocationAsStart}>Use my location</button>
+            <p class="size-m instruction">{t('routing.startPrompt', { what: t('routing.startWhat') })}<span hidden>{$locale}</span></p>
+            <button class="button size-xs location-btn" on:click={handleUseMyLocationAsStart}>{t('routing.useMyLocation')}</button>
+            <button class="button size-xs location-btn" on:click={() => importFileInput?.click()}>{t('routing.importFile')}</button>
+            <input
+                bind:this={importFileInput}
+                type="file"
+                accept=".gpx,.rtz"
+                style="display:none"
+                on:change={handleImportFile}
+            />
         {:else if waypointState === 'WAITING_END'}
-            <p class="size-m instruction">Click the map to set your <strong>end point</strong>.</p>
+            <p class="size-m instruction">{t('routing.startPrompt', { what: t('routing.endWhat') })}</p>
         {:else if waypointState === 'READY' || waypointState === 'ADDING_WAYPOINTS'}
-            {#if results.length > 0}
-                <!-- Read-only coords when a route is calculated -->
-                <p class="size-xs coords">{startName ? `Start: ${startName}` : `Start: ${formatLatLon(start)}`}</p>
-                {#if startName}<p class="size-xs coords coords--sub">{formatLatLon(start)}</p>{/if}
-                {#each waypoints as wp, i}
-                    <div class="waypoint-row size-xs">
-                        <span class="wp-dot">{i + 1}</span>
-                        <span class="coords">{formatLatLon(wp)}</span>
-                    </div>
-                {/each}
-                <p class="size-xs coords">{endName ? `End: ${endName}` : `End: ${formatLatLon(end)}`}</p>
-                {#if endName}<p class="size-xs coords coords--sub">{formatLatLon(end)}</p>{/if}
-            {:else}
+            <RouteStopsCard
+                {start}
+                {startName}
+                {end}
+                {endName}
+                {waypoints}
+                readOnly={results.length > 0}
+                onEditStart={handleEditStartFromCard}
+                onEditEnd={handleEditEndFromCard}
+                onEditWaypoint={handleEditWaypointFromCard}
+                {onRemoveWaypoint}
+            />
+
+            {#if results.length === 0}
                 {#if editingPoint === 'start'}
                     <div class="coord-edit-row size-xs">
-                        <span>Start:</span>
+                        <span>{t('routing.startLabel')}:</span>
                         <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
                         <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
                         <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
                         <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
-                        <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title="Use my location">&#8982;</button>
+                        <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title={t('routing.useMyLocationTitle')}>&#8982;</button>
                     </div>
-                {:else}
-                    <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('start')}>{startName ? `Start: ${startName}` : `Start: ${formatLatLon(start)}`}</p>
-                    {#if startName}<p class="size-xs coords coords--sub">{formatLatLon(start)}</p>{/if}
+                {:else if editingPoint === 'end'}
+                    <div class="coord-edit-row size-xs">
+                        <span>{t('routing.endLabel')}:</span>
+                        <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
+                        <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
+                        <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title={t('routing.useMyLocationTitle')}>&#8982;</button>
+                    </div>
+                {:else if typeof editingPoint === 'number'}
+                    <div class="coord-edit-row size-xs">
+                        <span class="wp-dot">{editingPoint + 1}</span>
+                        <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
+                        <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
+                        <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
+                    </div>
                 {/if}
-                {#each waypoints as wp, i}
-                    {#if editingPoint === i}
-                        <div class="coord-edit-row size-xs">
-                            <span class="wp-dot">{i + 1}</span>
-                            <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                            <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                            <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
-                            <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
-                        </div>
-                    {:else}
-                        <div class="waypoint-row size-xs">
-                            <span class="wp-dot">{i + 1}</span>
-                            <span class="coords clickable" on:click={() => !isRouting && startEditCoord(i)}>{formatLatLon(wp)}</span>
-                            <button class="wp-remove" on:click={() => onRemoveWaypoint(i)}>&#215;</button>
+
+                {#if waypointState === 'ADDING_WAYPOINTS'}
+                    <p class="size-xs instruction">{t('routing.waypointPrompt')}</p>
+                {:else}
+                    <button class="button size-xs" on:click={onAddWaypoint}>{t('routing.addWaypoint')}</button>
+                {/if}
+
+                <!-- Save / Load lives with the route stops, not down in a separate section -->
+                {#if waypointState === 'READY' && !isRouting}
+                    <div class="route-mgmt-row">
+                        {#if showSaveInput}
+                            <div class="save-row">
+                                <input
+                                    class="input size-xs save-name-input"
+                                    type="text"
+                                    placeholder={t('routing.routeNamePlaceholder')}
+                                    bind:value={saveRouteName}
+                                    on:keydown={(e) => e.key === 'Enter' && confirmSaveRoute()}
+                                />
+                                <button class="button size-xs" on:click={confirmSaveRoute}>{t('routing.saveButton')}</button>
+                                <button class="button size-xs" on:click={cancelSaveRoute}>&#215;</button>
+                            </div>
+                        {:else}
+                            <button class="button size-xs" on:click={() => { showSaveInput = true; saveRouteName = suggestedRouteName; }}>{t('routing.saveRoute')}</button>
+                        {/if}
+                        {#if savedRoutes.length > 0}
+                            <button class="button size-xs" on:click={() => showRouteList = !showRouteList}>
+                                {showRouteList ? t('routing.hideRoute') : t('routing.loadRoute')} ({savedRoutes.length})
+                            </button>
+                        {/if}
+                    </div>
+                    {#if showRouteList && savedRoutes.length > 0}
+                        <div class="route-list mt-5">
+                            {#each savedRoutes as sr (sr.id)}
+                                <div class="route-list-item size-xs">
+                                    <button class="route-load-btn" on:click={() => { onLoadRoute(sr.id); showRouteList = false; }}>
+                                        {sr.name}
+                                    </button>
+                                    <button class="wp-remove" on:click={() => onDeleteRoute(sr.id)}>&#215;</button>
+                                </div>
+                            {/each}
                         </div>
                     {/if}
-                {/each}
-                {#if editingPoint === 'end'}
-                    <div class="coord-edit-row size-xs">
-                        <span>End:</span>
-                        <input class="coord-input" type="number" step="0.0001" min="-90" max="90" bind:value={editLat} placeholder="Lat" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                        <input class="coord-input" type="number" step="0.0001" min="-180" max="180" bind:value={editLon} placeholder="Lon" on:keydown={(e) => e.key === 'Enter' && confirmEditCoord()} />
-                        <button class="button size-xs" on:click={confirmEditCoord}>OK</button>
-                        <button class="button size-xs" on:click={cancelEditCoord}>&#215;</button>
-                        <button class="button size-xs loc-btn" on:click={useMyLocationForEdit} title="Use my location">&#8982;</button>
-                    </div>
-                {:else}
-                    <p class="size-xs coords clickable" on:click={() => !isRouting && startEditCoord('end')}>{endName ? `End: ${endName}` : `End: ${formatLatLon(end)}`}</p>
-                    {#if endName}<p class="size-xs coords coords--sub">{formatLatLon(end)}</p>{/if}
-                {/if}
-                {#if waypointState === 'ADDING_WAYPOINTS'}
-                    <p class="size-xs instruction">Click the map to add a waypoint.</p>
-                    <button class="button size-xs" on:click={onStopAddingWaypoints}>Done</button>
-                {:else}
-                    <button class="button size-xs" on:click={onAddWaypoint}>+ Add Waypoint</button>
                 {/if}
             {/if}
         {/if}
@@ -75,20 +145,34 @@
 
     <!-- Preview distance -->
     {#if previewDistanceNm > 0 && (waypointState === 'READY' || waypointState === 'ADDING_WAYPOINTS')}
-        <div class="section mb-10 size-s preview-dist">
-            &gt; {previewDistanceNm.toFixed(0)} nm direct
+        <div
+            class="section mb-10 size-s preview-dist"
+            class:tab-hidden={needsTabs && results.length > 0 && resultsTab !== 'route'}
+        >
+            {t('routing.previewDirect', { distance: formatDistance(previewDistanceNm, $settings.distanceUnit, 0) })}
         </div>
     {/if}
 
     <!-- Land warning -->
     {#if warning}
-        <div class="section mb-10 warning-text size-s">{warning}</div>
+        <div
+            class="section mb-10 warning-text size-s"
+            class:tab-hidden={needsTabs && results.length > 0 && resultsTab !== 'route'}
+        >{warning}</div>
     {/if}
 
     <!-- Pre-calculation UI (hidden when results exist) -->
     {#if results.length === 0}
+        {#if needsTabs && !isRouting && !isDepartureScanning}
+            <Tabs tabs={setupTabDefs} active={setupTab} onSelect={selectSetupTab} />
+        {/if}
+
         <!-- Boat / Polar selection -->
-        <div class="section mb-10 boat-section" class:section--disabled={isRouting || isDepartureScanning}>
+        <div
+            class="section mb-10 boat-section setup-tab setup-tab--boat"
+            class:section--disabled={isRouting || isDepartureScanning}
+            class:tab-hidden={needsTabs && setupTab !== 'boat'}
+        >
             <!-- Row 1: searchable dropdown + polar thumbnail -->
             <div class="boat-row">
                 <div class="polar-search-wrap">
@@ -100,7 +184,7 @@
                         on:input={openPolarDropdown}
                         on:keydown={handlePolarSearchKey}
                         on:blur={closePolarDropdown}
-                        placeholder="Search boats..."
+                        placeholder={t('boat.polarSearchPlaceholder')}
                     />
                     {#if polarDropdownOpen}
                         <div class="polar-dropdown">
@@ -112,88 +196,52 @@
                                 >{p.name}</button>
                             {/each}
                             {#if filteredPolars.length === 0}
-                                <div class="polar-option polar-option--empty">No matches</div>
+                                <div class="polar-option polar-option--empty">{t('boat.noMatches')}</div>
                             {/if}
                         </div>
                     {/if}
                 </div>
-                {#if currentPolar}
-                    <div class="boat-thumb" on:click={handleViewPolar} title="View polar diagram">
+                {#if currentPolar && !motorboatMode}
+                    <div class="boat-thumb" on:click={handleViewPolar} title={t('boat.viewPolarTitle')}>
                         <PolarDiagram polar={currentPolar} width={80} mini={true} />
                     </div>
                 {/if}
             </div>
+            {#if motorboatMode}
+                <button
+                    class="motor-summary size-xs"
+                    on:click={() => motorboatModal.open()}
+                    title={t('boat.editMotorSpeedsTitle')}
+                >
+                    {t('boat.motorSummary', {
+                        cruise: formatSpeed(motorboatCruiseKt, $settings.speedUnit, 1),
+                        heavy: formatSpeed(motorboatHeavyKt, $settings.speedUnit, 1),
+                        swell: formatHeight(motorboatSwellThresholdM, $settings.heightUnit, 1),
+                    })}
+                    <span class="motor-summary-edit">✎</span>
+                </button>
+            {/if}
             <!-- Row 2: action buttons -->
-            <div class="boat-buttons">
-                <button class="btn size-xs" on:click={handleEditPolar}>Edit</button>
-                <button class="btn size-xs" on:click={handleNewPolar}>New</button>
-                {#if isCustomPolar}
-                    <button class="btn size-xs btn--danger" on:click={handleDeletePolar}>Delete</button>
-                {/if}
-            </div>
-        </div>
-
-        <!-- Route management -->
-        {#if waypointState === 'READY' && !isRouting}
-            <div class="section mb-10 route-mgmt">
-                {#if showSaveInput}
-                    <div class="save-row">
-                        <input
-                            class="input size-xs save-name-input"
-                            type="text"
-                            placeholder="Route name"
-                            bind:value={saveRouteName}
-                            on:keydown={(e) => e.key === 'Enter' && confirmSaveRoute()}
-                        />
-                        <button class="button size-xs" on:click={confirmSaveRoute}>Save</button>
-                        <button class="button size-xs" on:click={cancelSaveRoute}>&#215;</button>
-                    </div>
-                {:else}
-                    <button class="button size-xs" on:click={() => { showSaveInput = true; saveRouteName = suggestedRouteName; }}>Save Route</button>
-                {/if}
-                {#if savedRoutes.length > 0}
-                    <button class="button size-xs" on:click={() => showRouteList = !showRouteList}>
-                        {showRouteList ? 'Hide' : 'Load'} ({savedRoutes.length})
-                    </button>
-                {/if}
-            </div>
-            {#if showRouteList && savedRoutes.length > 0}
-                <div class="section mb-10 route-list">
-                    {#each savedRoutes as sr (sr.id)}
-                        <div class="route-list-item size-xs">
-                            <button class="route-load-btn" on:click={() => { onLoadRoute(sr.id); showRouteList = false; }}>
-                                {sr.name}
-                            </button>
-                            <button class="wp-remove" on:click={() => onDeleteRoute(sr.id)}>&#215;</button>
-                        </div>
-                    {/each}
+            {#if !motorboatMode}
+                <div class="boat-buttons">
+                    <button class="btn size-xs" on:click={handleEditPolar}>{t('boat.edit')}</button>
+                    <button class="btn size-xs" on:click={handleNewPolar}>{t('boat.new')}</button>
+                    {#if isCustomPolar}
+                        <button class="btn size-xs btn--danger" on:click={handleDeletePolar}>{t('boat.delete')}</button>
+                    {/if}
                 </div>
             {/if}
-        {/if}
-
-        <!-- Mode toggle -->
-        <div class="section mb-10 mt-10 mode-toggle" class:section--disabled={isRouting || isDepartureScanning}>
-            <button
-                class="pill size-xs"
-                class:pill--active={mode === 'single'}
-                on:click={() => mode = 'single'}
-            >
-                Single Route
-            </button>
-            <button
-                class="pill size-xs"
-                class:pill--active={mode === 'departure'}
-                on:click={() => mode = 'departure'}
-            >
-                Departure Planner
-            </button>
         </div>
 
         <!-- Departure time / window -->
         {#if mode === 'single'}
-            <div class="section mb-15 departure-row" class:section--disabled={isRouting || isDepartureScanning}>
+            <div
+                class="section mb-15 departure-row setup-tab setup-tab--when"
+                class:section--disabled={isRouting || isDepartureScanning}
+                class:tab-hidden={needsTabs && setupTab !== 'when'}
+            >
                 <div class="departure-input">
-                    <label class="size-xs label" for="departure">Departure:</label>
+                    <label class="size-xs label" for="departure">{t('routing.departureLabel')}</label>
                     <input
                         id="departure"
                         type="datetime-local"
@@ -202,33 +250,41 @@
                         disabled={isRouting || isDepartureScanning}
                     />
                 </div>
-                <button class="gear-btn" on:click={() => settingsModal.open()} title="Settings" disabled={isRouting || isDepartureScanning}>&#9881;</button>
             </div>
             {#if departureInPast}
-                <div class="section mb-10 warning-text size-xs">Departure time is in the past.</div>
+                <div
+                    class="section mb-10 warning-text size-xs setup-tab setup-tab--when"
+                    class:tab-hidden={needsTabs && setupTab !== 'when'}
+                >{t('routing.departureInPast')}</div>
             {:else if departureBeyondForecast}
-                <div class="section mb-10 caution-text size-xs">Departure is &gt;7 days out — forecast accuracy will be limited.</div>
+                <div
+                    class="section mb-10 caution-text size-xs setup-tab setup-tab--when"
+                    class:tab-hidden={needsTabs && setupTab !== 'when'}
+                >{t('routing.departureBeyondForecast')}</div>
             {/if}
         {:else}
-            <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
+            <div
+                class="section mb-15 setup-tab setup-tab--when"
+                class:section--disabled={isRouting || isDepartureScanning}
+                class:tab-hidden={needsTabs && setupTab !== 'when'}
+            >
                 <DepartureWindowInput
                     modelCount={settingsStore.get('selectedModels').length}
                     bind:this={departureWindowInput}
                     onWindowInPastChange={handleWindowInPastChange}
                 />
-                <button class="gear-btn gear-btn--float" on:click={() => settingsModal.open()} title="Settings" disabled={isRouting || isDepartureScanning}>&#9881;</button>
             </div>
         {/if}
 
         <!-- Calculate / Cancel button -->
-        <div class="section mb-15">
+        <div class="section mb-15 calculate-action">
             {#if isRouting || isDepartureScanning}
                 <button
                     class="button button--variant-orange size-m"
                     style="width:100%"
                     on:click={onCancel}
                 >
-                    Cancel
+                    {t('routing.cancelButton')}
                 </button>
             {:else}
                 <button
@@ -238,9 +294,9 @@
                     on:click={handleCalculate}
                 >
                     {#if mode === 'departure'}
-                        Scan Departures
+                        {t('routing.scanDepartures')}
                     {:else}
-                        Calculate Route
+                        {t('routing.calculateButton')}
                     {/if}
                 </button>
             {/if}
@@ -263,22 +319,47 @@
 
     <!-- Results -->
     {#if results.length > 0}
-        <div class="section results">
-            <!-- Compact route reference -->
-            <div class="route-ref size-xs mb-10">
-                <div>Depart: {formatEta(results[0].route.path[0]?.time ?? Date.now())}</div>
-            </div>
+        <div
+            class="section results"
+            class:tab-hidden={needsTabs && resultsTab === 'route'}
+        >
+            <!-- Single-route header: just the Route Details affordance.
+                 Departure time has moved into the Route Details modal title
+                 to claw back vertical space on the main panel. -->
+            {#if results.length === 1}
+                <div
+                    class="route-ref size-xs mb-10 results-tab results-tab--models"
+                    class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                >
+                    <button class="button size-xs detail-inline-btn" on:click={() => routeDetailModal?.openModal()}>
+                        {t('results.routeDetails')}
+                        <span class="popup-icon">&#8599;</span>
+                    </button>
+                </div>
+            {/if}
 
             <!-- Comparison table (multi-model only) -->
             {#if results.length > 1}
-                <h3 class="size-s mb-5">Route Comparison</h3>
-                <table class="comparison-table size-xs">
+                <div
+                    class="comparison-header mb-5 results-tab results-tab--models"
+                    class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                >
+                    <h3 class="size-s">{t('results.routeComparison')}</h3>
+                    <button class="button size-xs detail-inline-btn" on:click={() => routeDetailModal?.openModal()}>
+                        {t('results.routeDetails')}
+                        <span class="popup-icon">&#8599;</span>
+                    </button>
+                </div>
+                <table
+                    class="comparison-table size-xs results-tab results-tab--models"
+                    class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                >
                     <thead>
                         <tr>
-                            <th>Model</th>
-                            <th>Duration</th>
-                            <th>SOG</th>
-                            <th>TWS</th>
+                            <th>{t('results.modelCol')}</th>
+                            <th>{t('results.durationCol')}</th>
+                            <th>{t('results.sogCol')} ({speedLabel($settings.speedUnit)})</th>
+                            <th>{t('results.twsCol')} ({speedLabel($settings.speedUnit)})</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -300,8 +381,8 @@
                                     <span class={fastest ? 'fastest-label' : ''}>{MODEL_LABELS[mr.model]}</span>
                                 </td>
                                 <td>{formatDuration(mr.route.durationHours)}</td>
-                                <td>{mr.route.avgSpeedKt.toFixed(1)}</td>
-                                <td>{mr.route.maxTws.toFixed(0)}</td>
+                                <td>{convertSpeed(mr.route.avgSpeedKt, $settings.speedUnit).toFixed(1)}</td>
+                                <td>{convertSpeed(mr.route.maxTws, $settings.speedUnit).toFixed(0)}</td>
                             </tr>
                         {/each}
                     </tbody>
@@ -313,32 +394,38 @@
                 {@const sr = selectedResult.route}
                 <div class="selected-stats mt-10">
                     {#if results.length > 1}
-                        <div class="stats-header size-xs mb-5">{MODEL_LABELS[selectedResult.model]} Route</div>
+                        <div
+                            class="stats-header size-xs mb-5 results-tab results-tab--models"
+                            class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                        >{t('results.routeSuffix', { model: MODEL_LABELS[selectedResult.model] })}</div>
                     {/if}
-                    <div class="result-grid">
+                    <div
+                        class="result-grid results-tab results-tab--models"
+                        class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                    >
                         <div class="result-item">
-                            <span class="size-xs label">ETA</span>
+                            <span class="size-xs label">{t('results.eta')}</span>
                             <span class="size-s">{formatEta(sr.eta)}</span>
                         </div>
                         <div class="result-item">
-                            <span class="size-xs label">Distance</span>
-                            <span class="size-s">{sr.totalDistanceNm.toFixed(1)} nm</span>
+                            <span class="size-xs label">{t('results.totalDistance')}</span>
+                            <span class="size-s">{formatDistance(sr.totalDistanceNm, $settings.distanceUnit, 1)}</span>
                         </div>
                         <div class="result-item">
-                            <span class="size-xs label">Avg SOG</span>
-                            <span class="size-s">{sr.avgSpeedKt.toFixed(1)} kt</span>
+                            <span class="size-xs label">{t('results.avgSog')}</span>
+                            <span class="size-s">{formatSpeed(sr.avgSpeedKt, $settings.speedUnit, 1)}</span>
                         </div>
                         <div class="result-item">
-                            <span class="size-xs label">Max TWS</span>
-                            <span class="size-s">{sr.maxTws.toFixed(0)} kt</span>
+                            <span class="size-xs label">{t('results.maxTws')}</span>
+                            <span class="size-s">{formatSpeed(sr.maxTws, $settings.speedUnit, 0)}</span>
                         </div>
                         <div class="result-item">
-                            <span class="size-xs label">Duration</span>
+                            <span class="size-xs label">{t('results.duration')}</span>
                             <span class="size-s">{formatDuration(sr.durationHours)}</span>
                         </div>
                         {#if selectedResult.modelRunTime}
                         <div class="result-item">
-                            <span class="size-xs label">Forecast</span>
+                            <span class="size-xs label">{t('results.forecast')}</span>
                             <span class="size-s">{MODEL_LABELS[selectedResult.model]} {formatModelAge(selectedResult.modelRunTime)}</span>
                         </div>
                         {/if}
@@ -346,20 +433,23 @@
 
                     {#if routeStats}
                         {@const sailLegend = legendItems([
-                            [routeStats.sail.upwind, 'upwind', '#E63946'],
-                            [routeStats.sail.reaching, 'reaching', '#2A9D8F'],
-                            [routeStats.sail.downwind, 'downwind', '#457B9D'],
-                            [routeStats.sail.motoring, 'motoring', '#888'],
+                            [routeStats.sail.upwind, t('results.sailUpwind'), '#E63946'],
+                            [routeStats.sail.reaching, t('results.sailReaching'), '#2A9D8F'],
+                            [routeStats.sail.downwind, t('results.sailDownwind'), '#457B9D'],
+                            [routeStats.sail.motoring, t('results.sailMotoring'), '#888'],
                         ])}
                         {@const windLegend = legendItems([
-                            [routeStats.wind.light, '<10 kt', '#89CFF0'],
-                            [routeStats.wind.moderate, '10-20 kt', '#457B9D'],
-                            [routeStats.wind.fresh, '20-30 kt', '#E9C46A'],
-                            [routeStats.wind.strong, '30+ kt', '#E63946'],
+                            [routeStats.wind.light, speedRange(null, 10, $settings.speedUnit), '#89CFF0'],
+                            [routeStats.wind.moderate, speedRange(10, 20, $settings.speedUnit), '#457B9D'],
+                            [routeStats.wind.fresh, speedRange(20, 30, $settings.speedUnit), '#E9C46A'],
+                            [routeStats.wind.strong, speedRange(30, null, $settings.speedUnit), '#E63946'],
                         ])}
-                        <div class="route-breakdown mt-10">
+                        <div
+                            class="route-breakdown mt-10 results-tab results-tab--stats"
+                            class:tab-hidden={needsTabs && resultsTab !== 'stats'}
+                        >
                             <div class="breakdown-section">
-                                <div class="breakdown-label size-xs">Points of Sail</div>
+                                <div class="breakdown-label size-xs">{t('results.pointsOfSail')}</div>
                                 <div class="stacked-bar">
                                     {#each sailLegend as s}
                                         <div class="bar-seg" style="width:{s.pct}%;background:{s.color}"></div>
@@ -375,7 +465,7 @@
                             </div>
 
                             <div class="breakdown-section">
-                                <div class="breakdown-label size-xs">Wind</div>
+                                <div class="breakdown-label size-xs">{t('results.windHeading')}</div>
                                 <div class="stacked-bar">
                                     {#each windLegend as w}
                                         <div class="bar-seg" style="width:{w.pct}%;background:{w.color}"></div>
@@ -392,13 +482,13 @@
 
                             {#if routeStats.swell}
                                 {@const swellLegend = legendItems([
-                                    [routeStats.swell.calm, '<1m', '#2A9D8F'],
-                                    [routeStats.swell.moderate, '1-2m', '#E9C46A'],
-                                    [routeStats.swell.rough, '2-3m', '#E76F51'],
-                                    [routeStats.swell.heavy, '3+m', '#E63946'],
+                                    [routeStats.swell.calm, heightRange(null, 1, $settings.heightUnit), '#2A9D8F'],
+                                    [routeStats.swell.moderate, heightRange(1, 2, $settings.heightUnit), '#E9C46A'],
+                                    [routeStats.swell.rough, heightRange(2, 3, $settings.heightUnit), '#E76F51'],
+                                    [routeStats.swell.heavy, heightRange(3, null, $settings.heightUnit), '#E63946'],
                                 ])}
                                 <div class="breakdown-section">
-                                    <div class="breakdown-label size-xs">Swell</div>
+                                    <div class="breakdown-label size-xs">{t('results.swellHeading')}</div>
                                     <div class="stacked-bar">
                                         {#each swellLegend as s}
                                             <div class="bar-seg" style="width:{s.pct}%;background:{s.color}"></div>
@@ -420,7 +510,10 @@
 
             <!-- Failed model warnings -->
             {#if failedModels.length > 0}
-                <div class="failed-list mt-10">
+                <div
+                    class="failed-list mt-10 results-tab results-tab--stats"
+                    class:tab-hidden={needsTabs && resultsTab !== 'stats'}
+                >
                     {#each failedModels as fm}
                         <div class="failed-item size-xs">
                             &#9888; {MODEL_LABELS[fm.model]}: {fm.reason}
@@ -441,7 +534,7 @@
         />
         {#if departureResults.length > 0 && !isDepartureScanning}
             <button class="button size-s mt-15" style="width:100%" on:click={handleClear}>
-                Clear Results
+                {t('routing.clearResults')}
             </button>
         {/if}
     {/if}
@@ -460,39 +553,44 @@
 
     <!-- Route Detail Modal button + Player controls (post-calculation) -->
     {#if results.length > 0}
-        <RouteDetailModal {results} />
+        <RouteDetailModal bind:this={routeDetailModal} {results} {waypoints} />
 
         <PlayerControls
             {results}
+            {waypoints}
             {onTimeChange}
             bind:this={playerControls}
         />
 
+        <button class="button size-s mt-10 export-btn" style="width:100%" on:click={handleExportGpx}>
+            {t('routing.exportGpx')}
+        </button>
+
         <button class="button size-s mt-10 clear-btn" style="width:100%" on:click={handleClear}>
-            Clear Route
+            {t('routing.clearRoute')}
         </button>
     {/if}
 
     <!-- Footer -->
     <div class="disclaimer size-xs mt-15">
-        Routes are advisory only. Not a substitute for proper passage planning and seamanship.
+        {t('footer.advisoryNotice')}
     </div>
     <div class="footer size-xs mt-10">
-        v0.1.0 &mdash; Fair winds &mdash; <button class="footer-link" on:click={() => showAboutModal = true}>Appd</button>
+        {t('footer.versionPrefix')}{pkg.version} &mdash; {t('footer.fairWinds')} &mdash; <button class="footer-link" on:click={() => showAboutModal = true}>Appd</button>
     </div>
 
     {#if showAboutModal}
         <div class="about-overlay" on:click|self={() => showAboutModal = false}>
             <div class="about-modal">
                 <button class="about-close" on:click={() => showAboutModal = false}>&times;</button>
-                <h3 class="about-title">Sail Router by Appd</h3>
+                <h3 class="about-title">{t('footer.aboutTitle')}</h3>
                 <p class="about-text">
-                    We'd love to hear your feedback, suggestions, or questions!
+                    👋 {t('footer.aboutIntro')}
                 </p>
                 <p class="about-text">
-                    Email us at <a href="mailto:hello@appd.com.au" class="about-link">hello@appd.com.au</a>
-                </p>
-                <p class="about-text">
+                    {t('footer.aboutReachOut')}
+                    <a href="mailto:hello@appd.com.au" class="about-link">hello@appd.com.au</a>
+                    {t('footer.aboutOrVisit')}
                     <a href="https://appd.com.au" target="_blank" rel="noopener noreferrer" class="about-link">https://appd.com.au</a>
                 </p>
             </div>
@@ -510,21 +608,45 @@
         {/if}
     </div>
     <SettingsModal bind:this={settingsModal} />
+    <MotorboatEditModal bind:this={motorboatModal} />
 </div>
 
 <script lang="ts">
     import { onDestroy } from 'svelte';
+    import { t, locale } from '../i18n';
+    import pkg from '../../package.json';
+    import { triggerGpxDownload } from '../export/gpxExport';
+    import { parseRouteFile, RouteImportError } from '../import/routeImport';
     import ProgressBar from './ProgressBar.svelte';
     import TaskChecklist from './TaskChecklist.svelte';
     import SettingsModal from './SettingsModal.svelte';
+    import MotorboatEditModal from './MotorboatEditModal.svelte';
     import PolarDiagram from './PolarDiagram.svelte';
     import PolarViewEditModal from './PolarViewEditModal.svelte';
     import PlayerControls from './PlayerControls.svelte';
     import RouteDetailModal from './RouteDetailModal.svelte';
     import DepartureWindowInput from './DepartureWindowInput.svelte';
     import DeparturePlannerResults from './DeparturePlannerResults.svelte';
+    import RouteStopsCard from './RouteStopsCard.svelte';
+    import Tabs from './Tabs.svelte';
     import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
-    import { settingsStore } from '../stores/SettingsStore';
+    import { settingsStore, settings } from '../stores/SettingsStore';
+    import { isMobile } from '../stores/mobileMedia';
+    import { formatDistance, formatSpeed, formatHeight, convertDistance, convertSpeed, convertHeight, distanceLabel, speedLabel, heightLabel } from '../data/units';
+    import type { SpeedUnit, HeightUnit } from '../routing/types';
+
+    function speedRange(lowKt: number | null, highKt: number | null, unit: SpeedUnit): string {
+        const u = speedLabel(unit);
+        if (lowKt == null) return `<${convertSpeed(highKt!, unit).toFixed(0)} ${u}`;
+        if (highKt == null) return `${convertSpeed(lowKt, unit).toFixed(0)}+ ${u}`;
+        return `${convertSpeed(lowKt, unit).toFixed(0)}-${convertSpeed(highKt, unit).toFixed(0)} ${u}`;
+    }
+    function heightRange(lowM: number | null, highM: number | null, unit: HeightUnit): string {
+        const u = heightLabel(unit);
+        if (lowM == null) return `<${convertHeight(highM!, unit).toFixed(1)} ${u}`;
+        if (highM == null) return `${convertHeight(lowM, unit).toFixed(1)}+ ${u}`;
+        return `${convertHeight(lowM, unit).toFixed(1)}-${convertHeight(highM, unit).toFixed(1)} ${u}`;
+    }
 
     import type { LatLon, ModelRouteResult, WindModelId, PipelineStep, SavedRoute, PolarData, UserSettings, DepartureResult, RoutePoint } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
@@ -576,6 +698,92 @@
     let departureWindowInput: DepartureWindowInput;
     let departureWindowInPast = false;
     let showAboutModal = false;
+
+    type SetupTab = 'when' | 'boat';
+    type ResultsTab = 'route' | 'models' | 'stats';
+    let setupTab: SetupTab = 'when';
+    let resultsTab: ResultsTab = 'route';
+    const setupTabDefs: { id: SetupTab; label: string }[] = [
+        { id: 'when', label: 'When' },
+        { id: 'boat', label: 'Boat' },
+    ];
+    const resultsTabDefs: { id: ResultsTab; label: string }[] = [
+        { id: 'route', label: 'Route' },
+        { id: 'models', label: 'Models' },
+        { id: 'stats', label: 'Stats' },
+    ];
+    const selectSetupTab = (id: string) => { setupTab = id as SetupTab; };
+    const selectResultsTab = (id: string) => { resultsTab = id as ResultsTab; };
+    /** Show tabs whenever we're on a mobile-width viewport. Height-based
+     *  detection isn't reliable — Windy uses CSS transforms (not resizing)
+     *  to slide the bottom sheet between snap states, so the panel's parent
+     *  reports full height regardless of which snap is active. Falling back
+     *  to width detection ensures tabs reliably appear on small viewports. */
+    $: needsTabs = $isMobile;
+
+    let importFileInput: HTMLInputElement | null = null;
+
+    async function handleImportFile(e: Event): Promise<void> {
+        const input = e.target as HTMLInputElement;
+        const file = input.files?.[0];
+        // Reset so re-selecting the same file still triggers change.
+        input.value = '';
+        if (!file) return;
+
+        let xml: string;
+        try {
+            xml = await file.text();
+        } catch {
+            error = t('routing.importErrorInvalidXml');
+            return;
+        }
+
+        let imported;
+        try {
+            imported = parseRouteFile(file.name, xml);
+        } catch (err) {
+            if (err instanceof RouteImportError) {
+                const key = `routing.importError${pascal(err.code)}`;
+                const msg = t(key);
+                error = msg && msg !== key ? msg : err.message;
+            } else {
+                error = t('routing.importErrorInvalidXml');
+            }
+            return;
+        }
+
+        if (imported.warning && !confirm(t('routing.importWaypointWarning', { count: imported.waypoints.length }))) {
+            return;
+        }
+
+        error = null;
+
+        // Drive the same handlers a manual click would.
+        const startOk = await onEditStart(imported.start);
+        if (!startOk) {
+            error = t('routing.importErrorOutOfRange');
+            return;
+        }
+        const endOk = await onEditEnd(imported.end);
+        if (!endOk) {
+            error = t('routing.importErrorOutOfRange');
+            return;
+        }
+        for (let i = 0; i < imported.waypoints.length; i++) {
+            const ok = await onEditWaypoint(i, imported.waypoints[i]);
+            if (!ok) {
+                error = t('routing.importErrorOutOfRange');
+                return;
+            }
+        }
+        if (imported.name) {
+            saveRouteName = imported.name;
+        }
+    }
+
+    function pascal(s: string): string {
+        return s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('');
+    }
 
     function handleWindowInPastChange(v: boolean): void {
         departureWindowInPast = v;
@@ -681,6 +889,8 @@
     }
 
     let settingsModal: SettingsModal;
+    let motorboatModal: MotorboatEditModal;
+    let routeDetailModal: RouteDetailModal;
     let polarModal: PolarViewEditModal;
     let playerControls: PlayerControls;
 
@@ -690,6 +900,10 @@
     }
     let allPolars = getAllPolars();
     let selectedPolarName: string = settingsStore.get('selectedPolarName');
+    let motorboatMode: boolean = settingsStore.get('motorboatMode');
+    let motorboatCruiseKt: number = settingsStore.get('motorboatCruiseKt');
+    let motorboatHeavyKt: number = settingsStore.get('motorboatHeavyKt');
+    let motorboatSwellThresholdM: number = settingsStore.get('motorboatSwellThresholdM');
 
     $: currentPolar = allPolars.find(p => p.name === selectedPolarName) ?? allPolars[0];
     $: isCustomPolar = getCustomPolars().some(p => p.name === selectedPolarName);
@@ -721,8 +935,18 @@
     function selectPolar(name: string): void {
         selectedPolarName = name;
         settingsStore.set('selectedPolarName', name);
+        motorboatMode = name === 'Motorboat';
+        settingsStore.set('motorboatMode', motorboatMode);
         polarSearchQuery = name;
         polarDropdownOpen = false;
+    }
+
+    /** Re-read motorboat fields from store (e.g. after SettingsModal changes). */
+    export function refreshFromSettings(): void {
+        motorboatMode = settingsStore.get('motorboatMode');
+        motorboatCruiseKt = settingsStore.get('motorboatCruiseKt');
+        motorboatHeavyKt = settingsStore.get('motorboatHeavyKt');
+        motorboatSwellThresholdM = settingsStore.get('motorboatSwellThresholdM');
     }
 
     function handlePolarSearchKey(e: KeyboardEvent): void {
@@ -762,6 +986,22 @@
     let editingPoint: 'start' | 'end' | number | null = null;
     let editLat = '';
     let editLon = '';
+
+    function handleEditStartFromCard(): void {
+        if (isRouting || isDepartureScanning) return;
+        if (waypointState === 'ADDING_WAYPOINTS') onStopAddingWaypoints();
+        startEditCoord('start');
+    }
+    function handleEditEndFromCard(): void {
+        if (isRouting || isDepartureScanning) return;
+        if (waypointState === 'ADDING_WAYPOINTS') onStopAddingWaypoints();
+        startEditCoord('end');
+    }
+    function handleEditWaypointFromCard(i: number): void {
+        if (isRouting || isDepartureScanning) return;
+        if (waypointState === 'ADDING_WAYPOINTS') onStopAddingWaypoints();
+        startEditCoord(i);
+    }
 
     function startEditCoord(point: 'start' | 'end' | number): void {
         editingPoint = point;
@@ -846,6 +1086,19 @@
     function handleClear(): void {
         selectedComparisonModel = null;
         onClear();
+    }
+
+    function handleExportGpx(): void {
+        if (!start || !end) return;
+        triggerGpxDownload({
+            startName: startName || 'Start',
+            endName: endName || 'Finish',
+            start,
+            end,
+            waypoints,
+            version: pkg.version,
+            timestamp: new Date().toISOString(),
+        });
     }
 
     function formatLatLon(pos: LatLon | null): string {
@@ -954,6 +1207,10 @@
 
     function onSettingsChange(settings: UserSettings): void {
         selectedPolarName = settings.selectedPolarName;
+        motorboatMode = settings.motorboatMode;
+        motorboatCruiseKt = settings.motorboatCruiseKt;
+        motorboatHeavyKt = settings.motorboatHeavyKt;
+        motorboatSwellThresholdM = settings.motorboatSwellThresholdM;
         allPolars = getAllPolars();
     }
 
@@ -967,13 +1224,33 @@
         display: flex;
         flex-direction: column;
         min-height: 100%;
+        position: relative;
     }
+
     .section {
         padding: 0;
     }
     .section--disabled {
         opacity: 0.4;
         pointer-events: none;
+    }
+
+    /* Tabbed mobile layout: hide non-active tab content via CSS so component
+       state (input values, dropdown selection) is preserved. Tabs themselves
+       only render on mobile (gated by $isMobile in markup). */
+    .tab-hidden {
+        display: none !important;
+    }
+
+    /* Mobile: button sits naturally at the bottom of the form. No backdrop
+       box — Windy's bottom sheet already provides separation from the map. */
+
+    /* Save / Load buttons inline with the route stops card */
+    .route-mgmt-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 8px;
     }
     .instruction {
         line-height: 1.6;
@@ -1065,8 +1342,16 @@
 
     /* Route reference (compact coords) */
     .route-ref {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
         opacity: 0.6;
         line-height: 1.5;
+
+        .detail-inline-btn {
+            opacity: 1;
+        }
     }
 
     /* Selected route stats */
@@ -1089,7 +1374,52 @@
         }
     }
 
+    .export-btn {
+        background: rgba(69, 123, 157, 0.18);
+        border: 1px solid rgba(69, 123, 157, 0.45);
+        color: #a8c4dc;
+        &:hover {
+            background: rgba(69, 123, 157, 0.28);
+            color: #e6eef8;
+            border-color: rgba(69, 123, 157, 0.7);
+        }
+    }
+
     /* Comparison table */
+    .comparison-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+
+        h3 {
+            margin: 0;
+        }
+    }
+
+    .detail-inline-btn {
+        flex: none;
+        padding: 4px 10px;
+        background: rgba(42, 157, 143, 0.35);
+        border: 1px solid rgba(42, 157, 143, 0.75);
+        color: #ffffff;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+
+        &:hover {
+            background: rgba(42, 157, 143, 0.55);
+            color: #ffffff;
+            border-color: rgba(42, 157, 143, 1);
+        }
+
+        .popup-icon {
+            opacity: 1;
+        }
+    }
+
     .comparison-table {
         width: 100%;
         border-collapse: collapse;
@@ -1440,6 +1770,32 @@
         gap: 5px;
     }
 
+    .motor-summary {
+        color: #8a9ab0;
+        padding: 6px 10px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 6px;
+        line-height: 1.35;
+        margin-top: 6px;
+        width: 100%;
+        text-align: left;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        font: inherit;
+    }
+    .motor-summary:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #e6eef8;
+    }
+    .motor-summary-edit {
+        opacity: 0.6;
+        font-size: 12px;
+    }
+
     .btn {
         background: rgba(255, 255, 255, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.15);
@@ -1508,8 +1864,13 @@
         opacity: 0.7;
         transition: all 0.15s;
 
-        &:hover {
+        &:hover:not(:disabled) {
             opacity: 1;
+        }
+
+        &:disabled {
+            cursor: default;
+            opacity: 0.4;
         }
 
         &.pill--active {
@@ -1519,20 +1880,18 @@
         }
     }
 
-    .gear-btn--float {
-        position: absolute;
-        right: 0;
-        top: 0;
-        background: none;
-        border: none;
-        color: rgba(255, 255, 255, 0.5);
-        font-size: 20px;
-        cursor: pointer;
-        padding: 4px;
-        line-height: 1;
+    .mode-bar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
 
-        &:hover {
-            color: rgba(255, 255, 255, 0.9);
+        .mode-toggle {
+            flex: 1;
+        }
+
+        .gear-btn {
+            flex: none;
+            margin-bottom: 0;
         }
     }
 

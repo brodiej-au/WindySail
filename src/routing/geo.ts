@@ -50,6 +50,19 @@ export function computeTWA(boatHeading: number, windDirection: number): number {
 }
 
 /**
+ * Signed TWA: negative if wind is to port (boat turns left to reach it),
+ * positive if wind is to starboard. Range: [-180, 180].
+ */
+export function signedTWA(boatHeading: number, windDirection: number): number {
+    const h = normaliseAngle(boatHeading);
+    const w = normaliseAngle(windDirection);
+    let diff = w - h;
+    while (diff > 180) diff -= 360;
+    while (diff < -180) diff += 360;
+    return diff;
+}
+
+/**
  * Closest approach distance from a point to a great-circle segment.
  * Uses planar approximation (valid for segments < ~50nm).
  */

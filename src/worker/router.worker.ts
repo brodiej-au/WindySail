@@ -148,11 +148,29 @@ async function runRouting(payload: {
     let frontier: IsochronePoint[] = [startPoint];
     let lastIsoEmit = 0;
 
+    const motorboatOpts = options.motorboatMode
+        ? {
+            enabled: true,
+            cruiseKt: options.motorboatCruiseKt ?? 7,
+            heavyKt: options.motorboatHeavyKt ?? 5,
+            swellThresholdM: options.motorboatSwellThresholdM ?? 2.5,
+        }
+        : undefined;
+    // Advanced settings are explicitly skipped when motorboat mode is on.
+    const advancedOpts = options.motorboatMode ? undefined : options.advanced;
+
     for (let step = 0; step < maxSteps; step++) {
         // Expand frontier (with ocean data for current/swell-aware routing)
         const candidates = expandFrontier(
-            frontier, windGrid, polar, timeStep, step, motorOptions,
-            currentGrid, swellGrid, options.comfortWeight,
+            frontier, windGrid, polar, timeStep, step,
+            {
+                motor: motorOptions,
+                currentGrid,
+                swellGrid,
+                comfortWeight: options.comfortWeight,
+                motorboat: motorboatOpts,
+                advanced: advancedOpts,
+            },
         );
 
         // Filter out zero-speed candidates (becalmed at same position)

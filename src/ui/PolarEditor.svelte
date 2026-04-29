@@ -1,14 +1,15 @@
 <div class="polar-editor">
-    <h3 class="size-m mb-10">{polar ? 'Edit Polar' : 'New Polar'}</h3>
+    <span hidden>{$locale}</span>
+    <h3 class="size-m mb-10">{polar ? t('boat.editPolarTitle') : t('boat.newPolarTitle')}</h3>
 
     <!-- Name input -->
     <div class="section mb-10">
-        <label class="size-xs label" for="polarName">Name</label>
+        <label class="size-xs label" for="polarName">{t('boat.nameLabel')}</label>
         <input
             id="polarName"
             type="text"
             class="input size-s name-input"
-            placeholder="e.g. My Boat 35"
+            placeholder={t('boat.namePlaceholder')}
             bind:value={name}
         />
     </div>
@@ -28,19 +29,19 @@
                                 step="1"
                                 value={tws}
                                 on:change={e => updateTws(ci, e)}
-                                aria-label="TWS column {ci + 1}"
+                                aria-label={t('boat.twsColAria', { n: ci + 1 })}
                             />
                         </th>
                     {/each}
                     <th class="col-btns">
                         <button
                             class="icon-btn"
-                            title="Add TWS column"
+                            title={t('boat.addTwsColumn')}
                             on:click={addColumn}
                         >+</button>
                         <button
                             class="icon-btn"
-                            title="Remove last TWS column"
+                            title={t('boat.removeTwsColumn')}
                             disabled={twsSpeeds.length <= 2}
                             on:click={removeColumn}
                         >−</button>
@@ -59,7 +60,7 @@
                                 step="1"
                                 value={twa}
                                 on:change={e => updateTwa(ri, e)}
-                                aria-label="TWA row {ri + 1}"
+                                aria-label={t('boat.twaRowAria', { n: ri + 1 })}
                             />
                         </td>
                         {#each speeds[ri] as spd, ci}
@@ -71,7 +72,7 @@
                                     step="0.1"
                                     value={spd}
                                     on:change={e => updateSpeed(ri, ci, e)}
-                                    aria-label="Speed row {ri + 1} col {ci + 1}"
+                                    aria-label={t('boat.speedCellAria', { r: ri + 1, c: ci + 1 })}
                                 />
                             </td>
                         {/each}
@@ -84,13 +85,13 @@
 
     <!-- Row add/remove buttons -->
     <div class="row-btns mb-15">
-        <button class="icon-btn" title="Add TWA row" on:click={addRow}>+ Row</button>
+        <button class="icon-btn" title={t('boat.addTwaRow')} on:click={addRow}>{t('boat.addRow')}</button>
         <button
             class="icon-btn"
-            title="Remove last TWA row"
+            title={t('boat.removeTwaRow')}
             disabled={twaAngles.length <= 2}
             on:click={removeRow}
-        >− Row</button>
+        >{t('boat.removeRow')}</button>
     </div>
 
     <!-- Validation error -->
@@ -100,12 +101,13 @@
 
     <!-- Action buttons -->
     <div class="actions">
-        <button class="button button--variant-orange size-m" on:click={handleSave}>Save</button>
-        <button class="button size-m" on:click={onCancel}>Cancel</button>
+        <button class="button button--variant-orange size-m" on:click={handleSave}>{t('boat.saveButton')}</button>
+        <button class="button size-m" on:click={onCancel}>{t('boat.cancelButton')}</button>
     </div>
 </div>
 
 <script lang="ts">
+    import { t, locale } from '../i18n';
     import { saveCustomPolar } from '../data/polarRegistry';
     import type { PolarData } from '../routing/types';
 

@@ -1,6 +1,6 @@
 {
     "name": "windy-plugin-sail-router",
-    "version": "0.2.0",
+    "version": "0.13.0",
     "description": "Sailing weather routing plugin for Windy.com with multi-model comparison",
     "main": "dist/plugin.min.js",
     "type": "module",
@@ -30,6 +30,7 @@
     },
     "devDependencies": {
         "@rollup/plugin-json": "^6.1.0",
+        "happy-dom": "^20.9.0",
         "rollup": "^4.60.1",
         "vitest": "^3.1.1"
     }

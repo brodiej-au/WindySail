@@ -52,21 +52,42 @@ export async function waitForProductReady(
     refLat: number,
     refLon: number,
     baseline: number[] | null,
-    timeoutMs: number = 5000,
+    timeoutMs: number = 8000,
 ): Promise<void> {
     const start = Date.now();
     const checkInterval = 200;
+    // The original implementation only checked `Date.now() - start < timeoutMs`
+    // BETWEEN poll iterations, so a Windy interpolator promise that never
+    // resolved (which can happen during a product switch with tiles mid-load)
+    // would hang the function forever. Race every awaited operation against
+    // a single shared deadline promise so the outer cap is actually enforced.
+    let deadlineHit = false;
+    const deadline = new Promise<void>(resolve => {
+        setTimeout(() => { deadlineHit = true; resolve(); }, timeoutMs);
+    });
 
-    while (Date.now() - start < timeoutMs) {
-        await new Promise(r => setTimeout(r, checkInterval));
+    while (!deadlineHit && Date.now() - start < timeoutMs) {
+        await Promise.race([
+            new Promise(r => setTimeout(r, checkInterval)),
+            deadline,
+        ]);
+        if (deadlineHit) break;
         try {
-            const interp = await getLatLonInterpolator();
+            const interp = await Promise.race([
+                getLatLonInterpolator(),
+                deadline.then(() => null),
+            ]);
             if (!interp) continue;
-            const result = await interp({ lat: refLat, lon: refLon });
-            if (result && result.length >= 2) {
-                // If we have no baseline to compare against (first switch), accept immediately
+            // Race the interp call against the outer deadline, NOT a tighter
+            // per-poll cap. This gives genuinely slow (but eventually-OK)
+            // interpolator responses the time they need while still preventing
+            // an indefinite hang.
+            const result = await Promise.race([
+                Promise.resolve(interp({ lat: refLat, lon: refLon })).catch(() => null),
+                deadline.then(() => null),
+            ]);
+            if (result && Array.isArray(result) && result.length >= 2) {
                 if (!baseline) return;
-                // If the values differ from the baseline, the product switch took effect
                 if (result[0] !== baseline[0] || result[1] !== baseline[1]) {
                     return;
                 }

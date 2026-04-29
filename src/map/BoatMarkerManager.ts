@@ -1,5 +1,7 @@
 import { map } from '@windy/map';
 import type { WindModelId } from '../routing/types';
+import { settingsStore } from '../stores/SettingsStore';
+import { convertSpeed, speedLabel } from '../data/units';
 
 export interface BoatMarkerPoint {
     lat: number;
@@ -34,9 +36,7 @@ export class BoatMarkerManager {
      * Tooltip shows SOG, TWS, TWD, TWA.
      */
     updateMarker(model: WindModelId, point: BoatMarkerPoint, color: string): void {
-        const tooltipContent = `SOG: ${point.boatSpeed.toFixed(1)} kt | TWS: ${point.tws.toFixed(
-            1,
-        )} kt<br>TWD: ${Math.round(point.twd)}\u00B0 | TWA: ${Math.round(point.twa)}\u00B0`;
+        const tooltipContent = this.buildTooltipHtml(point, color);
 
         const heading = Math.round(point.heading);
         const existingMarker = this.markers.get(model);
@@ -64,10 +64,28 @@ export class BoatMarkerManager {
                 permanent: true,
                 direction: 'top',
                 offset: [0, -14],
+                className: 'boat-info-tooltip',
             });
 
             this.markers.set(model, marker);
         }
+    }
+
+    private buildTooltipHtml(point: BoatMarkerPoint, color: string): string {
+        const speedUnit = settingsStore.get('speedUnit');
+        const sUnit = speedLabel(speedUnit);
+        const sog = convertSpeed(point.boatSpeed, speedUnit).toFixed(1);
+        const tws = convertSpeed(point.tws, speedUnit).toFixed(1);
+        return `
+            <div class="bi-wrap" style="--bi-accent:${color}">
+                <div class="bi-grid">
+                    <div class="bi-cell"><span class="bi-k">SOG</span><span class="bi-v">${sog}<span class="bi-u">${sUnit}</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">TWS</span><span class="bi-v">${tws}<span class="bi-u">${sUnit}</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">TWA</span><span class="bi-v">${Math.round(point.twa)}<span class="bi-u">&deg;</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">TWD</span><span class="bi-v">${Math.round(point.twd)}<span class="bi-u">&deg;</span></span></div>
+                </div>
+            </div>
+        `.trim();
     }
 
     /**

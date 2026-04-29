@@ -52,6 +52,13 @@ export interface RoutingOptions {
     comfortWeight?: number; // 0-1, modulates swell speed penalty
     landMarginNm?: number; // hard minimum distance from land
     preferredLandMarginNm?: number; // soft preferred distance from land
+    // Motorboat mode — short-circuits polar + swell + advanced adjustments
+    motorboatMode?: boolean;
+    motorboatCruiseKt?: number;
+    motorboatHeavyKt?: number;
+    motorboatSwellThresholdM?: number;
+    // Advanced routing (tack/gybe, TWS limits, night, reef)
+    advanced?: AdvancedSettings;
 }
 
 export const DEFAULT_OPTIONS: RoutingOptions = {
@@ -192,6 +199,30 @@ export interface DepartureResult {
     failedModels?: WindModelId[];
 }
 
+export interface AdvancedSettings {
+    tackPenaltyS: number;
+    gybePenaltyS: number;
+    motorAboveTws: number | null;
+    motorBelowTws: number | null;
+    nightSpeedFactor: number;
+    reefAboveTws: number | null;
+    reefFactor: number;
+}
+
+export const DEFAULT_ADVANCED: AdvancedSettings = {
+    tackPenaltyS: 15,
+    gybePenaltyS: 20,
+    motorAboveTws: null,
+    motorBelowTws: 4,
+    nightSpeedFactor: 1.0,
+    reefAboveTws: null,
+    reefFactor: 0.85,
+};
+
+export type DistanceUnit = 'nm' | 'km' | 'mi';
+export type SpeedUnit = 'kt' | 'kmh' | 'mph';
+export type HeightUnit = 'm' | 'ft';
+
 export interface UserSettings {
     timeStep: number; // hours
     maxDuration: number; // hours
@@ -208,6 +239,24 @@ export interface UserSettings {
     showIsochrones: boolean; // show isochrone expansion on map during routing
     selectedModels: WindModelId[];
     selectedPolarName: string;
+
+    // Display units (independent per dimension; storage values remain canonical
+    // — distance in nm, speed in kt, height in m — only display is converted)
+    distanceUnit: DistanceUnit;
+    speedUnit: SpeedUnit;
+    heightUnit: HeightUnit;
+
+    // Privacy
+    analyticsEnabled: boolean; // send anonymous usage analytics
+
+    // Motorboat mode (sub-project C)
+    motorboatMode: boolean;
+    motorboatCruiseKt: number;
+    motorboatHeavyKt: number;
+    motorboatSwellThresholdM: number;
+
+    // Advanced routing (sub-project D)
+    advanced: AdvancedSettings;
 }
 
 export const DEFAULT_SETTINGS: UserSettings = {
@@ -224,6 +273,15 @@ export const DEFAULT_SETTINGS: UserSettings = {
     motorSpeed: 4,
     comfortWeight: 0.3,
     showIsochrones: false,
+    distanceUnit: 'nm',
+    speedUnit: 'kt',
+    heightUnit: 'm',
+    analyticsEnabled: true,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',
+    motorboatMode: false,
+    motorboatCruiseKt: 7,
+    motorboatHeavyKt: 5,
+    motorboatSwellThresholdM: 2.5,
+    advanced: DEFAULT_ADVANCED,
 }

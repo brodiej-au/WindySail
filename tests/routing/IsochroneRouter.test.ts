@@ -46,6 +46,85 @@ describe('expandFrontier', () => {
     });
 });
 
+describe('motorboat mode', () => {
+    it('uses cruise speed in calm swell, ignoring polar', () => {
+        const polar = { name: 'unused', twaAngles: [0, 180], twsSpeeds: [0, 30], speeds: [[0, 0], [0, 0]] };
+        const windGrid = makeUniformWindGrid();
+        const frontier = [{ lat: -34, lon: 151, parent: null as number | null, twa: 0, tws: 0, twd: 0, boatSpeed: 0, heading: 0, time: 0, isMotoring: false, sog: 0 }];
+        const out = expandFrontier(frontier as any, windGrid, polar as any, 1, 0, {
+            motorboat: { enabled: true, cruiseKt: 7, heavyKt: 5, swellThresholdM: 2.5 },
+        });
+        expect(out[0].boatSpeed).toBe(7);
+        expect(out[0].isMotoring).toBe(true);
+    });
+});
+
+describe('reef factor', () => {
+    it('reduces boat speed by reefFactor when TWS exceeds threshold', () => {
+        // Strong wind: windV = -12.86 m/s ≈ 25 kt from north.
+        const lats = [-36, -35, -34, -33];
+        const lons = [150, 151, 152, 153];
+        const timestamps = [0, 3600_000];
+        const windU: number[][][] = lats.map(() => lons.map(() => [0, 0]));
+        const windV: number[][][] = lats.map(() => lons.map(() => [-12.86, -12.86]));
+        const windGrid = { lats, lons, timestamps, windU, windV };
+        const polar = { name: 'reef-test', twaAngles: [0, 90, 180], twsSpeeds: [10, 20, 30], speeds: [[0, 0, 0], [7, 8, 9], [0, 0, 0]] };
+        const frontier = [{ lat: -34, lon: 151, parent: null as number | null, twa: 0, tws: 0, twd: 0, boatSpeed: 0, heading: 0, time: 0, isMotoring: false, sog: 0 }];
+        const withReef = expandFrontier(frontier as any, windGrid as any, polar as any, 1, 0, {
+            advanced: { tackPenaltyS: 0, gybePenaltyS: 0, motorAboveTws: null, motorBelowTws: null, nightSpeedFactor: 1, reefAboveTws: 20, reefFactor: 0.8 },
+        });
+        const withoutReef = expandFrontier(frontier as any, windGrid as any, polar as any, 1, 0, {});
+        const reefed = withReef.find(c => c.heading === 90);
+        const unreefed = withoutReef.find(c => c.heading === 90);
+        expect(reefed!.boatSpeed).toBeLessThan(unreefed!.boatSpeed);
+    });
+});
+
+describe('TWS motor limits', () => {
+    it('forces motor when wind exceeds motorAboveTws', () => {
+        // ~35 kt wind: windV = -18 m/s
+        const lats = [-36, -35, -34, -33];
+        const lons = [150, 151, 152, 153];
+        const timestamps = [0, 3600_000];
+        const windU: number[][][] = lats.map(() => lons.map(() => [0, 0]));
+        const windV: number[][][] = lats.map(() => lons.map(() => [-18, -18]));
+        const windGrid = { lats, lons, timestamps, windU, windV };
+        const polar = { name: 'tws-test', twaAngles: [0, 90, 180], twsSpeeds: [30, 40], speeds: [[0, 0], [9, 10], [0, 0]] };
+        const frontier = [{ lat: -34, lon: 151, parent: null as number | null, twa: 0, tws: 0, twd: 0, boatSpeed: 0, heading: 0, time: 0, isMotoring: false, sog: 0 }];
+        const out = expandFrontier(frontier as any, windGrid as any, polar as any, 1, 0, {
+            motor: { enabled: true, threshold: 2, speed: 5 },
+            advanced: { tackPenaltyS: 0, gybePenaltyS: 0, motorAboveTws: 30, motorBelowTws: null, nightSpeedFactor: 1, reefAboveTws: null, reefFactor: 1 },
+        });
+        const anyMotoring = out.find(c => c.isMotoring);
+        expect(anyMotoring).toBeDefined();
+        expect(anyMotoring!.boatSpeed).toBe(5);
+    });
+});
+
+describe('modifier stack walkthrough (F-1 audit)', () => {
+    // Documents the modifier order: polar lookup → swell penalty → motor check → current.
+    // Paper walkthrough: twa=110, tws=15 (Bavaria 38 ~7.85 kt); swell 2.0m @ 180°, hdg 200°
+    // gives relSwellAngle=20°, beamFactor=sin(20°)=0.342, penaltyPerMeter=0.04,
+    // penalty=min(0.5, 2.0*0.342*0.04)=0.0274 → boatSpeed≈7.64 kt. With motor threshold 3
+    // and speed 6, no motor engages. With zero current, sog == boatSpeed.
+    it('produces one candidate per heading step when the pipeline runs end-to-end', () => {
+        const polar: PolarData = {
+            name: 'Audit',
+            twaAngles: [0, 110, 180],
+            twsSpeeds: [15],
+            speeds: [[0], [7.3], [0]],
+        };
+        const windGrid = makeUniformWindGrid();
+        const frontier: IsochronePoint[] = [{
+            lat: -33.5, lon: 151.5, parent: null,
+            twa: 0, tws: 0, twd: 0, boatSpeed: 0,
+            heading: 0, time: 0, isMotoring: false, sog: 0,
+        }];
+        const out = expandFrontier(frontier, windGrid, polar, 1, 0);
+        expect(out.length).toBe(72); // 360 / 5-deg heading step
+    });
+});
+
 describe('pruneToSectors', () => {
     it('keeps one point per sector', () => {
         const start: LatLon = { lat: -34, lon: 151 };

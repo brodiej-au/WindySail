@@ -54,15 +54,24 @@
     />
 </section>
 
+<DisclaimerModal
+    visible={disclaimerVisible}
+    onAccept={onDisclaimerAccept}
+/>
+
 <script lang="ts">
     import bcast from '@windy/broadcast';
     import store from '@windy/store';
     import { map } from '@windy/map';
     import { get as reverseName } from '@windy/reverseName';
     import { getGPSlocation } from '@windy/geolocation';
-    import { onDestroy } from 'svelte';
+    import { onDestroy, onMount } from 'svelte';
 
     import config from './pluginConfig';
+    import { getOrCreateDeviceId, hasPersistedDeviceId } from './backend/deviceId';
+    import { postInstall, postHeartbeat, postDisclaimerAck, postRoute, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
+    import { DISCLAIMER_VERSION } from './backend/config';
+    import DisclaimerModal from './ui/DisclaimerModal.svelte';
     import { initAnalytics, trackEvent } from './analytics';
     import RoutingPanel from './ui/RoutingPanel.svelte';
     import { WaypointManager } from './map/WaypointManager';
@@ -74,7 +83,7 @@
     import { settingsStore } from './stores/SettingsStore';
     import { routeStore } from './stores/RouteStore';
     import type { SavedRoute } from './routing/types';
-    import { getPolarByName } from './data/polarRegistry';
+    import { getPolarByName, syncCustomPolarsFromRemote } from './data/polarRegistry';
     import { interpolateAtTime } from './routing/RouteInterpolator';
     import { distance } from './routing/geo';
 
@@ -115,10 +124,65 @@
     let originalProduct: string | null = null;
     let originalOverlay: string | null = null;
 
+    const DISCLAIMER_ACK_KEY = 'windysail-disclaimer-ack';
+    let disclaimerVisible = false;
+    let pendingCalculate: (() => void) | null = null;
+
+    function hasAcknowledgedDisclaimer(): boolean {
+        try {
+            const raw = localStorage.getItem(DISCLAIMER_ACK_KEY);
+            if (!raw) return false;
+            const parsed = JSON.parse(raw);
+            return parsed?.version === DISCLAIMER_VERSION;
+        } catch { return false; }
+    }
+
+    function markDisclaimerAccepted(): void {
+        try {
+            localStorage.setItem(DISCLAIMER_ACK_KEY, JSON.stringify({
+                version: DISCLAIMER_VERSION,
+                acceptedAt: new Date().toISOString(),
+            }));
+        } catch {}
+    }
+
+    function onDisclaimerAccept() {
+        markDisclaimerAccepted();
+        const deviceId = getOrCreateDeviceId();
+        const email = (store.get('user') as any)?.email ?? null;
+        postDisclaimerAck({
+            deviceId,
+            email,
+            pluginVersion: config.version,
+            disclaimerVersion: DISCLAIMER_VERSION,
+            acceptedAt: new Date().toISOString(),
+        });
+        disclaimerVisible = false;
+        pendingCalculate?.();
+        pendingCalculate = null;
+    }
+
     const renderer = new RouteRenderer();
     const boatMarkers = new BoatMarkerManager();
     const orchestrator = new RoutingOrchestrator(name);
     let waypointMgr: WaypointManager;
+
+    onMount(() => {
+        const freshInstall = !hasPersistedDeviceId();
+        const deviceId = getOrCreateDeviceId();
+        const email = (store.get('user') as any)?.email ?? null;
+        const pluginVersion = config.version;
+        const usedLang = (store.get('usedLang') as string) ?? 'en';
+        const userAgent = navigator.userAgent;
+
+        // Fire-and-forget, never await. Plugin UX must never block on backend.
+        if (freshInstall) {
+            postInstall({ deviceId, email, pluginVersion, usedLang, userAgent });
+        } else if (shouldSendHeartbeat()) {
+            postHeartbeat({ deviceId, email, pluginVersion, usedLang });
+        }
+        flushPendingEvents();
+    });
 
     function updatePreview(
         liveStart: LatLon | null,
@@ -177,7 +241,22 @@
         }
     }
 
-    async function handleCalculate(): Promise<void> {
+    function handleCalculate(): void {
+        if (hasAcknowledgedDisclaimer()) {
+            performCalculate();
+            return;
+        }
+        pendingCalculate = () => { performCalculate(); };
+        disclaimerVisible = true;
+    }
+
+    async function performCalculate(): Promise<void> {
+        // Auto-exit waypoint-adding mode so Calculate never blocks on an
+        // unresolved UI transition.
+        if (waypointState === 'ADDING_WAYPOINTS') {
+            handleStopAddingWaypoints();
+        }
+
         // Read latest positions directly from WaypointManager to avoid stale state
         const liveStart = waypointMgr?.getStart() ?? start;
         const liveEnd = waypointMgr?.getEnd() ?? end;
@@ -243,6 +322,11 @@
                 comfortWeight: settings.comfortWeight,
                 landMarginNm: settings.landMarginNm,
                 preferredLandMarginNm: settings.preferredLandMarginNm,
+                motorboatMode: settings.motorboatMode,
+                motorboatCruiseKt: settings.motorboatCruiseKt,
+                motorboatHeavyKt: settings.motorboatHeavyKt,
+                motorboatSwellThresholdM: settings.motorboatSwellThresholdM,
+                advanced: settings.advanced,
             };
 
             // Set up isochrone visualization callback if enabled
@@ -325,6 +409,34 @@
                     avg_sog: Math.round(fastest.route.avgSpeedKt * 10) / 10,
                     compute_time_ms: Date.now() - computeStart,
                 });
+
+                // Server-side route log — fire and forget.
+                postRoute({
+                    deviceId: getOrCreateDeviceId(),
+                    email: (store.get('user') as any)?.email ?? null,
+                    pluginVersion: config.version,
+                    usedLang: (store.get('usedLang') as string) ?? 'en',
+                    mode: 'single',
+                    startedAt: new Date(computeStart).toISOString(),
+                    completedAt: new Date().toISOString(),
+                    departureTime: new Date(departureTime).toISOString(),
+                    polarName: settings.selectedPolarName,
+                    motorboatMode: !!settings.motorboatMode,
+                    selectedModels: settings.selectedModels,
+                    start: { lat: liveStart.lat, lon: liveStart.lon, name: startName || undefined },
+                    end: { lat: liveEnd.lat, lon: liveEnd.lon, name: endName || undefined },
+                    waypointCount: liveWaypoints.length,
+                    waypoints: liveWaypoints.map(wp => ({ lat: wp.lat, lon: wp.lon })),
+                    results: routeResults.map(r => ({
+                        model: r.model,
+                        durationHours: r.route.durationHours,
+                        totalDistanceNm: r.route.totalDistanceNm,
+                        avgSpeedKt: r.route.avgSpeedKt,
+                        maxTws: r.route.maxTws,
+                        etaMs: r.route.eta,
+                    })),
+                    failedReason: null,
+                });
             }
 
             // Identify models that were selected but didn't return results
@@ -362,7 +474,10 @@
         error = null;
         departureResults = [];
         progressPercent = 0;
-        progressStatus = 'Starting departure scan...';
+        progressStatus = 'Starting multi plan…';
+        // Fall back to the flat ProgressBar — the single-route TaskChecklist
+        // steps don't describe what a multi-departure scan is doing.
+        pipelineSteps = [];
 
         const scanStart = Date.now();
 
@@ -406,6 +521,11 @@
                 comfortWeight: settings.comfortWeight,
                 landMarginNm: settings.landMarginNm,
                 preferredLandMarginNm: settings.preferredLandMarginNm,
+                motorboatMode: settings.motorboatMode,
+                motorboatCruiseKt: settings.motorboatCruiseKt,
+                motorboatHeavyKt: settings.motorboatHeavyKt,
+                motorboatSwellThresholdM: settings.motorboatSwellThresholdM,
+                advanced: settings.advanced,
             };
 
             await departurePlanner.scan(
@@ -434,7 +554,7 @@
             if (err instanceof DOMException && err.name === 'AbortError') {
                 // User cancelled — not an error
             } else {
-                error = err instanceof Error ? err.message : 'Departure scan failed.';
+                error = err instanceof Error ? err.message : 'Multi plan failed.';
             }
         } finally {
             isDepartureScanning = false;
@@ -498,6 +618,7 @@
         renderer.clear();
         boatMarkers.clear();
         previewDistanceNm = 0;
+        pipelineSteps = [];
     }
 
     // Guard to prevent store.on('timestamp') -> handlePlayerTimeChange -> store.set('timestamp') loop
@@ -642,19 +763,23 @@
     }
 
     async function handleEditStart(latLon: LatLon): Promise<boolean> {
-        if (!waypointMgr) return false;
+        if (!waypointMgr || results.length > 0) return false;
         return waypointMgr.updateStart(latLon);
     }
 
     async function handleEditEnd(latLon: LatLon): Promise<boolean> {
-        if (!waypointMgr) return false;
+        if (!waypointMgr || results.length > 0) return false;
         return waypointMgr.updateEnd(latLon);
     }
 
     async function handleEditWaypoint(index: number, latLon: LatLon): Promise<boolean> {
-        if (!waypointMgr) return false;
+        if (!waypointMgr || results.length > 0) return false;
         return waypointMgr.updateWaypoint(index, latLon);
     }
+
+    // Lock/unlock map marker dragging whenever results change — an active
+    // calculated route makes the pins read-only until the user clears.
+    $: if (waypointMgr) waypointMgr.setLocked(results.length > 0);
 
     function onRoutesChanged(routes: SavedRoute[]): void {
         savedRoutes = routes;
@@ -671,7 +796,16 @@
         }
     }
 
+    // Tracks whether initialisation has already run. Windy may invoke onopen
+    // again when the plugin is already mounted (e.g. context-menu click while
+    // the panel is open); in that case we no-op so the user's existing route,
+    // results, and UI state stay intact.
+    let isInitialised = false;
+
     export const onopen = (_params: unknown) => {
+        if (isInitialised) return;
+        isInitialised = true;
+
         initAnalytics();
         trackEvent('plugin_open');
         settingsStore.subscribe(onSettingsChange);
@@ -692,9 +826,28 @@
                 routingPanel?.setDepartureTime(lastRoute.departureTime);
             }
         }
+
+        // Cloud-sync pull: fetch saved routes, custom polars, and user
+        // settings from the server when the user is signed into Windy.
+        // Fire-and-forget; UI updates via existing store subscriptions as
+        // soon as data arrives.
+        settingsStore.syncFromRemote();
+        routeStore.syncFromRemote();
+        syncCustomPolarsFromRemote();
+        routeStore.syncLastRouteFromRemote().then(remote => {
+            // If the cloud last-route is newer than what we already loaded,
+            // switch the map over to it so the user picks up where they left off.
+            if (remote && (!lastRoute || (remote as any).updatedAt > ((lastRoute as any).updatedAt ?? 0))) {
+                waypointMgr.loadRoute(remote.start, remote.end, remote.waypoints);
+                if (remote.departureTime) {
+                    routingPanel?.setDepartureTime(remote.departureTime);
+                }
+            }
+        });
     };
 
     onDestroy(() => {
+        isInitialised = false;
         trackEvent('plugin_close');
         if (timestampSubId !== null) {
             store.off(timestampSubId);
@@ -719,4 +872,54 @@
 </script>
 
 <style lang="less">
+    /* Boat info bubble on the map — Leaflet tooltip lives outside Svelte's
+       scoped-css tree, so these rules must be global. */
+    :global(.leaflet-tooltip.boat-info-tooltip) {
+        background: rgba(15, 23, 32, 0.94);
+        color: #e6eef8;
+        border: none;
+        border-radius: 10px;
+        padding: 0;
+        box-shadow: 0 8px 22px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.06);
+        font-family: inherit;
+        white-space: normal;
+    }
+    :global(.leaflet-tooltip.boat-info-tooltip::before) {
+        border-top-color: rgba(15, 23, 32, 0.94);
+    }
+    :global(.boat-info-tooltip .bi-wrap) {
+        padding: 8px 10px;
+        border-left: 3px solid var(--bi-accent, #457b9d);
+        border-radius: 8px 10px 10px 8px;
+    }
+    :global(.boat-info-tooltip .bi-grid) {
+        display: grid;
+        grid-template-columns: auto auto;
+        gap: 4px 14px;
+        line-height: 1.1;
+    }
+    :global(.boat-info-tooltip .bi-cell) {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    :global(.boat-info-tooltip .bi-k) {
+        font-size: 9px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: #8a9ab0;
+        margin-bottom: 2px;
+    }
+    :global(.boat-info-tooltip .bi-v) {
+        font-size: 13px;
+        font-weight: 600;
+        color: #e6eef8;
+    }
+    :global(.boat-info-tooltip .bi-u) {
+        font-size: 10px;
+        font-weight: 400;
+        color: #8a9ab0;
+        margin-left: 2px;
+    }
+
 </style>
