@@ -328,12 +328,17 @@ export class RoutingOrchestrator {
         const settled = await Promise.allSettled(routingPromises);
 
         const results: ModelRouteResult[] = [];
+        const failureReasons: string[] = [];
 
         for (let i = 0; i < settled.length; i++) {
             const outcome = settled[i];
             if (outcome.status === 'fulfilled') {
                 results.push(outcome.value);
             } else {
+                const reason = outcome.reason instanceof Error
+                    ? outcome.reason.message
+                    : String(outcome.reason ?? 'Unknown error');
+                failureReasons.push(reason);
                 console.warn(
                     `[RoutingOrchestrator] Routing failed for model "${modelsWithGrids[i]}":`,
                     outcome.reason,
@@ -342,10 +347,16 @@ export class RoutingOrchestrator {
         }
 
         if (results.length === 0) {
+            // Surface the actual worker reason (e.g. "All routes blocked by land")
+            // rather than a generic "All models failed" message.
+            const uniqueReasons = [...new Set(failureReasons)].filter(Boolean);
+            const reasonText = uniqueReasons.length === 1
+                ? uniqueReasons[0]
+                : uniqueReasons.join(' · ');
             routingStep.status = 'failed';
-            routingStep.detail = 'All models failed';
-            emitStatus('All models failed', 100);
-            throw new Error('All models failed to produce a route.');
+            routingStep.detail = reasonText || 'All models failed';
+            emitStatus(reasonText || 'All models failed', 100);
+            throw new Error(reasonText || 'All models failed to produce a route.');
         }
 
         routingStep.status = 'done';

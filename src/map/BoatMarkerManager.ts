@@ -1,5 +1,7 @@
 import { map } from '@windy/map';
 import type { WindModelId } from '../routing/types';
+import { settingsStore } from '../stores/SettingsStore';
+import { convertSpeed, speedLabel } from '../data/units';
 
 export interface BoatMarkerPoint {
     lat: number;
@@ -70,11 +72,15 @@ export class BoatMarkerManager {
     }
 
     private buildTooltipHtml(point: BoatMarkerPoint, color: string): string {
+        const speedUnit = settingsStore.get('speedUnit');
+        const sUnit = speedLabel(speedUnit);
+        const sog = convertSpeed(point.boatSpeed, speedUnit).toFixed(1);
+        const tws = convertSpeed(point.tws, speedUnit).toFixed(1);
         return `
             <div class="bi-wrap" style="--bi-accent:${color}">
                 <div class="bi-grid">
-                    <div class="bi-cell"><span class="bi-k">SOG</span><span class="bi-v">${point.boatSpeed.toFixed(1)}<span class="bi-u">kt</span></span></div>
-                    <div class="bi-cell"><span class="bi-k">TWS</span><span class="bi-v">${point.tws.toFixed(1)}<span class="bi-u">kt</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">SOG</span><span class="bi-v">${sog}<span class="bi-u">${sUnit}</span></span></div>
+                    <div class="bi-cell"><span class="bi-k">TWS</span><span class="bi-v">${tws}<span class="bi-u">${sUnit}</span></span></div>
                     <div class="bi-cell"><span class="bi-k">TWA</span><span class="bi-v">${Math.round(point.twa)}<span class="bi-u">&deg;</span></span></div>
                     <div class="bi-cell"><span class="bi-k">TWD</span><span class="bi-v">${Math.round(point.twd)}<span class="bi-u">&deg;</span></span></div>
                 </div>

@@ -1,34 +1,45 @@
 <div class="routing-panel">
-    <!-- Mode toggle + Settings — always visible -->
-    <div class="section mb-10 mode-bar" class:section--disabled={isRouting || isDepartureScanning}>
-        <div class="mode-toggle">
+    <!-- Mode toggle + Settings — only shown pre-results; once a route is calculated
+         the bar is removed entirely (no value in showing a disabled toggle). -->
+    {#if results.length === 0}
+        <div class="section mb-10 mode-bar" class:section--disabled={isRouting || isDepartureScanning}>
+            <div class="mode-toggle">
+                <button
+                    class="pill size-xs"
+                    class:pill--active={mode === 'single'}
+                    on:click={() => mode = 'single'}
+                >
+                    {t('routing.singleRoute')}
+                </button>
+                <button
+                    class="pill size-xs"
+                    class:pill--active={mode === 'departure'}
+                    on:click={() => mode = 'departure'}
+                >
+                    {t('routing.departurePlanner')}
+                </button>
+            </div>
             <button
-                class="pill size-xs"
-                class:pill--active={mode === 'single'}
-                on:click={() => mode = 'single'}
-                disabled={results.length > 0}
-            >
-                {t('routing.singleRoute')}
-            </button>
-            <button
-                class="pill size-xs"
-                class:pill--active={mode === 'departure'}
-                on:click={() => mode = 'departure'}
-                disabled={results.length > 0}
-            >
-                {t('routing.departurePlanner')}
-            </button>
+                class="gear-btn"
+                on:click={() => settingsModal.open()}
+                title={t('routing.settingsTitle')}
+                disabled={isRouting || isDepartureScanning}
+            >&#9881;</button>
         </div>
-        <button
-            class="gear-btn"
-            on:click={() => settingsModal.open()}
-            title={t('routing.settingsTitle')}
-            disabled={isRouting || isDepartureScanning}
-        >&#9881;</button>
-    </div>
+    {/if}
 
-    <!-- Waypoint instructions -->
-    <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
+    <!-- Results tab bar — lifted above the route section so the active tab's
+         content (Route / Models / Stats) sits visually below it. -->
+    {#if needsTabs && results.length > 0}
+        <Tabs tabs={resultsTabDefs} active={resultsTab} onSelect={selectResultsTab} />
+    {/if}
+
+    <!-- Waypoint instructions / Route status — always-on on setup, Route tab on mobile-results -->
+    <div
+        class="section mb-15 results-tab results-tab--route"
+        class:section--disabled={isRouting || isDepartureScanning}
+        class:tab-hidden={needsTabs && results.length > 0 && resultsTab !== 'route'}
+    >
         {#if waypointState === 'WAITING_START'}
             <p class="size-m instruction">{t('routing.startPrompt', { what: t('routing.startWhat') })}<span hidden>{$locale}</span></p>
             <button class="button size-xs location-btn" on:click={handleUseMyLocationAsStart}>{t('routing.useMyLocation')}</button>
@@ -90,26 +101,78 @@
                 {:else}
                     <button class="button size-xs" on:click={onAddWaypoint}>{t('routing.addWaypoint')}</button>
                 {/if}
+
+                <!-- Save / Load lives with the route stops, not down in a separate section -->
+                {#if waypointState === 'READY' && !isRouting}
+                    <div class="route-mgmt-row">
+                        {#if showSaveInput}
+                            <div class="save-row">
+                                <input
+                                    class="input size-xs save-name-input"
+                                    type="text"
+                                    placeholder={t('routing.routeNamePlaceholder')}
+                                    bind:value={saveRouteName}
+                                    on:keydown={(e) => e.key === 'Enter' && confirmSaveRoute()}
+                                />
+                                <button class="button size-xs" on:click={confirmSaveRoute}>{t('routing.saveButton')}</button>
+                                <button class="button size-xs" on:click={cancelSaveRoute}>&#215;</button>
+                            </div>
+                        {:else}
+                            <button class="button size-xs" on:click={() => { showSaveInput = true; saveRouteName = suggestedRouteName; }}>{t('routing.saveRoute')}</button>
+                        {/if}
+                        {#if savedRoutes.length > 0}
+                            <button class="button size-xs" on:click={() => showRouteList = !showRouteList}>
+                                {showRouteList ? t('routing.hideRoute') : t('routing.loadRoute')} ({savedRoutes.length})
+                            </button>
+                        {/if}
+                    </div>
+                    {#if showRouteList && savedRoutes.length > 0}
+                        <div class="route-list mt-5">
+                            {#each savedRoutes as sr (sr.id)}
+                                <div class="route-list-item size-xs">
+                                    <button class="route-load-btn" on:click={() => { onLoadRoute(sr.id); showRouteList = false; }}>
+                                        {sr.name}
+                                    </button>
+                                    <button class="wp-remove" on:click={() => onDeleteRoute(sr.id)}>&#215;</button>
+                                </div>
+                            {/each}
+                        </div>
+                    {/if}
+                {/if}
             {/if}
         {/if}
     </div>
 
     <!-- Preview distance -->
     {#if previewDistanceNm > 0 && (waypointState === 'READY' || waypointState === 'ADDING_WAYPOINTS')}
-        <div class="section mb-10 size-s preview-dist">
-            {t('routing.previewDirect', { nm: previewDistanceNm.toFixed(0) })}
+        <div
+            class="section mb-10 size-s preview-dist"
+            class:tab-hidden={needsTabs && results.length > 0 && resultsTab !== 'route'}
+        >
+            {t('routing.previewDirect', { distance: formatDistance(previewDistanceNm, $settings.distanceUnit, 0) })}
         </div>
     {/if}
 
     <!-- Land warning -->
     {#if warning}
-        <div class="section mb-10 warning-text size-s">{warning}</div>
+        <div
+            class="section mb-10 warning-text size-s"
+            class:tab-hidden={needsTabs && results.length > 0 && resultsTab !== 'route'}
+        >{warning}</div>
     {/if}
 
     <!-- Pre-calculation UI (hidden when results exist) -->
     {#if results.length === 0}
+        {#if needsTabs && !isRouting && !isDepartureScanning}
+            <Tabs tabs={setupTabDefs} active={setupTab} onSelect={selectSetupTab} />
+        {/if}
+
         <!-- Boat / Polar selection -->
-        <div class="section mb-10 boat-section" class:section--disabled={isRouting || isDepartureScanning}>
+        <div
+            class="section mb-10 boat-section setup-tab setup-tab--boat"
+            class:section--disabled={isRouting || isDepartureScanning}
+            class:tab-hidden={needsTabs && setupTab !== 'boat'}
+        >
             <!-- Row 1: searchable dropdown + polar thumbnail -->
             <div class="boat-row">
                 <div class="polar-search-wrap">
@@ -150,7 +213,11 @@
                     on:click={() => motorboatModal.open()}
                     title={t('boat.editMotorSpeedsTitle')}
                 >
-                    {t('boat.motorSummary', { cruise: motorboatCruiseKt, heavy: motorboatHeavyKt, swell: motorboatSwellThresholdM })}
+                    {t('boat.motorSummary', {
+                        cruise: formatSpeed(motorboatCruiseKt, $settings.speedUnit, 1),
+                        heavy: formatSpeed(motorboatHeavyKt, $settings.speedUnit, 1),
+                        swell: formatHeight(motorboatSwellThresholdM, $settings.heightUnit, 1),
+                    })}
                     <span class="motor-summary-edit">✎</span>
                 </button>
             {/if}
@@ -166,48 +233,13 @@
             {/if}
         </div>
 
-        <!-- Route management -->
-        {#if waypointState === 'READY' && !isRouting}
-            <div class="section mb-10 route-mgmt">
-                {#if showSaveInput}
-                    <div class="save-row">
-                        <input
-                            class="input size-xs save-name-input"
-                            type="text"
-                            placeholder={t('routing.routeNamePlaceholder')}
-                            bind:value={saveRouteName}
-                            on:keydown={(e) => e.key === 'Enter' && confirmSaveRoute()}
-                        />
-                        <button class="button size-xs" on:click={confirmSaveRoute}>{t('routing.saveButton')}</button>
-                        <button class="button size-xs" on:click={cancelSaveRoute}>&#215;</button>
-                    </div>
-                {:else}
-                    <button class="button size-xs" on:click={() => { showSaveInput = true; saveRouteName = suggestedRouteName; }}>{t('routing.saveRoute')}</button>
-                {/if}
-                {#if savedRoutes.length > 0}
-                    <button class="button size-xs" on:click={() => showRouteList = !showRouteList}>
-                        {showRouteList ? t('routing.hideRoute') : t('routing.loadRoute')} ({savedRoutes.length})
-                    </button>
-                {/if}
-            </div>
-            {#if showRouteList && savedRoutes.length > 0}
-                <div class="section mb-10 route-list">
-                    {#each savedRoutes as sr (sr.id)}
-                        <div class="route-list-item size-xs">
-                            <button class="route-load-btn" on:click={() => { onLoadRoute(sr.id); showRouteList = false; }}>
-                                {sr.name}
-                            </button>
-                            <button class="wp-remove" on:click={() => onDeleteRoute(sr.id)}>&#215;</button>
-                        </div>
-                    {/each}
-                </div>
-            {/if}
-        {/if}
-
-
         <!-- Departure time / window -->
         {#if mode === 'single'}
-            <div class="section mb-15 departure-row" class:section--disabled={isRouting || isDepartureScanning}>
+            <div
+                class="section mb-15 departure-row setup-tab setup-tab--when"
+                class:section--disabled={isRouting || isDepartureScanning}
+                class:tab-hidden={needsTabs && setupTab !== 'when'}
+            >
                 <div class="departure-input">
                     <label class="size-xs label" for="departure">{t('routing.departureLabel')}</label>
                     <input
@@ -220,12 +252,22 @@
                 </div>
             </div>
             {#if departureInPast}
-                <div class="section mb-10 warning-text size-xs">{t('routing.departureInPast')}</div>
+                <div
+                    class="section mb-10 warning-text size-xs setup-tab setup-tab--when"
+                    class:tab-hidden={needsTabs && setupTab !== 'when'}
+                >{t('routing.departureInPast')}</div>
             {:else if departureBeyondForecast}
-                <div class="section mb-10 caution-text size-xs">{t('routing.departureBeyondForecast')}</div>
+                <div
+                    class="section mb-10 caution-text size-xs setup-tab setup-tab--when"
+                    class:tab-hidden={needsTabs && setupTab !== 'when'}
+                >{t('routing.departureBeyondForecast')}</div>
             {/if}
         {:else}
-            <div class="section mb-15" class:section--disabled={isRouting || isDepartureScanning}>
+            <div
+                class="section mb-15 setup-tab setup-tab--when"
+                class:section--disabled={isRouting || isDepartureScanning}
+                class:tab-hidden={needsTabs && setupTab !== 'when'}
+            >
                 <DepartureWindowInput
                     modelCount={settingsStore.get('selectedModels').length}
                     bind:this={departureWindowInput}
@@ -235,7 +277,7 @@
         {/if}
 
         <!-- Calculate / Cancel button -->
-        <div class="section mb-15">
+        <div class="section mb-15 calculate-action">
             {#if isRouting || isDepartureScanning}
                 <button
                     class="button button--variant-orange size-m"
@@ -277,34 +319,47 @@
 
     <!-- Results -->
     {#if results.length > 0}
-        <div class="section results">
-            <!-- Compact route reference -->
-            <div class="route-ref size-xs mb-10">
-                <div>{t('routing.depart', { time: formatEta(results[0].route.path[0]?.time ?? Date.now()) })}</div>
-                {#if results.length === 1}
+        <div
+            class="section results"
+            class:tab-hidden={needsTabs && resultsTab === 'route'}
+        >
+            <!-- Single-route header: just the Route Details affordance.
+                 Departure time has moved into the Route Details modal title
+                 to claw back vertical space on the main panel. -->
+            {#if results.length === 1}
+                <div
+                    class="route-ref size-xs mb-10 results-tab results-tab--models"
+                    class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                >
                     <button class="button size-xs detail-inline-btn" on:click={() => routeDetailModal?.openModal()}>
                         {t('results.routeDetails')}
                         <span class="popup-icon">&#8599;</span>
                     </button>
-                {/if}
-            </div>
+                </div>
+            {/if}
 
             <!-- Comparison table (multi-model only) -->
             {#if results.length > 1}
-                <div class="comparison-header mb-5">
+                <div
+                    class="comparison-header mb-5 results-tab results-tab--models"
+                    class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                >
                     <h3 class="size-s">{t('results.routeComparison')}</h3>
                     <button class="button size-xs detail-inline-btn" on:click={() => routeDetailModal?.openModal()}>
                         {t('results.routeDetails')}
                         <span class="popup-icon">&#8599;</span>
                     </button>
                 </div>
-                <table class="comparison-table size-xs">
+                <table
+                    class="comparison-table size-xs results-tab results-tab--models"
+                    class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                >
                     <thead>
                         <tr>
                             <th>{t('results.modelCol')}</th>
                             <th>{t('results.durationCol')}</th>
-                            <th>{t('results.sogCol')}</th>
-                            <th>{t('results.twsCol')}</th>
+                            <th>{t('results.sogCol')} ({speedLabel($settings.speedUnit)})</th>
+                            <th>{t('results.twsCol')} ({speedLabel($settings.speedUnit)})</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -326,8 +381,8 @@
                                     <span class={fastest ? 'fastest-label' : ''}>{MODEL_LABELS[mr.model]}</span>
                                 </td>
                                 <td>{formatDuration(mr.route.durationHours)}</td>
-                                <td>{mr.route.avgSpeedKt.toFixed(1)}</td>
-                                <td>{mr.route.maxTws.toFixed(0)}</td>
+                                <td>{convertSpeed(mr.route.avgSpeedKt, $settings.speedUnit).toFixed(1)}</td>
+                                <td>{convertSpeed(mr.route.maxTws, $settings.speedUnit).toFixed(0)}</td>
                             </tr>
                         {/each}
                     </tbody>
@@ -339,24 +394,30 @@
                 {@const sr = selectedResult.route}
                 <div class="selected-stats mt-10">
                     {#if results.length > 1}
-                        <div class="stats-header size-xs mb-5">{t('results.routeSuffix', { model: MODEL_LABELS[selectedResult.model] })}</div>
+                        <div
+                            class="stats-header size-xs mb-5 results-tab results-tab--models"
+                            class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                        >{t('results.routeSuffix', { model: MODEL_LABELS[selectedResult.model] })}</div>
                     {/if}
-                    <div class="result-grid">
+                    <div
+                        class="result-grid results-tab results-tab--models"
+                        class:tab-hidden={needsTabs && resultsTab !== 'models'}
+                    >
                         <div class="result-item">
                             <span class="size-xs label">{t('results.eta')}</span>
                             <span class="size-s">{formatEta(sr.eta)}</span>
                         </div>
                         <div class="result-item">
                             <span class="size-xs label">{t('results.totalDistance')}</span>
-                            <span class="size-s">{sr.totalDistanceNm.toFixed(1)} {t('units.nm')}</span>
+                            <span class="size-s">{formatDistance(sr.totalDistanceNm, $settings.distanceUnit, 1)}</span>
                         </div>
                         <div class="result-item">
                             <span class="size-xs label">{t('results.avgSog')}</span>
-                            <span class="size-s">{sr.avgSpeedKt.toFixed(1)} {t('units.knots')}</span>
+                            <span class="size-s">{formatSpeed(sr.avgSpeedKt, $settings.speedUnit, 1)}</span>
                         </div>
                         <div class="result-item">
                             <span class="size-xs label">{t('results.maxTws')}</span>
-                            <span class="size-s">{sr.maxTws.toFixed(0)} {t('units.knots')}</span>
+                            <span class="size-s">{formatSpeed(sr.maxTws, $settings.speedUnit, 0)}</span>
                         </div>
                         <div class="result-item">
                             <span class="size-xs label">{t('results.duration')}</span>
@@ -378,12 +439,15 @@
                             [routeStats.sail.motoring, t('results.sailMotoring'), '#888'],
                         ])}
                         {@const windLegend = legendItems([
-                            [routeStats.wind.light, t('results.windLight'), '#89CFF0'],
-                            [routeStats.wind.moderate, t('results.windModerate'), '#457B9D'],
-                            [routeStats.wind.fresh, t('results.windFresh'), '#E9C46A'],
-                            [routeStats.wind.strong, t('results.windStrong'), '#E63946'],
+                            [routeStats.wind.light, speedRange(null, 10, $settings.speedUnit), '#89CFF0'],
+                            [routeStats.wind.moderate, speedRange(10, 20, $settings.speedUnit), '#457B9D'],
+                            [routeStats.wind.fresh, speedRange(20, 30, $settings.speedUnit), '#E9C46A'],
+                            [routeStats.wind.strong, speedRange(30, null, $settings.speedUnit), '#E63946'],
                         ])}
-                        <div class="route-breakdown mt-10">
+                        <div
+                            class="route-breakdown mt-10 results-tab results-tab--stats"
+                            class:tab-hidden={needsTabs && resultsTab !== 'stats'}
+                        >
                             <div class="breakdown-section">
                                 <div class="breakdown-label size-xs">{t('results.pointsOfSail')}</div>
                                 <div class="stacked-bar">
@@ -418,10 +482,10 @@
 
                             {#if routeStats.swell}
                                 {@const swellLegend = legendItems([
-                                    [routeStats.swell.calm, t('results.swellCalm'), '#2A9D8F'],
-                                    [routeStats.swell.moderate, t('results.swellModerate'), '#E9C46A'],
-                                    [routeStats.swell.rough, t('results.swellRough'), '#E76F51'],
-                                    [routeStats.swell.heavy, t('results.swellHeavy'), '#E63946'],
+                                    [routeStats.swell.calm, heightRange(null, 1, $settings.heightUnit), '#2A9D8F'],
+                                    [routeStats.swell.moderate, heightRange(1, 2, $settings.heightUnit), '#E9C46A'],
+                                    [routeStats.swell.rough, heightRange(2, 3, $settings.heightUnit), '#E76F51'],
+                                    [routeStats.swell.heavy, heightRange(3, null, $settings.heightUnit), '#E63946'],
                                 ])}
                                 <div class="breakdown-section">
                                     <div class="breakdown-label size-xs">{t('results.swellHeading')}</div>
@@ -446,7 +510,10 @@
 
             <!-- Failed model warnings -->
             {#if failedModels.length > 0}
-                <div class="failed-list mt-10">
+                <div
+                    class="failed-list mt-10 results-tab results-tab--stats"
+                    class:tab-hidden={needsTabs && resultsTab !== 'stats'}
+                >
                     {#each failedModels as fm}
                         <div class="failed-item size-xs">
                             &#9888; {MODEL_LABELS[fm.model]}: {fm.reason}
@@ -518,12 +585,12 @@
                 <button class="about-close" on:click={() => showAboutModal = false}>&times;</button>
                 <h3 class="about-title">{t('footer.aboutTitle')}</h3>
                 <p class="about-text">
-                    {t('footer.aboutIntro')}
+                    👋 {t('footer.aboutIntro')}
                 </p>
                 <p class="about-text">
-                    {t('footer.aboutEmail')} <a href="mailto:hello@appd.com.au" class="about-link">hello@appd.com.au</a>
-                </p>
-                <p class="about-text">
+                    {t('footer.aboutReachOut')}
+                    <a href="mailto:hello@appd.com.au" class="about-link">hello@appd.com.au</a>
+                    {t('footer.aboutOrVisit')}
                     <a href="https://appd.com.au" target="_blank" rel="noopener noreferrer" class="about-link">https://appd.com.au</a>
                 </p>
             </div>
@@ -561,8 +628,25 @@
     import DepartureWindowInput from './DepartureWindowInput.svelte';
     import DeparturePlannerResults from './DeparturePlannerResults.svelte';
     import RouteStopsCard from './RouteStopsCard.svelte';
+    import Tabs from './Tabs.svelte';
     import { getAllPolars, getCustomPolars, deleteCustomPolar } from '../data/polarRegistry';
-    import { settingsStore } from '../stores/SettingsStore';
+    import { settingsStore, settings } from '../stores/SettingsStore';
+    import { isMobile } from '../stores/mobileMedia';
+    import { formatDistance, formatSpeed, formatHeight, convertDistance, convertSpeed, convertHeight, distanceLabel, speedLabel, heightLabel } from '../data/units';
+    import type { SpeedUnit, HeightUnit } from '../routing/types';
+
+    function speedRange(lowKt: number | null, highKt: number | null, unit: SpeedUnit): string {
+        const u = speedLabel(unit);
+        if (lowKt == null) return `<${convertSpeed(highKt!, unit).toFixed(0)} ${u}`;
+        if (highKt == null) return `${convertSpeed(lowKt, unit).toFixed(0)}+ ${u}`;
+        return `${convertSpeed(lowKt, unit).toFixed(0)}-${convertSpeed(highKt, unit).toFixed(0)} ${u}`;
+    }
+    function heightRange(lowM: number | null, highM: number | null, unit: HeightUnit): string {
+        const u = heightLabel(unit);
+        if (lowM == null) return `<${convertHeight(highM!, unit).toFixed(1)} ${u}`;
+        if (highM == null) return `${convertHeight(lowM, unit).toFixed(1)}+ ${u}`;
+        return `${convertHeight(lowM, unit).toFixed(1)}-${convertHeight(highM, unit).toFixed(1)} ${u}`;
+    }
 
     import type { LatLon, ModelRouteResult, WindModelId, PipelineStep, SavedRoute, PolarData, UserSettings, DepartureResult, RoutePoint } from '../routing/types';
     import type { WaypointState } from '../map/WaypointManager';
@@ -614,6 +698,28 @@
     let departureWindowInput: DepartureWindowInput;
     let departureWindowInPast = false;
     let showAboutModal = false;
+
+    type SetupTab = 'when' | 'boat';
+    type ResultsTab = 'route' | 'models' | 'stats';
+    let setupTab: SetupTab = 'when';
+    let resultsTab: ResultsTab = 'route';
+    const setupTabDefs: { id: SetupTab; label: string }[] = [
+        { id: 'when', label: 'When' },
+        { id: 'boat', label: 'Boat' },
+    ];
+    const resultsTabDefs: { id: ResultsTab; label: string }[] = [
+        { id: 'route', label: 'Route' },
+        { id: 'models', label: 'Models' },
+        { id: 'stats', label: 'Stats' },
+    ];
+    const selectSetupTab = (id: string) => { setupTab = id as SetupTab; };
+    const selectResultsTab = (id: string) => { resultsTab = id as ResultsTab; };
+    /** Show tabs whenever we're on a mobile-width viewport. Height-based
+     *  detection isn't reliable — Windy uses CSS transforms (not resizing)
+     *  to slide the bottom sheet between snap states, so the panel's parent
+     *  reports full height regardless of which snap is active. Falling back
+     *  to width detection ensures tabs reliably appear on small viewports. */
+    $: needsTabs = $isMobile;
 
     let importFileInput: HTMLInputElement | null = null;
 
@@ -1120,12 +1226,31 @@
         min-height: 100%;
         position: relative;
     }
+
     .section {
         padding: 0;
     }
     .section--disabled {
         opacity: 0.4;
         pointer-events: none;
+    }
+
+    /* Tabbed mobile layout: hide non-active tab content via CSS so component
+       state (input values, dropdown selection) is preserved. Tabs themselves
+       only render on mobile (gated by $isMobile in markup). */
+    .tab-hidden {
+        display: none !important;
+    }
+
+    /* Mobile: button sits naturally at the bottom of the form. No backdrop
+       box — Windy's bottom sheet already provides separation from the map. */
+
+    /* Save / Load buttons inline with the route stops card */
+    .route-mgmt-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 8px;
     }
     .instruction {
         line-height: 1.6;
@@ -1275,22 +1400,23 @@
     .detail-inline-btn {
         flex: none;
         padding: 4px 10px;
-        background: rgba(42, 157, 143, 0.18);
-        border: 1px solid rgba(42, 157, 143, 0.45);
-        color: #bfe4dc;
+        background: rgba(42, 157, 143, 0.35);
+        border: 1px solid rgba(42, 157, 143, 0.75);
+        color: #ffffff;
+        font-weight: 500;
         display: inline-flex;
         align-items: center;
         gap: 4px;
         white-space: nowrap;
 
         &:hover {
-            background: rgba(42, 157, 143, 0.3);
-            color: #e6eef8;
-            border-color: rgba(42, 157, 143, 0.7);
+            background: rgba(42, 157, 143, 0.55);
+            color: #ffffff;
+            border-color: rgba(42, 157, 143, 1);
         }
 
         .popup-icon {
-            opacity: 0.8;
+            opacity: 1;
         }
     }
 

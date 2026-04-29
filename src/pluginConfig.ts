@@ -8,9 +8,9 @@ import type { ExternalPluginConfig } from '@windy/interfaces';
 // The runtime footer reads package.json directly (via pluginConfig consumers).
 const config: ExternalPluginConfig = {
     name: 'windy-plugin-sail-router',
-    version: '0.4.0',
+    version: '0.13.0',
     icon: '⛵',
-    title: 'Sail Router',
+    title: 'Passage Planner',
     description:
         'Weather routing for sailing with multi-model comparison. ' +
         'Computes optimal routes using boat polars, wind forecasts, ' +

@@ -46,7 +46,9 @@
       "Bash(./deploy.sh)",
       "Bash(tar tvf *)",
       "Bash(tar cf *)",
-      "Bash(tar uf *)"
+      "Bash(tar uf *)",
+      "Bash(git *)",
+      "Bash(awk '/^### Task 6/,/^### Task 7|^---$/' /mnt/c/Users/brodi/dev/WindySail/docs/superpowers/plans/2026-04-23-gpx-import-and-analytics-opt-out.md)"
     ]
   }
 }

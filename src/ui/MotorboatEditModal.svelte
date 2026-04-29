@@ -1,14 +1,18 @@
 <script lang="ts">
     import { t, locale } from '../i18n';
-    import { settingsStore } from '../stores/SettingsStore';
+    import { settingsStore, settings } from '../stores/SettingsStore';
+    import {
+        convertSpeed, speedToKt, speedLabel,
+        convertHeight, heightToM, heightLabel,
+    } from '../data/units';
 
     let showModal = false;
+    // Stored canonically (kt, kt, m); inputs convert in/out via $settings units.
     let cruiseKt: number = settingsStore.get('motorboatCruiseKt');
     let heavyKt: number = settingsStore.get('motorboatHeavyKt');
     let swellThresholdM: number = settingsStore.get('motorboatSwellThresholdM');
 
     export function open(): void {
-        // Re-sync from store every open so stale local values don't overwrite.
         cruiseKt = settingsStore.get('motorboatCruiseKt');
         heavyKt = settingsStore.get('motorboatHeavyKt');
         swellThresholdM = settingsStore.get('motorboatSwellThresholdM');
@@ -21,6 +25,20 @@
 
     function handleBackdropClick(e: MouseEvent): void {
         if ((e.target as HTMLElement).classList.contains('modal-backdrop')) close();
+    }
+
+    function handleSpeedInput(field: 'cruiseKt' | 'heavyKt', e: Event): void {
+        const v = parseFloat((e.target as HTMLInputElement).value);
+        if (isNaN(v)) return;
+        const kt = speedToKt(v, $settings.speedUnit);
+        if (field === 'cruiseKt') cruiseKt = kt;
+        else heavyKt = kt;
+    }
+
+    function handleSwellInput(e: Event): void {
+        const v = parseFloat((e.target as HTMLInputElement).value);
+        if (isNaN(v)) return;
+        swellThresholdM = heightToM(v, $settings.heightUnit);
     }
 
     function handleSave(): void {
@@ -43,15 +61,27 @@
             <div class="modal-body">
                 <p class="size-xs hint">{t('boat.motorboatHint')}</p>
                 <div class="param-grid">
-                    <label class="size-xs param-label" for="mb-cruise">{t('settings.mbCruise')}</label>
-                    <input id="mb-cruise" type="number" class="input size-s" min="1" max="50" step="0.5"
-                        bind:value={cruiseKt} />
-                    <label class="size-xs param-label" for="mb-heavy">{t('settings.mbHeavy')}</label>
-                    <input id="mb-heavy" type="number" class="input size-s" min="1" max="50" step="0.5"
-                        bind:value={heavyKt} />
-                    <label class="size-xs param-label" for="mb-swell">{t('settings.mbSwell')}</label>
-                    <input id="mb-swell" type="number" class="input size-s" min="0.5" max="10" step="0.5"
-                        bind:value={swellThresholdM} />
+                    <label class="size-xs param-label" for="mb-cruise">{t('settings.mbCruise')} ({speedLabel($settings.speedUnit)})</label>
+                    <input id="mb-cruise" type="number" class="input size-s"
+                        min={convertSpeed(1, $settings.speedUnit).toFixed(1)}
+                        max={convertSpeed(50, $settings.speedUnit).toFixed(0)}
+                        step="0.5"
+                        value={convertSpeed(cruiseKt, $settings.speedUnit).toFixed(1)}
+                        on:input={(e) => handleSpeedInput('cruiseKt', e)} />
+                    <label class="size-xs param-label" for="mb-heavy">{t('settings.mbHeavy')} ({speedLabel($settings.speedUnit)})</label>
+                    <input id="mb-heavy" type="number" class="input size-s"
+                        min={convertSpeed(1, $settings.speedUnit).toFixed(1)}
+                        max={convertSpeed(50, $settings.speedUnit).toFixed(0)}
+                        step="0.5"
+                        value={convertSpeed(heavyKt, $settings.speedUnit).toFixed(1)}
+                        on:input={(e) => handleSpeedInput('heavyKt', e)} />
+                    <label class="size-xs param-label" for="mb-swell">{t('settings.mbSwell')} ({heightLabel($settings.heightUnit)})</label>
+                    <input id="mb-swell" type="number" class="input size-s"
+                        min={convertHeight(0.5, $settings.heightUnit).toFixed(1)}
+                        max={convertHeight(10, $settings.heightUnit).toFixed(0)}
+                        step="0.5"
+                        value={convertHeight(swellThresholdM, $settings.heightUnit).toFixed(1)}
+                        on:input={handleSwellInput} />
                 </div>
             </div>
 

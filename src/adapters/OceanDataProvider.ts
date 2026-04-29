@@ -103,6 +103,10 @@ export async function fetchSwellGrid(
     let lastNonEmptyIdx = -1;
 
     try {
+        // Give the UI a label during the otherwise-silent product-switch wait
+        // (waitForProductReady can take up to 5s with no progress callback).
+        onProgress?.('Switching to swell forecast…', 0);
+
         store.set('overlay', 'waves');
         store.set('product', 'ecmwfWaves');
         store.set('timestamp', timestamps[0]);
@@ -277,6 +281,9 @@ export async function fetchCurrentGrid(
     const refLon = (bounds.west + bounds.east) / 2;
 
     try {
+        // Give the UI a label during the otherwise-silent product-switch wait.
+        onProgress?.('Switching to currents forecast…', 0);
+
         store.set('overlay', 'currents');
         store.set('product', 'cmems');
         store.set('timestamp', timestamps[0]);
@@ -423,7 +430,7 @@ export async function fetchOceanGrids(
     const cachedSwell = getSwell(swellCacheKey);
     const cachedCurrent = getCurrent(currentCacheKey);
 
-    if (cachedSwell && cachedCurrent !== undefined) {
+    if (cachedSwell && cachedCurrent !== null) {
         console.log('[OceanDataProvider] Both ocean grids cached');
         return { swellGrid: cachedSwell, currentGrid: cachedCurrent };
     }
@@ -433,7 +440,7 @@ export async function fetchOceanGrids(
         const currentGrid = await fetchCurrentGrid(bounds, departureTime, maxDurationHours, onCurrentProgress, signal);
         return { swellGrid: cachedSwell, currentGrid };
     }
-    if (cachedCurrent !== undefined) {
+    if (cachedCurrent !== null) {
         const swellGrid = await fetchSwellGrid(bounds, departureTime, maxDurationHours, onSwellProgress, signal);
         return { swellGrid, currentGrid: cachedCurrent };
     }

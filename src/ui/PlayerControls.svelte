@@ -162,7 +162,10 @@
 
 <style lang="less">
     .player-controls {
-        padding: 5px 0;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 6px;
+        padding: 12px;
+        margin-top: 10px;
     }
 
     .row {

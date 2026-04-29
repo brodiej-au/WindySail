@@ -219,6 +219,10 @@ export const DEFAULT_ADVANCED: AdvancedSettings = {
     reefFactor: 0.85,
 };
 
+export type DistanceUnit = 'nm' | 'km' | 'mi';
+export type SpeedUnit = 'kt' | 'kmh' | 'mph';
+export type HeightUnit = 'm' | 'ft';
+
 export interface UserSettings {
     timeStep: number; // hours
     maxDuration: number; // hours
@@ -235,6 +239,12 @@ export interface UserSettings {
     showIsochrones: boolean; // show isochrone expansion on map during routing
     selectedModels: WindModelId[];
     selectedPolarName: string;
+
+    // Display units (independent per dimension; storage values remain canonical
+    // — distance in nm, speed in kt, height in m — only display is converted)
+    distanceUnit: DistanceUnit;
+    speedUnit: SpeedUnit;
+    heightUnit: HeightUnit;
 
     // Privacy
     analyticsEnabled: boolean; // send anonymous usage analytics
@@ -263,6 +273,9 @@ export const DEFAULT_SETTINGS: UserSettings = {
     motorSpeed: 4,
     comfortWeight: 0.3,
     showIsochrones: false,
+    distanceUnit: 'nm',
+    speedUnit: 'kt',
+    heightUnit: 'm',
     analyticsEnabled: true,
     selectedModels: ['gfs'],
     selectedPolarName: 'Bavaria 38',

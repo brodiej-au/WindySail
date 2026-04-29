@@ -1,3 +1,4 @@
+import { readable } from 'svelte/store';
 import type { UserSettings } from '../routing/types';
 import { DEFAULT_SETTINGS } from '../routing/types';
 import { pullSettings, pushSettings, isSyncEnabled } from '../backend/sync';
@@ -125,3 +126,14 @@ export class SettingsStore {
 }
 
 export const settingsStore = new SettingsStore();
+
+/**
+ * Reactive Svelte store mirroring `settingsStore`. Components can subscribe
+ * via the `$settings` shorthand to react to any settings change, e.g.
+ * `$settings.distanceUnit`. Always emits a fresh copy.
+ */
+export const settings = readable<UserSettings>(settingsStore.getAll(), set => {
+    const cb = (s: UserSettings) => set(s);
+    settingsStore.subscribe(cb);
+    return () => settingsStore.unsubscribe(cb);
+});

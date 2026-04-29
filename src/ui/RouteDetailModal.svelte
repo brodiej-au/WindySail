@@ -16,7 +16,14 @@
         <div class="modal-container">
             <!-- Header with model tabs -->
             <div class="modal-header">
-                <h3 class="size-m">{t('results.routeDetails')}</h3>
+                <h3 class="size-m">
+                    {#if results[selectedIndex]}
+                        {MODEL_LABELS[results[selectedIndex].model]} {t('results.routeWord')}
+                        <span class="header-depart size-xs">· {t('routing.depart', { time: formatDateTime(results[selectedIndex].route.path[0].time) })}</span>
+                    {:else}
+                        {t('results.routeDetails')}
+                    {/if}
+                </h3>
                 <div class="model-tabs">
                     {#each results as mr, i}
                         <button
@@ -52,15 +59,15 @@
                 </div>
                 <div class="summary-item">
                     <span class="summary-label size-xs">{t('results.totalDistance')}</span>
-                    <span class="summary-value size-s">{route.totalDistanceNm.toFixed(1)} {t('units.nm')}</span>
+                    <span class="summary-value size-s">{formatDistance(route.totalDistanceNm, $settings.distanceUnit, 1)}</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-label size-xs">{t('results.avgSog')}</span>
-                    <span class="summary-value size-s">{route.avgSpeedKt.toFixed(1)} {t('units.knots')}</span>
+                    <span class="summary-value size-s">{formatSpeed(route.avgSpeedKt, $settings.speedUnit, 1)}</span>
                 </div>
                 <div class="summary-item">
                     <span class="summary-label size-xs">{t('results.maxTws')}</span>
-                    <span class="summary-value size-s">{route.maxTws.toFixed(0)} {t('units.knots')}</span>
+                    <span class="summary-value size-s">{formatSpeed(route.maxTws, $settings.speedUnit, 0)}</span>
                 </div>
                 {#if results[selectedIndex].modelRunTime}
                 <div class="summary-item">
@@ -120,12 +127,12 @@
                     <thead>
                         <tr>
                             <th>{t('results.colTime')}</th>
-                            <th>{t('results.colTws')}</th>
+                            <th>{t('results.colTws')} ({speedLabel($settings.speedUnit)})</th>
                             <th>{t('results.colTwa')}</th>
                             <th>{t('results.colHdg')}</th>
-                            <th>{t('results.colSog')}</th>
-                            {#if hasSwell}<th>{t('results.colSwell')}</th>{/if}
-                            {#if hasCurrents}<th>{t('results.colCurrent')}</th>{/if}
+                            <th>{t('results.colSog')} ({speedLabel($settings.speedUnit)})</th>
+                            {#if hasSwell}<th>{t('results.colSwell')} ({heightLabel($settings.heightUnit)})</th>{/if}
+                            {#if hasCurrents}<th>{t('results.colCurrent')} ({speedLabel($settings.speedUnit)})</th>{/if}
                         </tr>
                     </thead>
                     <tbody>
@@ -137,12 +144,12 @@
                             {/if}
                             <tr class:motoring-row={pt.isMotoring}>
                                 <td>{formatTime(pt.time)}</td>
-                                <td>{pt.tws.toFixed(1)}</td>
+                                <td>{convertSpeed(pt.tws, $settings.speedUnit).toFixed(1)}</td>
                                 <td>{pt.twa.toFixed(0)}°</td>
                                 <td>{pt.heading.toFixed(0)}°</td>
-                                <td>{pt.boatSpeed.toFixed(1)}{pt.isMotoring ? ' ⚙' : ''}</td>
-                                {#if hasSwell}<td>{pt.swell ? pt.swell.height.toFixed(1) + 'm' : '-'}</td>{/if}
-                                {#if hasCurrents}<td>{pt.current ? pt.current.speed.toFixed(1) + 'kt' : '-'}</td>{/if}
+                                <td>{convertSpeed(pt.boatSpeed, $settings.speedUnit).toFixed(1)}{pt.isMotoring ? ' ⚙' : ''}</td>
+                                {#if hasSwell}<td>{pt.swell ? convertHeight(pt.swell.height, $settings.heightUnit).toFixed(1) : '-'}</td>{/if}
+                                {#if hasCurrents}<td>{pt.current ? convertSpeed(pt.current.speed, $settings.speedUnit).toFixed(1) : '-'}</td>{/if}
                             </tr>
                         {/each}
                     </tbody>
@@ -171,6 +178,8 @@
     import type { LatLon, ModelRouteResult, RoutePoint } from '../routing/types';
     import { MODEL_LABELS } from '../map/modelColors';
     import { waypointEtas } from '../routing/waypointEta';
+    import { settings } from '../stores/SettingsStore';
+    import { formatDistance, formatSpeed, convertSpeed, convertHeight, speedLabel, heightLabel } from '../data/units';
 
     Chart.register(
         LineController,
@@ -664,6 +673,11 @@
             margin: 0;
             opacity: 0.9;
             white-space: nowrap;
+        }
+        .header-depart {
+            opacity: 0.7;
+            font-weight: 400;
+            margin-left: 4px;
         }
     }
 

@@ -41,13 +41,13 @@ export function buildGpx(args: BuildGpxArgs): string {
     ).join('\n');
 
     return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Windy Sail Router v${escapeXml(args.version)}" xmlns="http://www.topografix.com/GPX/1/1">
+<gpx version="1.1" creator="Windy Passage Planner v${escapeXml(args.version)}" xmlns="http://www.topografix.com/GPX/1/1">
   <metadata>
     <name>${escapeXml(routeName)}</name>
     <time>${escapeXml(args.timestamp)}</time>
   </metadata>
   <rte>
-    <name>Sail Router plan</name>
+    <name>Passage Planner plan</name>
 ${rtepts}
   </rte>
 </gpx>`;
