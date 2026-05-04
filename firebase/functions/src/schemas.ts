@@ -1,27 +1,31 @@
 import { z } from 'zod';
 
-const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// --- Identity model ---------------------------------------------------------
+// Per Windy's data-handling policy, we never accept raw `email` or persistent
+// `deviceId` from clients. The only optional user identifier is `emailHash`,
+// a one-way SHA-256 the client computes from the user's Windy email. Server
+// stores the hash; server cannot reverse it back to an email address.
+//
+// Anonymous users (not signed into Windy) send `emailHash: null` — these
+// events are recorded with no user pointer at all.
+
+const emailHashRegex = /^[0-9a-f]{32}$/i;
+const emailHashField = z.string().regex(emailHashRegex);
+const emailHashOrNull = z.string().regex(emailHashRegex).nullable().default(null);
 
 const baseFields = {
-    deviceId: z.string().regex(uuidRegex, 'deviceId must be a UUID'),
+    emailHash: emailHashOrNull,
     pluginVersion: z.string().min(1).max(20),
     usedLang: z.string().min(2).max(10).default('en'),
 };
 
 export const installSchema = z.object({
     ...baseFields,
-    email: z.string().email().nullable().default(null),
     userAgent: z.string().max(2000).transform(s => s.slice(0, 200)),
-});
-
-export const heartbeatSchema = z.object({
-    ...baseFields,
-    email: z.string().email().nullable().default(null),
 });
 
 export const disclaimerSchema = z.object({
     ...baseFields,
-    email: z.string().email().nullable().default(null),
     disclaimerVersion: z.string().min(1).max(30),
     acceptedAt: z.string().datetime(),
 });
@@ -43,7 +47,6 @@ const modelResultSchema = z.object({
 
 export const routeSchema = z.object({
     ...baseFields,
-    email: z.string().email().nullable().default(null),
     mode: z.enum(['single', 'departure']),
     startedAt: z.string().datetime(),
     completedAt: z.string().datetime(),
@@ -59,9 +62,9 @@ export const routeSchema = z.object({
     failedReason: z.string().max(200).nullable().default(null),
 });
 
-// Cross-device sync payloads ------------------------------------------------
-const emailHashRegex = /^[0-9a-f]{32}$/i;
-const emailField = z.string().email();
+// --- Cross-device sync payloads -------------------------------------------
+// All sync endpoints require an emailHash (sync is a no-op for anonymous
+// users). No raw email or deviceId is accepted.
 
 export const savedRouteSchema = z.object({
     id: z.string().min(1).max(64),
@@ -77,24 +80,18 @@ export const savedRouteSchema = z.object({
     routingOptions: z.record(z.any()),
 });
 
+export const syncListSchema = z.object({
+    emailHash: emailHashField,
+});
+
 export const syncRouteUpsertSchema = z.object({
-    emailHash: z.string().regex(emailHashRegex),
-    email: emailField,
-    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    emailHash: emailHashField,
     route: savedRouteSchema,
 });
 
 export const syncRouteDeleteSchema = z.object({
-    emailHash: z.string().regex(emailHashRegex),
-    email: emailField,
-    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    emailHash: emailHashField,
     routeId: z.string().min(1).max(64),
-});
-
-export const syncListSchema = z.object({
-    emailHash: z.string().regex(emailHashRegex),
-    email: emailField,
-    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
 });
 
 export const customPolarSchema = z.object({
@@ -106,16 +103,12 @@ export const customPolarSchema = z.object({
 });
 
 export const syncPolarUpsertSchema = z.object({
-    emailHash: z.string().regex(emailHashRegex),
-    email: emailField,
-    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    emailHash: emailHashField,
     polar: customPolarSchema,
 });
 
 export const syncPolarDeleteSchema = z.object({
-    emailHash: z.string().regex(emailHashRegex),
-    email: emailField,
-    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    emailHash: emailHashField,
     polarName: z.string().min(1).max(60),
 });
 
@@ -131,27 +124,20 @@ const lastRouteDataSchema = z.object({
 });
 
 export const syncLastRouteSetSchema = z.object({
-    emailHash: z.string().regex(emailHashRegex),
-    email: emailField,
-    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    emailHash: emailHashField,
     lastRoute: lastRouteDataSchema,
 });
 
-// User settings sync — accept any reasonable settings object; validation lives
-// on the client. Stored verbatim at users/{hash}/state/settings.
 const userSettingsBlob = z.record(z.any()).and(z.object({
     updatedAt: z.number().int().nonnegative().default(() => Date.now()),
 }));
 
 export const syncSettingsSetSchema = z.object({
-    emailHash: z.string().regex(emailHashRegex),
-    email: emailField,
-    deviceId: z.string().regex(/^[0-9a-f-]{36}$/i),
+    emailHash: emailHashField,
     settings: userSettingsBlob,
 });
 
 export type InstallPayload = z.infer<typeof installSchema>;
-export type HeartbeatPayload = z.infer<typeof heartbeatSchema>;
 export type DisclaimerPayload = z.infer<typeof disclaimerSchema>;
 export type RoutePayload = z.infer<typeof routeSchema>;
 export type SavedRouteDoc = z.infer<typeof savedRouteSchema>;

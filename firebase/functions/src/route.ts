@@ -11,9 +11,10 @@ export async function handleRoute(req: any, res: any): Promise<void> {
     const ipHash = hashIp(extractIp(req));
 
     // Append a dedicated document to `routes/` for easy querying / reporting.
+    // Identifies the user only by emailHash (one-way, irreversible) — null
+    // for anonymous routes.
     await db().collection('routes').add({
-        deviceId: data.deviceId,
-        email: data.email,
+        emailHash: data.emailHash,
         pluginVersion: data.pluginVersion,
         usedLang: data.usedLang,
         mode: data.mode,
@@ -33,14 +34,16 @@ export async function handleRoute(req: any, res: any): Promise<void> {
         ipHash,
     });
 
-    // Keep the device doc's lastLang/lastVersion fresh.
-    await db().collection('devices').doc(data.deviceId).set({
-        email: data.email ?? null,
-        lastSeenAt: serverTimestamp(),
-        lastVersion: data.pluginVersion,
-        lastLang: data.usedLang,
-    }, { merge: true });
+    // Touch the user doc for signed-in users so the lastSeenAt / version
+    // fields stay fresh. Anonymous users don't get a user doc at all.
+    if (data.emailHash) {
+        await db().collection('users').doc(data.emailHash).set({
+            lastSeenAt: serverTimestamp(),
+            lastVersion: data.pluginVersion,
+            lastLang: data.usedLang,
+        }, { merge: true });
+    }
 
-    await recordEvent('route', data.deviceId, data, ipHash);
+    await recordEvent('route', data, ipHash);
     res.status(200).json({ ok: true });
 }

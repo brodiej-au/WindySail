@@ -1,7 +1,8 @@
 import type { LatLon, PolarData, RouteResult, RoutePoint, RoutingOptions, WindModelId, ModelRouteResult, WindGridData, SwellGridData, CurrentGridData, PipelineStep, PreloadedGrids } from '../routing/types';
-import { fetchWindGrid, computeBoundsFromPoints } from './WindProvider';
-import { fetchSwellGrid, fetchCurrentGrid, fetchOceanGrids } from './OceanDataProvider';
-import { clearCache as clearLandCache } from './LandChecker';
+import { fetchWindGridInner, computeBoundsFromPoints } from './WindProvider';
+import { fetchOceanGridsInner } from './OceanDataProvider';
+import { withWindyState, settleTileCache } from './windyHelpers';
+import { clearCache as clearLandCache, prefetchTilesForBounds as prefetchLandTiles } from './LandChecker';
 import { clear as clearWindCache } from './WindCache';
 import { clear as clearOceanCache } from './OceanCache';
 import { WorkerBridge } from './WorkerBridge';
@@ -77,6 +78,37 @@ export class RoutingOrchestrator {
             maxSteps: Math.floor(options.maxDuration / options.timeStep),
         });
 
+        // --- Pre-fetch landmask tiles BEFORE the wind/ocean pipeline ---
+        // The wind/ocean phase thrashes Windy's SwitchableTileCache and saturates
+        // browser per-host connection slots. Landmask requests issued during that
+        // window frequently fail or stall, and our (intentionally fail-safe)
+        // policy then marks affected points as land — which surfaces as the
+        // generic "All routes blocked by land" error. Loading the landmask
+        // tiles up-front, before any product switches, sidesteps the contention
+        // entirely. Failures here are logged but non-fatal; downstream calls
+        // will retry per-tile and individual tile failures still fail-safe.
+        const landBounds = bounds; // already computed above
+        const landMargin = 0.5; // small extra ring beyond the wind/ocean bounds
+        emitStatus('Loading basemap…', 1);
+        prefetchLandTiles(
+            landBounds.south - landMargin,
+            landBounds.north + landMargin,
+            landBounds.west - landMargin,
+            landBounds.east + landMargin,
+        ).then(({ requested, loaded }) => {
+            if (loaded < requested) {
+                console.warn(
+                    `[RoutingOrchestrator] Landmask pre-fetch: ${loaded}/${requested} tiles loaded; remaining will be retried during routing.`,
+                );
+            } else {
+                console.log(`[RoutingOrchestrator] Landmask pre-fetch: ${loaded}/${requested} tiles loaded ✓`);
+            }
+        }).catch(err => console.warn('[RoutingOrchestrator] Landmask pre-fetch failed:', err));
+        // We deliberately do NOT await this — let it run in parallel with the
+        // wind/ocean sampling. By the time the worker requests CHECK_LAND,
+        // most tiles will be cached; any still-in-flight ones complete via
+        // the inFlight dedupe map.
+
         // --- Wind sampling phase (0–40%) ---
         const windGrids = new Map<WindModelId, WindGridData>();
         let swellGrid: SwellGridData | undefined;
@@ -102,6 +134,15 @@ export class RoutingOrchestrator {
 
             emitStatus('Computing routes...', 55);
         } else {
+            // Wrap the entire sampling phase in ONE save/restore. Each
+            // store.set('product', ...) queues a SwitchableTileCache to install;
+            // a second product change before the previous cache finishes loading
+            // orphans it and Windy throws on the eventual `alltilesloaded`. Old
+            // code did per-fetch save/restore, producing the orphan between
+            // every iteration. With one outer wrap, the only product changes
+            // are the deliberate ones for the next sample. Between them, we
+            // call settleTileCache() to give the previous cache time to install.
+            await withWindyState(async () => {
             // Must run sequentially: switching Windy products one at a time.
             let lastGrid: WindGridData | undefined;
 
@@ -115,8 +156,12 @@ export class RoutingOrchestrator {
 
                 emitStatus(`Sampling wind data (${MODEL_LABELS[model]})...`, baseProgress);
 
+                // Let any in-flight tile cache from the previous iteration
+                // (or from caller state) install before we queue a new one.
+                if (i > 0) await settleTileCache();
+
                 try {
-                    const grid = await fetchWindGrid(
+                    const grid = await fetchWindGridInner(
                         model,
                         bounds,
                         options.startTime,
@@ -199,8 +244,12 @@ export class RoutingOrchestrator {
             swellStep.status = 'active';
             emitStatus('Sampling ocean data...', 40);
 
+            // Same protection between wind→ocean: let the last wind product's
+            // tile cache install before queuing the swell product.
+            await settleTileCache();
+
             try {
-                const oceanResult = await fetchOceanGrids(
+                const oceanResult = await fetchOceanGridsInner(
                     bounds,
                     options.startTime,
                     options.maxDuration,
@@ -227,6 +276,11 @@ export class RoutingOrchestrator {
                 currentStep.detail = 'Partial or no data — continuing without currents';
                 console.warn('[RoutingOrchestrator] Ocean data sampling failed, continuing without ocean data:', err);
             }
+
+            // Settle one more time before the outer withWindyState restores
+            // user's original product — minimises orphan risk on exit.
+            await settleTileCache();
+            }); // end withWindyState
         }
 
         // --- Routing phase (55–100%) ---

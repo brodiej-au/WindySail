@@ -8,7 +8,7 @@ import type { ExternalPluginConfig } from '@windy/interfaces';
 // The runtime footer reads package.json directly (via pluginConfig consumers).
 const config: ExternalPluginConfig = {
     name: 'windy-plugin-sail-router',
-    version: '0.13.0',
+    version: '0.15.2',
     icon: '⛵',
     title: 'Passage Planner',
     description:

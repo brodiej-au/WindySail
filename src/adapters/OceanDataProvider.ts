@@ -2,7 +2,7 @@ import store from '@windy/store';
 import { getLatLonInterpolator } from '@windy/interpolator';
 import products from '@windy/products';
 import type { LatLonBounds, SwellGridData, CurrentGridData } from '../routing/types';
-import { waitForRedraw, waitForProductReady } from './windyHelpers';
+import { waitForRedraw, waitForProductReady, withWindyState } from './windyHelpers';
 import { buildOceanCacheKey, getSwell, setSwell, getCurrent, setCurrent } from './OceanCache';
 import { withTimeout, retryWithBackoff } from './asyncGuards';
 
@@ -65,6 +65,21 @@ export async function fetchSwellGrid(
     onProgress?: (msg: string, pct: number) => void,
     signal?: AbortSignal,
 ): Promise<SwellGridData> {
+    return withWindyState(() =>
+        fetchSwellGridInner(bounds, departureTime, maxDurationHours, onProgress, signal),
+    );
+}
+
+/**
+ * Inner swell grid fetch — does NOT save/restore Windy state. Caller wraps.
+ */
+export async function fetchSwellGridInner(
+    bounds: LatLonBounds,
+    departureTime: number,
+    maxDurationHours: number,
+    onProgress?: (msg: string, pct: number) => void,
+    signal?: AbortSignal,
+): Promise<SwellGridData> {
     const cacheKey = buildOceanCacheKey('swell', bounds, departureTime, maxDurationHours);
     const cached = getSwell(cacheKey);
     if (cached) {
@@ -88,10 +103,6 @@ export async function fetchSwellGrid(
     const swellPeriod: number[][][] = lats.map(() =>
         lons.map(() => new Array(timestamps.length).fill(0)),
     );
-
-    const originalTimestamp = store.get('timestamp');
-    const originalOverlay = store.get('overlay');
-    const originalProduct = store.get('product');
 
     let modelRunTime: number | undefined;
     let dataUpdateTime: number | undefined;
@@ -206,11 +217,12 @@ export async function fetchSwellGrid(
         // return whatever data we managed to collect rather than failing entirely
         if (err instanceof DOMException && err.name === 'AbortError') throw err;
         console.warn('[OceanDataProvider] Swell sampling interrupted:', err);
-    } finally {
-        store.set('timestamp', originalTimestamp);
-        store.set('overlay', originalOverlay);
-        store.set('product', originalProduct);
     }
+
+    // Settle on timestamps[0] so any in-flight tail-end tiles install on
+    // an already-cached value before the caller switches product.
+    store.set('timestamp', timestamps[0]);
+    await waitForRedraw(150);
 
     // Trim arrays if early termination occurred
     const coverageEndTime = lastNonEmptyIdx >= 0 ? timestamps[lastNonEmptyIdx] : undefined;
@@ -247,6 +259,21 @@ export async function fetchCurrentGrid(
     onProgress?: (msg: string, pct: number) => void,
     signal?: AbortSignal,
 ): Promise<CurrentGridData | null> {
+    return withWindyState(() =>
+        fetchCurrentGridInner(bounds, departureTime, maxDurationHours, onProgress, signal),
+    );
+}
+
+/**
+ * Inner current grid fetch — does NOT save/restore Windy state. Caller wraps.
+ */
+export async function fetchCurrentGridInner(
+    bounds: LatLonBounds,
+    departureTime: number,
+    maxDurationHours: number,
+    onProgress?: (msg: string, pct: number) => void,
+    signal?: AbortSignal,
+): Promise<CurrentGridData | null> {
     const cacheKey = buildOceanCacheKey('current', bounds, departureTime, maxDurationHours);
     const cached = getCurrent(cacheKey);
     if (cached) {
@@ -268,13 +295,10 @@ export async function fetchCurrentGrid(
         lons.map(() => new Array(timestamps.length).fill(0)),
     );
 
-    const originalTimestamp = store.get('timestamp');
-    const originalOverlay = store.get('overlay');
-    const originalProduct = store.get('product');
-
     let hasAnyData = false;
     let modelRunTime: number | undefined;
     let dataUpdateTime: number | undefined;
+    let lastNonEmptyIdx = -1;
 
     // Reference point for verifying product switch (centre of bounds)
     const refLat = (bounds.south + bounds.north) / 2;
@@ -303,7 +327,6 @@ export async function fetchCurrentGrid(
         }
 
         let consecutiveEmpty = 0;
-        let lastNonEmptyIdx = -1;
 
         for (let ti = 0; ti < timestamps.length; ti++) {
             if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -377,11 +400,12 @@ export async function fetchCurrentGrid(
         if (err instanceof DOMException && err.name === 'AbortError') throw err;
         console.warn('[OceanDataProvider] Currents data unavailable:', err);
         return null;
-    } finally {
-        store.set('timestamp', originalTimestamp);
-        store.set('overlay', originalOverlay);
-        store.set('product', originalProduct);
     }
+
+    // Settle on timestamps[0] so the next product switch (or outer restore)
+    // doesn't orphan tiles still loading for the LAST scrubbed timestamp.
+    store.set('timestamp', timestamps[0]);
+    await waitForRedraw(150);
 
     if (!hasAnyData) {
         console.warn('[OceanDataProvider] No currents data found for this region (CMEMS may not cover it).');
@@ -424,6 +448,22 @@ export async function fetchOceanGrids(
     onCurrentProgress?: (msg: string, pct: number) => void,
     signal?: AbortSignal,
 ): Promise<{ swellGrid?: SwellGridData; currentGrid: CurrentGridData | null }> {
+    return withWindyState(() =>
+        fetchOceanGridsInner(bounds, departureTime, maxDurationHours, onSwellProgress, onCurrentProgress, signal),
+    );
+}
+
+/**
+ * Inner combined ocean fetch — does NOT save/restore Windy state. Caller wraps.
+ */
+export async function fetchOceanGridsInner(
+    bounds: LatLonBounds,
+    departureTime: number,
+    maxDurationHours: number,
+    onSwellProgress?: (msg: string, pct: number) => void,
+    onCurrentProgress?: (msg: string, pct: number) => void,
+    signal?: AbortSignal,
+): Promise<{ swellGrid?: SwellGridData; currentGrid: CurrentGridData | null }> {
     // If both are cached, return immediately without touching Windy state
     const swellCacheKey = buildOceanCacheKey('swell', bounds, departureTime, maxDurationHours);
     const currentCacheKey = buildOceanCacheKey('current', bounds, departureTime, maxDurationHours);
@@ -435,26 +475,21 @@ export async function fetchOceanGrids(
         return { swellGrid: cachedSwell, currentGrid: cachedCurrent };
     }
 
-    // If only one is cached, fall back to individual calls
+    // If only one is cached, fall back to individual inner calls
     if (cachedSwell) {
-        const currentGrid = await fetchCurrentGrid(bounds, departureTime, maxDurationHours, onCurrentProgress, signal);
+        const currentGrid = await fetchCurrentGridInner(bounds, departureTime, maxDurationHours, onCurrentProgress, signal);
         return { swellGrid: cachedSwell, currentGrid };
     }
     if (cachedCurrent !== null) {
-        const swellGrid = await fetchSwellGrid(bounds, departureTime, maxDurationHours, onSwellProgress, signal);
+        const swellGrid = await fetchSwellGridInner(bounds, departureTime, maxDurationHours, onSwellProgress, signal);
         return { swellGrid, currentGrid: cachedCurrent };
     }
 
-    // Neither cached — do combined fetch with single save/restore
     const { lats, lons, timestamps } = buildGrid(bounds, departureTime, maxDurationHours);
 
     if (timestamps.length === 0) {
         return { swellGrid: undefined, currentGrid: null };
     }
-
-    const originalTimestamp = store.get('timestamp');
-    const originalOverlay = store.get('overlay');
-    const originalProduct = store.get('product');
 
     const refLat = (bounds.south + bounds.north) / 2;
     const refLon = (bounds.west + bounds.east) / 2;
@@ -462,35 +497,29 @@ export async function fetchOceanGrids(
     let swellGrid: SwellGridData | undefined;
     let currentGrid: CurrentGridData | null = null;
 
+    // --- Swell phase ---
     try {
-        // --- Swell phase ---
-        try {
-            swellGrid = await _sampleSwellInner(lats, lons, timestamps, refLat, refLon, onSwellProgress, signal);
-        } catch (err) {
-            if (err instanceof DOMException && err.name === 'AbortError') throw err;
-            console.warn('[OceanDataProvider] Swell sampling interrupted:', err);
-        }
+        swellGrid = await _sampleSwellInner(lats, lons, timestamps, refLat, refLon, onSwellProgress, signal);
+    } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+        console.warn('[OceanDataProvider] Swell sampling interrupted:', err);
+    }
 
-        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
-        // Reset timestamp before switching product to avoid tile cache race.
-        // The swell phase leaves the timestamp at the last sampled time; switching
-        // product while tiles for that timestamp are still loading can trigger
-        // SwitchableTileCache errors.
-        store.set('timestamp', timestamps[0]);
-        await waitForRedraw(150);
+    // Reset timestamp before switching product to avoid tile cache race.
+    // The swell phase leaves the timestamp at the last sampled time; switching
+    // product while tiles for that timestamp are still loading can trigger
+    // SwitchableTileCache errors.
+    store.set('timestamp', timestamps[0]);
+    await waitForRedraw(150);
 
-        // --- Current phase ---
-        try {
-            currentGrid = await _sampleCurrentInner(lats, lons, timestamps, refLat, refLon, onCurrentProgress, signal);
-        } catch (err) {
-            if (err instanceof DOMException && err.name === 'AbortError') throw err;
-            console.warn('[OceanDataProvider] Currents sampling interrupted:', err);
-        }
-    } finally {
-        store.set('timestamp', originalTimestamp);
-        store.set('overlay', originalOverlay);
-        store.set('product', originalProduct);
+    // --- Current phase ---
+    try {
+        currentGrid = await _sampleCurrentInner(lats, lons, timestamps, refLat, refLon, onCurrentProgress, signal);
+    } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') throw err;
+        console.warn('[OceanDataProvider] Currents sampling interrupted:', err);
     }
 
     // Cache results

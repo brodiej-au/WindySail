@@ -2,7 +2,6 @@ import { onRequest } from 'firebase-functions/v2/https';
 import { setGlobalOptions } from 'firebase-functions/v2';
 import * as admin from 'firebase-admin';
 import { handleInstall } from './install';
-import { handleHeartbeat } from './heartbeat';
 import { handleDisclaimer } from './disclaimer';
 import { handleRoute } from './route';
 import {
@@ -53,9 +52,6 @@ export const api = onRequest(
             switch (req.path) {
                 case '/install':
                     await handleInstall(req, res);
-                    return;
-                case '/heartbeat':
-                    await handleHeartbeat(req, res);
                     return;
                 case '/disclaimer-ack':
                     await handleDisclaimer(req, res);

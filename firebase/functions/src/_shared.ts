@@ -20,13 +20,14 @@ export function serverTimestamp() {
 }
 
 export async function recordEvent(
-    type: 'install' | 'heartbeat' | 'disclaimer-ack' | 'coffee' | 'route',
-    deviceId: string,
+    type: 'install' | 'disclaimer-ack' | 'coffee' | 'route',
     payload: Record<string, unknown>,
     ipHash: string,
 ): Promise<void> {
+    // Events no longer carry a per-device identifier. The payload itself
+    // carries `emailHash` (or null for anonymous users) — all the user
+    // pointer the server ever sees.
     await db().collection('events').add({
-        deviceId,
         type,
         payload,
         receivedAt: serverTimestamp(),

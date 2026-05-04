@@ -10,12 +10,22 @@ vi.mock('../../src/adapters/RoutingOrchestrator', () => ({
 
 vi.mock('../../src/adapters/WindProvider', () => ({
     fetchWindGrid: vi.fn().mockResolvedValue({ lats: [], lons: [], timestamps: [], windU: [], windV: [] }),
+    fetchWindGridInner: vi.fn().mockResolvedValue({ lats: [], lons: [], timestamps: [], windU: [], windV: [] }),
     computeBoundsFromPoints: vi.fn().mockReturnValue({ north: 0, south: 0, east: 0, west: 0 }),
 }));
 
 vi.mock('../../src/adapters/OceanDataProvider', () => ({
     fetchSwellGrid: vi.fn().mockResolvedValue(undefined),
     fetchCurrentGrid: vi.fn().mockResolvedValue(undefined),
+    fetchSwellGridInner: vi.fn().mockResolvedValue(undefined),
+    fetchCurrentGridInner: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('../../src/adapters/windyHelpers', () => ({
+    withWindyState: vi.fn(<T,>(fn: () => Promise<T>) => fn()),
+    settleTileCache: vi.fn().mockResolvedValue(undefined),
+    waitForRedraw: vi.fn().mockResolvedValue(undefined),
+    waitForProductReady: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { DeparturePlanner } from '../../src/adapters/DeparturePlanner';

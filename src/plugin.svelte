@@ -68,8 +68,8 @@
     import { onDestroy, onMount } from 'svelte';
 
     import config from './pluginConfig';
-    import { getOrCreateDeviceId, hasPersistedDeviceId } from './backend/deviceId';
-    import { postInstall, postHeartbeat, postDisclaimerAck, postRoute, shouldSendHeartbeat, flushPendingEvents } from './backend/client';
+    import { getEmail, emailHash } from './backend/userIdentity';
+    import { postInstall, postDisclaimerAck, postRoute, flushPendingEvents } from './backend/client';
     import { DISCLAIMER_VERSION } from './backend/config';
     import DisclaimerModal from './ui/DisclaimerModal.svelte';
     import { initAnalytics, trackEvent } from './analytics';
@@ -86,6 +86,7 @@
     import { getPolarByName, syncCustomPolarsFromRemote } from './data/polarRegistry';
     import { interpolateAtTime } from './routing/RouteInterpolator';
     import { distance } from './routing/geo';
+    import { settleTileCache } from './adapters/windyHelpers';
 
     import type { LatLon, ModelRouteResult, WindModelId, PipelineStep } from './routing/types';
     import { MODEL_COLORS, getWindyProduct } from './map/modelColors';
@@ -146,13 +147,12 @@
         } catch {}
     }
 
-    function onDisclaimerAccept() {
+    async function onDisclaimerAccept() {
         markDisclaimerAccepted();
-        const deviceId = getOrCreateDeviceId();
-        const email = (store.get('user') as any)?.email ?? null;
+        const email = getEmail();
+        const hash = email ? await emailHash(email) : null;
         postDisclaimerAck({
-            deviceId,
-            email,
+            emailHash: hash,
             pluginVersion: config.version,
             disclaimerVersion: DISCLAIMER_VERSION,
             acceptedAt: new Date().toISOString(),
@@ -168,18 +168,55 @@
     let waypointMgr: WaypointManager;
 
     onMount(() => {
-        const freshInstall = !hasPersistedDeviceId();
-        const deviceId = getOrCreateDeviceId();
-        const email = (store.get('user') as any)?.email ?? null;
-        const pluginVersion = config.version;
-        const usedLang = (store.get('usedLang') as string) ?? 'en';
-        const userAgent = navigator.userAgent;
+        // Diagnostic helper, exposed to the browser console. Lets a user
+        // verify whether the landmask tile cache has been populated when
+        // they hit "All routes blocked by land". Run in DevTools:
+        //   __sailRouterDebug.landCache()           // counts + tile keys
+        //   __sailRouterDebug.clearLandCache()      // wipe + force re-fetch
+        //   __sailRouterDebug.prefetchLandTiles(s,n,w,e)  // manual prefetch
+        if (typeof window !== 'undefined') {
+            // Lazy import so the debug surface lives in one place; the
+            // imports themselves are tree-shaken if never used at runtime.
+            import('./adapters/LandChecker').then(LC => {
+                (window as any).__sailRouterDebug = {
+                    landCache: () => LC.getCacheStats(),
+                    clearLandCache: () => LC.clearCache(),
+                    prefetchLandTiles: (s: number, n: number, w: number, e: number) =>
+                        LC.prefetchTilesForBounds(s, n, w, e),
+                };
+            });
+        }
 
-        // Fire-and-forget, never await. Plugin UX must never block on backend.
+        // Detect first-run via a dedicated localStorage flag. We send a
+        // single /install event on first open per-browser; recurring usage
+        // is tracked by Google Analytics, not by per-device heartbeats.
+        const INSTALL_FLAG_KEY = 'windysail-installed';
+        let freshInstall = false;
+        try {
+            freshInstall = !localStorage.getItem(INSTALL_FLAG_KEY);
+            if (freshInstall) localStorage.setItem(INSTALL_FLAG_KEY, '1');
+        } catch {
+            // Private mode etc — treat every open as fresh install.
+            freshInstall = true;
+        }
+        // Best-effort cleanup of legacy localStorage keys removed for
+        // privacy compliance: the persistent device-ID UUID and the
+        // last-heartbeat timestamp.
+        try { localStorage.removeItem('windysail-device-id'); } catch {}
+        try { localStorage.removeItem('windysail-last-heartbeat'); } catch {}
+
         if (freshInstall) {
-            postInstall({ deviceId, email, pluginVersion, usedLang, userAgent });
-        } else if (shouldSendHeartbeat()) {
-            postHeartbeat({ deviceId, email, pluginVersion, usedLang });
+            const pluginVersion = config.version;
+            const usedLang = (store.get('usedLang') as string) ?? 'en';
+            const userAgent = navigator.userAgent;
+            const email = getEmail();
+            const hashPromise: Promise<string | null> = email
+                ? emailHash(email).catch(() => null)
+                : Promise.resolve(null);
+            // Fire-and-forget; never block UI on backend response.
+            hashPromise.then(hash => {
+                postInstall({ emailHash: hash, pluginVersion, usedLang, userAgent });
+            });
         }
         flushPendingEvents();
     });
@@ -302,11 +339,17 @@
 
             progressStatus = `Fetching ${effectiveMaxDuration}h of forecast data (~${distNm.toFixed(0)}nm)`;
 
-            // Zoom map to route extents so Windy loads the right tiles before sampling
+            // Zoom map to route extents so Windy loads the right tiles before sampling.
+            // CRITICAL: wait for the resulting tiles to install before kicking off the
+            // pipeline. fitBounds spawns a SwitchableTileCache for the new view; if the
+            // first store.set('product', ...) lands before that cache finishes loading,
+            // it gets orphaned and Windy throws 'alltilesloaded' on the abandoned cache,
+            // and the cascade can corrupt the active product's interpolator state.
             const allPts: [number, number][] = [liveStart, ...(liveWaypoints ?? []), liveEnd]
                 .map(p => [p.lat, p.lon] as [number, number]);
             if (allPts.length >= 2) {
                 map.fitBounds(L.latLngBounds(allPts), { padding: [60, 60] });
+                await settleTileCache(1500);
             }
 
             const options = {
@@ -410,10 +453,14 @@
                     compute_time_ms: Date.now() - computeStart,
                 });
 
-                // Server-side route log — fire and forget.
+                // Server-side route log — fire and forget. Hash the email
+                // (or send null) before posting; never transmits raw PII.
+                const _routeEmail = getEmail();
+                const _routeEmailHash: string | null = _routeEmail
+                    ? await emailHash(_routeEmail).catch(() => null)
+                    : null;
                 postRoute({
-                    deviceId: getOrCreateDeviceId(),
-                    email: (store.get('user') as any)?.email ?? null,
+                    emailHash: _routeEmailHash,
                     pluginVersion: config.version,
                     usedLang: (store.get('usedLang') as string) ?? 'en',
                     mode: 'single',
@@ -501,11 +548,14 @@
             const estimatedHours = Math.max(24, Math.ceil(distNm / worstCaseVmg) * 2.0);
             const effectiveMaxDuration = Math.min(estimatedHours, settings.maxDuration);
 
-            // Zoom map to route extents so Windy loads the right tiles before sampling
+            // Zoom map to route extents so Windy loads the right tiles before sampling.
+            // See handleCalculate above for why we have to await tile settle here —
+            // same SwitchableTileCache orphan race applies to the departure scan.
             const allPts: [number, number][] = [liveStart, ...(liveWaypoints ?? []), liveEnd]
                 .map(p => [p.lat, p.lon] as [number, number]);
             if (allPts.length >= 2) {
                 map.fitBounds(L.latLngBounds(allPts), { padding: [60, 60] });
+                await settleTileCache(1500);
             }
 
             const baseOptions = {

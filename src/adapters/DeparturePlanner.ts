@@ -3,7 +3,6 @@ import type {
     PolarData,
     RoutingOptions,
     WindModelId,
-    ModelRouteResult,
     DepartureWindowConfig,
     DepartureResult,
     WindGridData,
@@ -12,8 +11,9 @@ import type {
     PreloadedGrids,
 } from '../routing/types';
 import { RoutingOrchestrator } from './RoutingOrchestrator';
-import { fetchWindGrid, computeBoundsFromPoints } from './WindProvider';
-import { fetchSwellGrid, fetchCurrentGrid } from './OceanDataProvider';
+import { fetchWindGridInner, computeBoundsFromPoints } from './WindProvider';
+import { fetchSwellGridInner, fetchCurrentGridInner } from './OceanDataProvider';
+import { withWindyState, settleTileCache } from './windyHelpers';
 
 export type DepartureStatusCallback = (
     status: string,
@@ -80,78 +80,89 @@ export class DeparturePlanner {
 
         onStatus?.('Fetching forecast data...', 0, 0, totalDepartures);
 
-        // Pre-fetch wind grids (one per model, sequentially — Windy product switching)
+        // Pre-fetch wind + ocean grids inside ONE save/restore. Per-fetch
+        // restore was orphaning Windy's SwitchableTileCache between calls.
         const preloadedWindGrids = new Map<WindModelId, WindGridData>();
-        let lastGrid: WindGridData | undefined;
-        for (let i = 0; i < models.length; i++) {
-            if (this.cancelled) break;
-            const model = models[i];
+        let swellGrid: SwellGridData | undefined;
+        let currentGrid: CurrentGridData | null | undefined;
+
+        await withWindyState(async () => {
+            // Wind grids (one per model, sequentially — Windy product switching)
+            let lastGrid: WindGridData | undefined;
+            for (let i = 0; i < models.length; i++) {
+                if (this.cancelled) break;
+                const model = models[i];
+                if (i > 0) await settleTileCache();
+                try {
+                    const grid = await fetchWindGridInner(
+                        model,
+                        bounds,
+                        fullStartTime,
+                        fullMaxDuration,
+                        (msg, pct) => {
+                            const sliceSize = 30 / models.length;
+                            const baseProgress = Math.round((i / models.length) * 30);
+                            const scaled = Math.round(baseProgress + pct * (sliceSize / 100));
+                            onStatus?.(
+                                `Fetching forecast data... ${msg}`,
+                                scaled,
+                                0,
+                                totalDepartures,
+                            );
+                        },
+                        lastGrid,
+                        signal,
+                    );
+                    preloadedWindGrids.set(model, grid);
+                    lastGrid = grid;
+                } catch (err) {
+                    console.warn(`[DeparturePlanner] Wind pre-fetch failed for "${model}":`, err);
+                }
+            }
+
+            if (this.cancelled) return;
+
+            // Swell
+            await settleTileCache();
+            onStatus?.('Fetching swell data...', 30, 0, totalDepartures);
             try {
-                const grid = await fetchWindGrid(
-                    model,
+                swellGrid = await fetchSwellGridInner(
                     bounds,
                     fullStartTime,
                     fullMaxDuration,
                     (msg, pct) => {
-                        const sliceSize = 30 / models.length;
-                        const baseProgress = Math.round((i / models.length) * 30);
-                        const scaled = Math.round(baseProgress + pct * (sliceSize / 100));
-                        onStatus?.(
-                            `Fetching forecast data... ${msg}`,
-                            scaled,
-                            0,
-                            totalDepartures,
-                        );
+                        const scaled = Math.round(30 + pct * 0.05);
+                        onStatus?.(`Fetching swell data... ${msg}`, scaled, 0, totalDepartures);
                     },
-                    lastGrid,
                     signal,
                 );
-                preloadedWindGrids.set(model, grid);
-                lastGrid = grid;
             } catch (err) {
-                console.warn(`[DeparturePlanner] Wind pre-fetch failed for "${model}":`, err);
+                if (err instanceof DOMException && err.name === 'AbortError') throw err;
+                console.warn('[DeparturePlanner] Swell pre-fetch failed:', err);
             }
-        }
 
-        if (this.cancelled) return results;
+            // Currents
+            await settleTileCache();
+            onStatus?.('Fetching current data...', 35, 0, totalDepartures);
+            try {
+                currentGrid = await fetchCurrentGridInner(
+                    bounds,
+                    fullStartTime,
+                    fullMaxDuration,
+                    (msg, pct) => {
+                        const scaled = Math.round(35 + pct * 0.05);
+                        onStatus?.(`Fetching current data... ${msg}`, scaled, 0, totalDepartures);
+                    },
+                    signal,
+                );
+            } catch (err) {
+                if (err instanceof DOMException && err.name === 'AbortError') throw err;
+                console.warn('[DeparturePlanner] Current pre-fetch failed:', err);
+            }
 
-        // Pre-fetch ocean data (model-independent)
-        let swellGrid: SwellGridData | undefined;
-        let currentGrid: CurrentGridData | null | undefined;
-
-        onStatus?.('Fetching swell data...', 30, 0, totalDepartures);
-        try {
-            swellGrid = await fetchSwellGrid(
-                bounds,
-                fullStartTime,
-                fullMaxDuration,
-                (msg, pct) => {
-                    const scaled = Math.round(30 + pct * 0.05);
-                    onStatus?.(`Fetching swell data... ${msg}`, scaled, 0, totalDepartures);
-                },
-                signal,
-            );
-        } catch (err) {
-            if (err instanceof DOMException && err.name === 'AbortError') throw err;
-            console.warn('[DeparturePlanner] Swell pre-fetch failed:', err);
-        }
-
-        onStatus?.('Fetching current data...', 35, 0, totalDepartures);
-        try {
-            currentGrid = await fetchCurrentGrid(
-                bounds,
-                fullStartTime,
-                fullMaxDuration,
-                (msg, pct) => {
-                    const scaled = Math.round(35 + pct * 0.05);
-                    onStatus?.(`Fetching current data... ${msg}`, scaled, 0, totalDepartures);
-                },
-                signal,
-            );
-        } catch (err) {
-            if (err instanceof DOMException && err.name === 'AbortError') throw err;
-            console.warn('[DeparturePlanner] Current pre-fetch failed:', err);
-        }
+            // Settle before withWindyState's outer restore swaps product back.
+            await settleTileCache();
+        });
 
         if (this.cancelled) return results;
 

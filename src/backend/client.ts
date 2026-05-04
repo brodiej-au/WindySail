@@ -1,17 +1,30 @@
-import { BACKEND_BASE_URL, POST_TIMEOUT_MS, HEARTBEAT_MIN_INTERVAL_MS } from './config';
+import { BACKEND_BASE_URL, POST_TIMEOUT_MS } from './config';
 import { enqueue, drain } from './eventQueue';
 import type { QueuedEvent } from './eventQueue';
 
-const HEARTBEAT_KEY = 'windysail-last-heartbeat';
+// --- Anonymous identity model -------------------------------------------------
+// Per Windy's data-handling policy, no concrete user pointers (email,
+// persistent device UUID) leave the client. The only optional identifier we
+// transmit is `emailHash` — a one-way SHA-256 of the user's Windy email,
+// computed in userIdentity.ts. It's null for users not signed into Windy.
+//
+// We deliberately do NOT send a stable per-device ID. Per-device analytics
+// is sacrificed for compliance. Recurring usage analytics (DAU / WAU /
+// session counts) is handled by Google Analytics on the client; the
+// backend records only one-shot events: /install, /disclaimer-ack,
+// /route. Heartbeats were removed in 0.15.0.
 
 export interface InstallBody {
-    deviceId: string; email: string | null; pluginVersion: string; usedLang: string; userAgent: string;
-}
-export interface HeartbeatBody {
-    deviceId: string; email: string | null; pluginVersion: string; usedLang: string;
+    emailHash: string | null;
+    pluginVersion: string;
+    usedLang: string;
+    userAgent: string;
 }
 export interface DisclaimerBody {
-    deviceId: string; email: string | null; pluginVersion: string; disclaimerVersion: string; acceptedAt: string;
+    emailHash: string | null;
+    pluginVersion: string;
+    disclaimerVersion: string;
+    acceptedAt: string;
 }
 
 export interface RoutePoint {
@@ -30,8 +43,7 @@ export interface RouteResultSummary {
 }
 
 export interface RouteBody {
-    deviceId: string;
-    email: string | null;
+    emailHash: string | null;
     pluginVersion: string;
     usedLang: string;
     mode: 'single' | 'departure';
@@ -77,33 +89,12 @@ export async function postInstall(body: InstallBody): Promise<void> {
     return sendOrQueue('/install', body as unknown as Record<string, unknown>);
 }
 
-export async function postHeartbeat(body: HeartbeatBody): Promise<void> {
-    try {
-        await send('/heartbeat', body);
-        try { localStorage.setItem(HEARTBEAT_KEY, new Date().toISOString()); } catch {}
-    } catch {
-        enqueue({ path: '/heartbeat', body: body as unknown as Record<string, unknown> });
-    }
-}
-
 export async function postDisclaimerAck(body: DisclaimerBody): Promise<void> {
     return sendOrQueue('/disclaimer-ack', body as unknown as Record<string, unknown>);
 }
 
 export async function postRoute(body: RouteBody): Promise<void> {
     return sendOrQueue('/route', body as unknown as Record<string, unknown>);
-}
-
-export function shouldSendHeartbeat(): boolean {
-    try {
-        const last = localStorage.getItem(HEARTBEAT_KEY);
-        if (!last) return true;
-        const lastMs = new Date(last).getTime();
-        if (Number.isNaN(lastMs)) return true;
-        return (Date.now() - lastMs) >= HEARTBEAT_MIN_INTERVAL_MS;
-    } catch {
-        return true;
-    }
 }
 
 export async function flushPendingEvents(): Promise<void> {

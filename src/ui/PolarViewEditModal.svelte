@@ -268,18 +268,19 @@
         color: #e0e0e0;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 720px) {
         .modal-container {
             width: 100vw;
             max-width: none;
+            max-height: 100vh;
             border-radius: 0;
         }
         .close-btn {
-            padding: 8px 12px;
+            padding: 10px 14px;
             font-size: 22px;
         }
         .action-btn {
-            padding: 6px 12px;
+            padding: 8px 14px;
         }
     }
 </style>

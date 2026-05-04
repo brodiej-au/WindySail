@@ -1,4 +1,3 @@
 export const BACKEND_BASE_URL = 'https://australia-southeast1-windysail-99bd7.cloudfunctions.net/api';
 export const DISCLAIMER_VERSION = '2026-04';
 export const POST_TIMEOUT_MS = 5_000;
-export const HEARTBEAT_MIN_INTERVAL_MS = 24 * 60 * 60 * 1000;

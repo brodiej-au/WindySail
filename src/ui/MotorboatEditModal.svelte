@@ -97,11 +97,12 @@
     .modal-backdrop {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.55);
+        background: rgba(0, 0, 0, 0.65);
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 1100;
+        /* Above Windy's bottom sheet (mobileUI: 'small'). */
+        z-index: 10000;
     }
     .modal-container {
         background: #1b2433;
@@ -113,6 +114,14 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+    }
+    @media (max-width: 720px) {
+        .modal-container {
+            width: 100vw;
+            max-width: none;
+            max-height: 100vh;
+            border-radius: 0;
+        }
     }
     .modal-header {
         display: flex;

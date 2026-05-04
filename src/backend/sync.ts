@@ -1,5 +1,4 @@
 import { BACKEND_BASE_URL, POST_TIMEOUT_MS } from './config';
-import { getOrCreateDeviceId } from './deviceId';
 import { getEmail, emailHash } from './userIdentity';
 import type { SavedRoute, PolarData } from '../routing/types';
 
@@ -23,11 +22,14 @@ async function post(path: string, body: unknown): Promise<any> {
     }
 }
 
-async function buildIdentity(): Promise<{ email: string; emailHash: string; deviceId: string } | null> {
+// Sync identity is now hash-only. We never transmit the raw email or a
+// persistent device ID. Same email across devices ⇒ same hash ⇒ same
+// cloud account; the server keys docs at users/{emailHash}.
+async function buildIdentity(): Promise<{ emailHash: string } | null> {
     const email = getEmail();
     if (!email) return null;
     const hash = await emailHash(email);
-    return { email, emailHash: hash, deviceId: getOrCreateDeviceId() };
+    return { emailHash: hash };
 }
 
 // Routes -------------------------------------------------------------------

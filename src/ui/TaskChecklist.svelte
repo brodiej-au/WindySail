@@ -1,7 +1,8 @@
 <!-- Structured task checklist showing per-step status during routing -->
 <div class="task-checklist">
-    <div class="warning-banner size-xs">
-        {t('progress.avoidWindyInteraction')}<span hidden>{$locale}</span>
+    <div class="warning-banner">
+        <span class="warning-icon" aria-hidden="true">&#9888;</span>
+        <span class="warning-text">{t('progress.avoidWindyInteraction')}</span><span hidden>{$locale}</span>
     </div>
 
     <div class="steps">
@@ -47,14 +48,51 @@
     }
 
     .warning-banner {
-        background: rgba(233, 196, 106, 0.12);
-        border: 1px solid rgba(233, 196, 106, 0.25);
-        border-radius: 4px;
-        color: #e9c46a;
-        padding: 6px 10px;
-        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        background: rgba(233, 196, 106, 0.18);
+        border: 1.5px solid rgba(233, 196, 106, 0.55);
+        border-radius: 6px;
+        color: #f5d27a;
+        padding: 8px 10px;
+        margin-bottom: 12px;
         text-align: center;
-        line-height: 1.4;
+        line-height: 1.3;
+        font-size: 11.5px;
+        font-weight: 600;
+        white-space: nowrap;
+        animation: warning-pulse 2.4s ease-in-out infinite;
+    }
+
+    .warning-icon {
+        font-size: 15px;
+        line-height: 1;
+        flex-shrink: 0;
+    }
+
+    .warning-text {
+        flex: 0 1 auto;
+    }
+
+    /* Subtle attention pulse — colour and border breathe, no scale change
+       so the banner doesn't shift the layout below it. */
+    @keyframes warning-pulse {
+        0%, 100% {
+            background: rgba(233, 196, 106, 0.18);
+            border-color: rgba(233, 196, 106, 0.55);
+            box-shadow: 0 0 0 0 rgba(233, 196, 106, 0);
+        }
+        50% {
+            background: rgba(233, 196, 106, 0.28);
+            border-color: rgba(233, 196, 106, 0.85);
+            box-shadow: 0 0 8px 0 rgba(233, 196, 106, 0.25);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .warning-banner { animation: none; }
     }
 
     .steps {

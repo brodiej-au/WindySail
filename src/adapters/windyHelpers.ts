@@ -1,5 +1,45 @@
 import bcast from '@windy/broadcast';
 import { getLatLonInterpolator } from '@windy/interpolator';
+import store from '@windy/store';
+
+/**
+ * Snapshot Windy's (timestamp, overlay, product) tuple, run `fn`, then
+ * restore on exit. Lifts save/restore out of individual fetchers so the
+ * pipeline performs ONE outer save/restore instead of N rapid ones.
+ *
+ * Why this matters: each `store.set('product', X)` queues a new
+ * SwitchableTileCache as the "next one to switch in". If a second product
+ * change happens before that cache finishes loading, the first becomes
+ * orphaned and Windy throws when it eventually fires `alltilesloaded`. The
+ * old per-fetch finally blocks did three rapid sets between operations,
+ * almost guaranteeing an orphan whenever multiple fetches ran in sequence.
+ */
+export async function withWindyState<T>(fn: () => Promise<T>): Promise<T> {
+    const originalTimestamp = store.get('timestamp');
+    const originalOverlay = store.get('overlay');
+    const originalProduct = store.get('product');
+    try {
+        return await fn();
+    } finally {
+        store.set('timestamp', originalTimestamp);
+        store.set('overlay', originalOverlay);
+        store.set('product', originalProduct);
+    }
+}
+
+/**
+ * Pause briefly so any in-flight SwitchableTileCache from a previous fetch
+ * has time to install before we queue a new product switch. Without this,
+ * back-to-back fetches inside a `withWindyState` block can still orphan
+ * the prior fetch's tail-end tiles.
+ *
+ * A hard delay is used because `redrawFinished` reflects vector overlay
+ * redraws, not raster tile completion, and `waitForProductReady` requires
+ * a known interpolator baseline change to detect.
+ */
+export function settleTileCache(ms = 1200): Promise<void> {
+    return new Promise(r => setTimeout(r, ms));
+}
 
 /**
  * Wait for Windy to finish redrawing.

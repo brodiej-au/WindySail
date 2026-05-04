@@ -223,6 +223,38 @@ async function runRouting(payload: {
         }
 
         if (validCandidates.length === 0) {
+            // Diagnostic breakdown: how many candidates failed each gate, plus
+            // a few sample lat/lons that failed each gate. Logged from the
+            // worker so the user can correlate which iteration / which
+            // candidates are causing the dead-end. Kept tight so it doesn't
+            // flood the console on every failure.
+            let pointLand = 0;
+            let segmentBlocked = 0;
+            let bothFailed = 0;
+            const samplePointFails: Array<[number, number]> = [];
+            const sampleSegmentFails: Array<[number, number, number, number]> = [];
+            for (let i = 0; i < movingCandidates.length; i++) {
+                const pOk = landResults.pointResults[i];
+                const sOk = landResults.segmentResults[i];
+                if (!pOk && !sOk) bothFailed++;
+                else if (!pOk) pointLand++;
+                else if (!sOk) segmentBlocked++;
+                if (!pOk && samplePointFails.length < 3) {
+                    samplePointFails.push([points[i][0], points[i][1]]);
+                }
+                if (!sOk && sampleSegmentFails.length < 3) {
+                    sampleSegmentFails.push(segments[i]);
+                }
+            }
+            console.warn(
+                `[Worker] BLOCKED at step ${step + 1}/${maxSteps}. ` +
+                `Of ${movingCandidates.length} moving candidates: ` +
+                `${pointLand} on land, ${segmentBlocked} cross-land segments, ` +
+                `${bothFailed} both, 0 valid. ` +
+                `Closest frontier dist to end: ${frontier.length ? Math.min(...frontier.map(f => distance(f, end))).toFixed(1) : 'n/a'}nm. ` +
+                `Sample pointLand: ${JSON.stringify(samplePointFails)}. ` +
+                `Sample segmentBlocked: ${JSON.stringify(sampleSegmentFails)}.`
+            );
             postMsg({
                 type: 'ROUTE_FAILED',
                 payload: { reason: 'All routes blocked by land. Try different waypoints.' },

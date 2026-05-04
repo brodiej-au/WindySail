@@ -850,7 +850,7 @@
         }
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 720px) {
         .modal-container {
             width: 100vw;
             max-width: none;
@@ -867,18 +867,18 @@
             gap: 4px;
         }
         .modal-body {
-            height: 200px;
+            height: 220px;
         }
         .leg-table-container {
-            max-height: 150px;
+            max-height: 35vh;
         }
         .close-btn {
-            padding: 8px 12px;
+            padding: 10px 14px;
             font-size: 22px;
         }
         .dataset-toggle input[type='checkbox'] {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
         }
     }
 </style>

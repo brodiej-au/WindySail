@@ -657,10 +657,11 @@
         &:active { transform: scale(0.98); }
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 720px) {
         .modal-container {
             width: 100vw;
             max-width: none;
+            max-height: 100vh;
             border-radius: 0;
         }
         .close-btn {
@@ -671,7 +672,8 @@
             grid-template-columns: 1fr;
         }
         .input {
-            padding: 8px 10px;
+            padding: 10px 12px;
+            font-size: 16px;
         }
     }
 

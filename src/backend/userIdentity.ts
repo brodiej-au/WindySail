@@ -15,9 +15,19 @@ export function getEmail(): string | null {
 }
 
 /**
- * SHA-256 of the lowercased email, truncated to 32 hex chars. Used as the
- * Firestore user doc ID so we can look up by email without storing it as a
- * key. Same email across devices ⇒ same hash ⇒ same cloud account.
+ * SHA-256 of the lowercased email, truncated to 32 hex chars.
+ *
+ * Used as the Firestore user doc ID so we can look up a user across
+ * devices without ever transmitting or storing the raw email. Same email
+ * across devices ⇒ same hash ⇒ same cloud account. Cryptographically
+ * one-way: the server cannot recover the email from the hash.
+ *
+ * NOTE: this is currently unsalted, which means a leak of the hashes
+ * could in principle be reversed via a precomputed SHA-256 rainbow table
+ * for common email addresses. Adding a constant client salt would mitigate
+ * this but would orphan every existing Firestore user doc (which is keyed
+ * on this hash). A future migration could rekey docs by accepting both
+ * old and new hashes for one release window.
  */
 export async function emailHash(email: string): Promise<string> {
     const data = new TextEncoder().encode(email.trim().toLowerCase());

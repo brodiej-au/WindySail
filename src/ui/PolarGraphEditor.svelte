@@ -20,160 +20,165 @@
             />
         </div>
 
-        <!-- Main area: diagram + sidebar -->
+        <!-- Main area: editable table (primary) + diagram preview -->
         <div class="main-area">
-            <!-- SVG Diagram -->
-            <div class="diagram-pane" bind:this={diagramPane}>
-                <svg
-                    class="polar-svg"
-                    viewBox="0 0 {svgWidth} {layout.height}"
-                    xmlns="http://www.w3.org/2000/svg"
-                    bind:this={svgEl}
-                    on:mousedown={handleSvgMouseDown}
-                    on:touchstart|passive={handleSvgTouchStart}
-                >
-                    <!-- Speed reference arcs -->
-                    {#each rings as ring}
-                        <path
-                            d={arcPath(layout.cx, layout.cy, (ring / maxSpeed) * layout.radius)}
-                            fill="none"
-                            stroke="rgba(255,255,255,0.12)"
-                            stroke-width="1"
-                        />
-                        <text
-                            x={layout.cx + 4}
-                            y={layout.cy - (ring / maxSpeed) * layout.radius - 3}
-                            class="ring-label"
-                        >{ring}</text>
-                    {/each}
-
-                    <!-- Angle reference lines -->
-                    {#each angleLines as deg}
-                        {@const outer = polarToSvg(deg, maxSpeed, layout.cx, layout.cy, layout.radius, maxSpeed)}
-                        <line
-                            x1={layout.cx} y1={layout.cy}
-                            x2={outer.x} y2={outer.y}
-                            stroke="rgba(255,255,255,0.08)" stroke-width="1"
-                        />
-                        {@const lbl = polarToSvg(deg, maxSpeed * 1.08, layout.cx, layout.cy, layout.radius, maxSpeed)}
-                        <text x={lbl.x} y={lbl.y} class="angle-label">{deg}°</text>
-                    {/each}
-
-                    <!-- TWS curves -->
-                    {#each twsSpeeds as _tws, ci}
-                        {@const color = twsColor(ci, twsSpeeds.length)}
-                        {@const speedsForTws = twaAngles.map((_a, ri) => speeds[ri][ci])}
-                        <path
-                            d={buildCurvePath(twaAngles, speedsForTws, layout.cx, layout.cy, layout.radius, maxSpeed)}
-                            fill="none" stroke={color} stroke-width="2"
-                        />
-                    {/each}
-
-                    <!-- Draggable data points -->
-                    {#each twaAngles as twa, ri}
-                        {#each twsSpeeds as _tws, ci}
-                            {@const color = twsColor(ci, twsSpeeds.length)}
-                            {@const pt = polarToSvg(twa, speeds[ri][ci], layout.cx, layout.cy, layout.radius, maxSpeed)}
-                            {@const isActive = dragging?.twaIdx === ri && dragging?.twsIdx === ci}
-                            {@const isHovered = hovered?.twaIdx === ri && hovered?.twsIdx === ci}
-                            <circle
-                                cx={pt.x} cy={pt.y}
-                                r={isActive || isHovered ? 8 : 6}
-                                fill={color}
-                                stroke={isActive || isHovered ? '#fff' : 'none'}
-                                stroke-width={isActive || isHovered ? 2 : 0}
-                                class="drag-point"
-                                data-ri={ri}
-                                data-ci={ci}
-                                on:mouseenter={() => { hovered = { twaIdx: ri, twsIdx: ci }; }}
-                                on:mouseleave={() => { hovered = null; }}
-                            />
-                        {/each}
-                    {/each}
-
-                    <!-- Drag tooltip -->
-                    {#if dragging && tooltipPos}
-                        <text
-                            x={tooltipPos.x + 14}
-                            y={tooltipPos.y - 10}
-                            class="tooltip-text"
-                        >{speeds[dragging.twaIdx][dragging.twsIdx].toFixed(1)} kt</text>
-                    {/if}
-                </svg>
+            <!-- Inputs pane: TWA × TWS table (always visible, scrollable) -->
+            <div class="inputs-pane">
+                <div class="table-wrapper">
+                    <table class="polar-table">
+                        <thead>
+                            <tr>
+                                <th class="corner-cell size-xs" scope="col">TWA \ TWS</th>
+                                {#each twsSpeeds as tws, ci}
+                                    <th class="tws-header-cell" scope="col">
+                                        <div class="tws-header">
+                                            <span class="color-dot" style:background={twsColor(ci, twsSpeeds.length)}></span>
+                                            <input
+                                                type="number"
+                                                class="cell-input tws-input"
+                                                min="0.1" step="1"
+                                                value={tws}
+                                                on:change={e => updateTws(ci, e)}
+                                                aria-label={t('boat.twsColAria', { n: ci + 1 })}
+                                            />
+                                            <span class="tws-suffix size-xs">kt</span>
+                                        </div>
+                                    </th>
+                                {/each}
+                                <th class="col-actions-cell">
+                                    <div class="col-actions">
+                                        <button
+                                            class="icon-btn"
+                                            on:click={addColumn}
+                                            title={t('boat.addTws')}
+                                            aria-label={t('boat.addTws')}
+                                        >+</button>
+                                        <button
+                                            class="icon-btn"
+                                            on:click={removeColumn}
+                                            title={t('boat.removeTws')}
+                                            aria-label={t('boat.removeTws')}
+                                            disabled={twsSpeeds.length <= 2}
+                                        >−</button>
+                                    </div>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {#each twaAngles as twa, ri}
+                                <tr>
+                                    <th class="twa-label size-s" scope="row">{twa}°</th>
+                                    {#each twsSpeeds as _tws, ci}
+                                        <td>
+                                            <input
+                                                type="number"
+                                                class="cell-input speed-input"
+                                                class:cell-active={activePoint?.twaIdx === ri && activePoint?.twsIdx === ci}
+                                                min="0" step="0.1"
+                                                value={speeds[ri][ci]}
+                                                on:focus={() => { hovered = { twaIdx: ri, twsIdx: ci }; }}
+                                                on:blur={() => { if (hovered?.twaIdx === ri && hovered?.twsIdx === ci) hovered = null; }}
+                                                on:change={e => updateSpeed(ri, ci, e)}
+                                                aria-label={t('boat.speedCellAria', { r: ri + 1, c: ci + 1 })}
+                                            />
+                                        </td>
+                                    {/each}
+                                    <td class="row-spacer"></td>
+                                </tr>
+                            {/each}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            <!-- Controls sidebar -->
-            <div class="sidebar">
-                <!-- Selected point info -->
-                {#if activePoint}
-                    <div class="section mb-10">
-                        <span class="size-xs label">{t('boat.selectedPoint')}</span>
-                        <div class="point-info size-s">
-                            <span>{t('boat.pointTwa', { value: twaAngles[activePoint.twaIdx] })}</span>
-                            <span>{t('boat.pointTws', { value: twsSpeeds[activePoint.twsIdx] })}</span>
-                            <span>{t('boat.pointSpeed', { value: speeds[activePoint.twaIdx][activePoint.twsIdx].toFixed(1) })}</span>
-                        </div>
-                    </div>
-                {/if}
-
-                <!-- TWS values -->
-                <div class="section mb-10">
-                    <span class="size-xs label">{t('boat.twsKt')}</span>
-                    <div class="value-list">
-                        {#each twsSpeeds as tws, ci}
-                            <div class="value-row">
-                                <span class="color-dot" style:background={twsColor(ci, twsSpeeds.length)}></span>
-                                <input
-                                    type="number"
-                                    class="cell-input"
-                                    min="0.1" step="1"
-                                    value={tws}
-                                    on:change={e => updateTws(ci, e)}
-                                />
-                            </div>
+            <!-- Preview pane: live polar diagram (drag-to-edit on desktop) -->
+            <div class="preview-pane">
+                <div class="diagram-pane" bind:this={diagramPane}>
+                    <svg
+                        class="polar-svg"
+                        viewBox="0 0 {svgWidth} {layout.height}"
+                        xmlns="http://www.w3.org/2000/svg"
+                        bind:this={svgEl}
+                        on:mousedown={handleSvgMouseDown}
+                        on:touchstart|passive={handleSvgTouchStart}
+                    >
+                        <!-- Speed reference arcs -->
+                        {#each rings as ring}
+                            <path
+                                d={arcPath(layout.cx, layout.cy, (ring / maxSpeed) * layout.radius)}
+                                fill="none"
+                                stroke="rgba(255,255,255,0.12)"
+                                stroke-width="1"
+                            />
+                            <text
+                                x={layout.cx + 4}
+                                y={layout.cy - (ring / maxSpeed) * layout.radius - 3}
+                                class="ring-label"
+                            >{ring}</text>
                         {/each}
-                        <div class="btn-row">
-                            <button class="icon-btn" on:click={addColumn} title={t('boat.addTws')}>+</button>
-                            <button class="icon-btn" on:click={removeColumn} title={t('boat.removeTws')} disabled={twsSpeeds.length <= 2}>−</button>
-                        </div>
-                    </div>
+
+                        <!-- Angle reference lines -->
+                        {#each angleLines as deg}
+                            {@const outer = polarToSvg(deg, maxSpeed, layout.cx, layout.cy, layout.radius, maxSpeed)}
+                            <line
+                                x1={layout.cx} y1={layout.cy}
+                                x2={outer.x} y2={outer.y}
+                                stroke="rgba(255,255,255,0.08)" stroke-width="1"
+                            />
+                            {@const lbl = polarToSvg(deg, maxSpeed * 1.08, layout.cx, layout.cy, layout.radius, maxSpeed)}
+                            <text x={lbl.x} y={lbl.y} class="angle-label">{deg}°</text>
+                        {/each}
+
+                        <!-- TWS curves -->
+                        {#each twsSpeeds as _tws, ci}
+                            {@const color = twsColor(ci, twsSpeeds.length)}
+                            {@const speedsForTws = twaAngles.map((_a, ri) => speeds[ri][ci])}
+                            <path
+                                d={buildCurvePath(twaAngles, speedsForTws, layout.cx, layout.cy, layout.radius, maxSpeed)}
+                                fill="none" stroke={color} stroke-width="2"
+                            />
+                        {/each}
+
+                        <!-- Draggable data points -->
+                        {#each twaAngles as twa, ri}
+                            {#each twsSpeeds as _tws, ci}
+                                {@const color = twsColor(ci, twsSpeeds.length)}
+                                {@const pt = polarToSvg(twa, speeds[ri][ci], layout.cx, layout.cy, layout.radius, maxSpeed)}
+                                {@const isActive = dragging?.twaIdx === ri && dragging?.twsIdx === ci}
+                                {@const isHovered = hovered?.twaIdx === ri && hovered?.twsIdx === ci}
+                                <circle
+                                    cx={pt.x} cy={pt.y}
+                                    r={isActive || isHovered ? 8 : 6}
+                                    fill={color}
+                                    stroke={isActive || isHovered ? '#fff' : 'none'}
+                                    stroke-width={isActive || isHovered ? 2 : 0}
+                                    class="drag-point"
+                                    data-ri={ri}
+                                    data-ci={ci}
+                                    on:mouseenter={() => { hovered = { twaIdx: ri, twsIdx: ci }; }}
+                                    on:mouseleave={() => { hovered = null; }}
+                                />
+                            {/each}
+                        {/each}
+
+                        <!-- Drag tooltip -->
+                        {#if dragging && tooltipPos}
+                            <text
+                                x={tooltipPos.x + 14}
+                                y={tooltipPos.y - 10}
+                                class="tooltip-text"
+                            >{speeds[dragging.twaIdx][dragging.twsIdx].toFixed(1)} kt</text>
+                        {/if}
+                    </svg>
                 </div>
 
-                <!-- Table toggle -->
-                <button class="icon-btn full-width mb-10" on:click={() => { showTable = !showTable; }}>
-                    {showTable ? t('boat.hideTable') : t('boat.showTable')}
-                </button>
-
-                {#if showTable}
-                    <div class="table-wrapper">
-                        <table class="polar-table">
-                            <thead>
-                                <tr>
-                                    <th class="size-xs corner-cell">TWA\TWS</th>
-                                    {#each twsSpeeds as tws}
-                                        <th class="size-xs">{tws}</th>
-                                    {/each}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {#each twaAngles as twa, ri}
-                                    <tr>
-                                        <td class="size-xs twa-label">{twa}°</td>
-                                        {#each twsSpeeds as _tws, ci}
-                                            <td>
-                                                <input
-                                                    type="number"
-                                                    class="cell-input"
-                                                    min="0" step="0.1"
-                                                    value={speeds[ri][ci]}
-                                                    on:change={e => updateSpeed(ri, ci, e)}
-                                                />
-                                            </td>
-                                        {/each}
-                                    </tr>
-                                {/each}
-                            </tbody>
-                        </table>
+                {#if activePoint}
+                    <div class="point-info size-xs">
+                        <span>{t('boat.pointTwa', { value: twaAngles[activePoint.twaIdx] })}</span>
+                        <span>·</span>
+                        <span>{t('boat.pointTws', { value: twsSpeeds[activePoint.twsIdx] })}</span>
+                        <span>·</span>
+                        <span>{t('boat.pointSpeed', { value: speeds[activePoint.twaIdx][activePoint.twsIdx].toFixed(1) })}</span>
                     </div>
                 {/if}
             </div>
@@ -221,7 +226,6 @@
         : Array.from({ length: 5 }, () => Array(4).fill(0));
 
     let errorMsg: string = '';
-    let showTable = false;
 
     // Diagram
     const svgWidth = 460;
@@ -480,11 +484,28 @@
         overflow: hidden;
     }
 
-    .diagram-pane {
-        flex: 3;
+    .inputs-pane {
+        flex: 1 1 60%;
         min-width: 0;
-        padding: 10px;
+        padding: 12px 14px;
         overflow: auto;
+    }
+
+    .preview-pane {
+        flex: 1 1 40%;
+        min-width: 0;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+        border-left: 1px solid rgba(255, 255, 255, 0.08);
+        overflow: auto;
+    }
+
+    .diagram-pane {
+        width: 100%;
+        max-width: 460px;
         display: flex;
         align-items: flex-start;
         justify-content: center;
@@ -497,42 +518,13 @@
         user-select: none;
     }
 
-    .sidebar {
-        flex: 2;
-        min-width: 200px;
-        max-width: 320px;
-        padding: 10px 14px;
-        overflow-y: auto;
-        border-left: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    .section {
-        padding: 0;
-    }
-
-    .label {
-        display: block;
-        opacity: 0.6;
-        margin-bottom: 4px;
-    }
-
     .point-info {
         display: flex;
-        flex-direction: column;
-        gap: 2px;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 4px 8px;
         opacity: 0.85;
-    }
-
-    .value-list {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .value-row {
-        display: flex;
-        align-items: center;
-        gap: 6px;
+        text-align: center;
     }
 
     .color-dot {
@@ -543,20 +535,13 @@
         flex-shrink: 0;
     }
 
-    .btn-row {
-        display: flex;
-        gap: 6px;
-        margin-top: 2px;
-    }
-
     .cell-input {
-        width: 60px;
         background: rgba(255, 255, 255, 0.08);
         border: 1px solid rgba(255, 255, 255, 0.15);
-        border-radius: 3px;
+        border-radius: 4px;
         color: inherit;
-        padding: 3px 5px;
-        font-size: 12px;
+        padding: 6px 6px;
+        font-size: 14px;
         text-align: center;
         box-sizing: border-box;
         -moz-appearance: textfield;
@@ -569,8 +554,26 @@
 
         &:focus {
             outline: none;
-            border-color: rgba(255, 255, 255, 0.4);
+            border-color: rgba(233, 196, 106, 0.7);
+            background: rgba(233, 196, 106, 0.08);
         }
+    }
+
+    .speed-input {
+        width: 100%;
+        min-width: 56px;
+
+        &.cell-active {
+            border-color: rgba(255, 255, 255, 0.5);
+        }
+    }
+
+    .tws-input {
+        width: 50px;
+    }
+
+    .tws-suffix {
+        opacity: 0.5;
     }
 
     .icon-btn {
@@ -579,9 +582,10 @@
         border-radius: 4px;
         color: inherit;
         cursor: pointer;
-        font-size: 12px;
-        padding: 3px 7px;
+        font-size: 14px;
+        padding: 4px 9px;
         line-height: 1.4;
+        min-width: 28px;
 
         &:hover:not(:disabled) {
             background: rgba(255, 255, 255, 0.15);
@@ -593,35 +597,62 @@
         }
     }
 
-    .full-width {
-        width: 100%;
-    }
-
     .table-wrapper {
         overflow-x: auto;
-        margin-bottom: 10px;
     }
 
     .polar-table {
-        border-collapse: collapse;
-        min-width: 100%;
+        border-collapse: separate;
+        border-spacing: 4px 4px;
+        width: 100%;
 
         th,
         td {
-            padding: 2px 3px;
+            padding: 0;
             text-align: center;
         }
     }
 
     .corner-cell {
-        opacity: 0.55;
+        opacity: 0.5;
         white-space: nowrap;
         padding: 4px 6px;
+        font-weight: 500;
+    }
+
+    .tws-header-cell {
+        white-space: nowrap;
+    }
+
+    .tws-header {
+        background: rgba(255, 255, 255, 0.04);
+        border-radius: 4px;
+        padding: 4px 6px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .col-actions-cell {
+        padding-left: 6px;
+    }
+
+    .col-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
     }
 
     .twa-label {
-        opacity: 0.55;
-        font-size: 11px;
+        opacity: 0.7;
+        white-space: nowrap;
+        padding: 4px 8px 4px 0;
+        text-align: right;
+        font-weight: 500;
+    }
+
+    .row-spacer {
+        width: 1px;
     }
 
     .ring-label {
@@ -705,7 +736,7 @@
         margin-bottom: 10px;
     }
 
-    @media (max-width: 600px) {
+    @media (max-width: 720px) {
         .modal-container {
             width: 100vw;
             max-width: none;
@@ -715,15 +746,43 @@
         .main-area {
             flex-direction: column;
         }
-        .sidebar {
-            min-width: unset;
-            max-width: none;
+        .inputs-pane {
+            flex: 1 1 auto;
+            padding: 10px 8px;
+        }
+        .preview-pane {
+            flex: 0 0 auto;
             border-left: none;
             border-top: 1px solid rgba(255, 255, 255, 0.08);
-            max-height: 40vh;
+            padding: 8px;
         }
         .diagram-pane {
-            padding: 6px;
+            max-width: 320px;
+        }
+        .polar-svg {
+            max-width: 320px;
+        }
+        /* Larger touch targets on mobile + 16px font to suppress iOS zoom-on-focus */
+        .cell-input {
+            font-size: 16px;
+            padding: 8px 6px;
+            min-height: 40px;
+        }
+        .speed-input {
+            min-width: 60px;
+        }
+        .tws-input {
+            width: 56px;
+        }
+        .icon-btn {
+            font-size: 16px;
+            padding: 8px 12px;
+            min-height: 40px;
+            min-width: 40px;
+        }
+        .twa-label {
+            font-size: 14px;
+            padding: 4px 6px 4px 0;
         }
         .close-btn {
             padding: 8px 12px;

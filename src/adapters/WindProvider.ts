@@ -3,7 +3,7 @@ import { getLatLonInterpolator } from '@windy/interpolator';
 import products from '@windy/products';
 import type { LatLon, LatLonBounds, WindGridData, WindModelId } from '../routing/types';
 import * as WindCache from './WindCache';
-import { waitForRedraw, waitForProductReady } from './windyHelpers';
+import { waitForRedraw, waitForProductReady, withWindyState } from './windyHelpers';
 
 const GRID_STEP = 1.0; // degrees — coarser grid for speed, router interpolates
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
@@ -18,6 +18,28 @@ const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
  *                      different data (avoids sampling stale tiles).
  */
 export async function fetchWindGrid(
+    model: WindModelId,
+    bounds: LatLonBounds,
+    departureTime: number,
+    maxDurationHours: number,
+    onProgress?: (msg: string, pct: number) => void,
+    previousGrid?: WindGridData,
+    signal?: AbortSignal,
+): Promise<WindGridData> {
+    // Standalone callers (tests, isolated use) get save/restore around the inner.
+    // Pipeline callers should use fetchWindGridInner under their own withWindyState.
+    return withWindyState(() =>
+        fetchWindGridInner(model, bounds, departureTime, maxDurationHours, onProgress, previousGrid, signal),
+    );
+}
+
+/**
+ * Inner wind grid fetch — does NOT save/restore Windy state. The caller is
+ * expected to wrap with `withWindyState` (and to call `settleTileCache`
+ * between successive inner calls so in-flight tile caches finish installing
+ * before the next product switch orphans them).
+ */
+export async function fetchWindGridInner(
     model: WindModelId,
     bounds: LatLonBounds,
     departureTime: number,
@@ -69,10 +91,6 @@ export async function fetchWindGrid(
         lons.map(() => new Array(timestamps.length).fill(0)),
     );
 
-    const originalTimestamp = store.get('timestamp');
-    const originalOverlay = store.get('overlay');
-    const originalProduct = store.get('product');
-
     // Reference point for verifying product switch (centre of bounds)
     const refLat = (bounds.south + bounds.north) / 2;
     const refLon = (bounds.west + bounds.east) / 2;
@@ -87,7 +105,7 @@ export async function fetchWindGrid(
     let modelRunTime: number | undefined;
     let dataUpdateTime: number | undefined;
 
-    try {
+    {
         // Ensure wind overlay is active and switch to the requested model.
         // Emit progress immediately — waitForProductReady below can take up
         // to 5s with no inner progress callback, and the UI would otherwise
@@ -215,10 +233,14 @@ export async function fetchWindGrid(
                 }
             }
         }
-    } finally {
-        store.set('timestamp', originalTimestamp);
-        store.set('overlay', originalOverlay);
-        store.set('product', originalProduct);
+
+        // Reset timestamp to the first sampling time before exiting so any
+        // in-flight tile loads from the LAST scrub-step settle on a value
+        // whose tiles are already cached. Without this, the next fetch's
+        // product switch can orphan the tail-end cache and Windy throws
+        // 'alltilesloaded' on the abandoned cache.
+        store.set('timestamp', timestamps[0]);
+        await waitForRedraw(150);
     }
 
     const grid: WindGridData = { lats, lons, timestamps, windU, windV, modelRunTime, dataUpdateTime };

@@ -10,17 +10,20 @@ export async function handleInstall(req: any, res: any): Promise<void> {
     const data = parsed.data;
     const ipHash = hashIp(extractIp(req));
 
-    await db().collection('devices').doc(data.deviceId).set({
-        email: data.email,
-        firstSeenAt: serverTimestamp(),
-        lastSeenAt: serverTimestamp(),
-        lastVersion: data.pluginVersion,
-        lastLang: data.usedLang,
-        installUserAgent: data.userAgent,
-        disclaimerVersion: null,
-        disclaimerAcceptedAt: null,
-    }, { merge: true });
+    // For signed-in users (emailHash present), maintain a lightweight user
+    // doc so we can correlate disclaimer acceptance / version across the
+    // events log. Anonymous users (emailHash === null) generate just an
+    // event row with no user pointer at all.
+    if (data.emailHash) {
+        await db().collection('users').doc(data.emailHash).set({
+            firstSeenAt: serverTimestamp(),
+            lastSeenAt: serverTimestamp(),
+            lastVersion: data.pluginVersion,
+            lastLang: data.usedLang,
+            installUserAgent: data.userAgent,
+        }, { merge: true });
+    }
 
-    await recordEvent('install', data.deviceId, data, ipHash);
+    await recordEvent('install', data, ipHash);
     res.status(200).json({ ok: true });
 }

@@ -1,6 +1,6 @@
 import type { LatLon, PolarData, RouteResult, RoutingOptions, WindGridData, SwellGridData, CurrentGridData } from '../routing/types';
 import type { WorkerToMainMessage } from '../worker/messages';
-import { checkPoints, checkSegments } from './LandChecker';
+import { checkPoints, checkSegments, getCacheStats as getLandCacheStats } from './LandChecker';
 
 export type ProgressCallback = (percent: number, step: number, totalSteps: number) => void;
 
@@ -43,7 +43,12 @@ export class WorkerBridge {
 
                 switch (msg.type) {
                     case 'CHECK_LAND': {
-                        // Perform land checks on main thread
+                        // Perform land checks on main thread.
+                        // Diagnostic: log how many tiles were cached vs in-flight at the
+                        // moment the worker requested results — lets us tell whether a
+                        // "blocked by land" failure is correlated with an empty/stale
+                        // landmask cache. Logged sparsely (once per CHECK_LAND request).
+                        const cacheBefore = getLandCacheStats();
                         const promises: [Promise<boolean[]>, Promise<boolean[]>, Promise<boolean[] | undefined>] = [
                             checkPoints(msg.payload.points),
                             checkSegments(msg.payload.segments),
@@ -52,6 +57,18 @@ export class WorkerBridge {
                                 : Promise.resolve(undefined),
                         ];
                         const [pointResults, segmentResults, rawMarginResults] = await Promise.all(promises);
+                        const cacheAfter = getLandCacheStats();
+                        const seaCount = pointResults.filter(Boolean).length;
+                        const segOkCount = segmentResults.filter(Boolean).length;
+                        if (seaCount === 0 || segOkCount === 0) {
+                            console.warn(
+                                `[WorkerBridge] CHECK_LAND returned all-blocked: ` +
+                                `points ${seaCount}/${pointResults.length} sea, ` +
+                                `segments ${segOkCount}/${segmentResults.length} ok. ` +
+                                `Cache before: ${cacheBefore.cachedTiles} cached / ${cacheBefore.inFlightTiles} in-flight. ` +
+                                `Cache after: ${cacheAfter.cachedTiles} cached / ${cacheAfter.inFlightTiles} in-flight.`
+                            );
+                        }
 
                         // Collapse ring results: candidate is near land if ANY ring point is on land
                         let marginResults: boolean[] | undefined;
