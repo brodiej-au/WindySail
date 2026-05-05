@@ -313,7 +313,11 @@ export const DEFAULT_SETTINGS: UserSettings = {
     distanceUnit: 'nm',
     speedUnit: 'kt',
     heightUnit: 'm',
-    analyticsEnabled: true,
+    // Analytics is OPT-IN. Default off so a fresh install transmits no
+    // telemetry until the user explicitly enables it in Settings. Gates
+    // both Google Analytics page/event tracking AND backend event POSTs
+    // (/install, /disclaimer-ack, /route).
+    analyticsEnabled: false,
     selectedModels: ['gfs'],
     selectedWaveModel: 'ecmwfWaves',
     selectedPolarName: 'Bavaria 38',

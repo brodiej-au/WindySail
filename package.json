@@ -1,6 +1,6 @@
 {
     "name": "windy-plugin-sail-router",
-    "version": "0.16.2",
+    "version": "0.17.1",
     "description": "Sailing weather routing plugin for Windy.com with multi-model comparison",
     "main": "dist/plugin.min.js",
     "type": "module",

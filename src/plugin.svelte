@@ -72,7 +72,7 @@
     import { postInstall, postDisclaimerAck, postRoute, flushPendingEvents } from './backend/client';
     import { DISCLAIMER_VERSION } from './backend/config';
     import DisclaimerModal from './ui/DisclaimerModal.svelte';
-    import { initAnalytics, trackEvent } from './analytics';
+    import { initAnalytics, trackEvent, isAnalyticsEnabled } from './analytics';
     import RoutingPanel from './ui/RoutingPanel.svelte';
     import { WaypointManager } from './map/WaypointManager';
     import { RouteRenderer } from './map/RouteRenderer';
@@ -149,14 +149,20 @@
 
     async function onDisclaimerAccept() {
         markDisclaimerAccepted();
-        const email = getEmail();
-        const hash = email ? await emailHash(email) : null;
-        postDisclaimerAck({
-            emailHash: hash,
-            pluginVersion: config.version,
-            disclaimerVersion: DISCLAIMER_VERSION,
-            acceptedAt: new Date().toISOString(),
-        });
+        // Backend POST gated on analytics opt-in — when disabled, the
+        // disclaimer acceptance is recorded only in localStorage. The
+        // user has consented locally; we don't transmit unless they've
+        // also enabled analytics.
+        if (isAnalyticsEnabled()) {
+            const email = getEmail();
+            const hash = email ? await emailHash(email) : null;
+            postDisclaimerAck({
+                emailHash: hash,
+                pluginVersion: config.version,
+                disclaimerVersion: DISCLAIMER_VERSION,
+                acceptedAt: new Date().toISOString(),
+            });
+        }
         disclaimerVisible = false;
         pendingCalculate?.();
         pendingCalculate = null;
@@ -205,7 +211,11 @@
         try { localStorage.removeItem('windysail-device-id'); } catch {}
         try { localStorage.removeItem('windysail-last-heartbeat'); } catch {}
 
-        if (freshInstall) {
+        // /install POST is gated on analytics opt-in. Default-off install
+        // never transmits, even on first run; if the user later opts in,
+        // the next fresh-install detection (e.g. on a new browser) will
+        // fire the event.
+        if (freshInstall && isAnalyticsEnabled()) {
             const pluginVersion = config.version;
             const usedLang = (store.get('usedLang') as string) ?? 'en';
             const userAgent = navigator.userAgent;
@@ -218,6 +228,12 @@
                 postInstall({ emailHash: hash, pluginVersion, usedLang, userAgent });
             });
         }
+        // Drain any events queued from previous sessions. Each post* call
+        // site enforces its own gating at queue time (postInstall +
+        // postDisclaimerAck check analyticsEnabled before queueing;
+        // postRoute always queues since route logs aren't analytics-gated).
+        // So whatever's in the queue was collected with the appropriate
+        // consent and is safe to flush unconditionally.
         flushPendingEvents();
     });
 
@@ -453,8 +469,13 @@
                     compute_time_ms: Date.now() - computeStart,
                 });
 
-                // Server-side route log — fire and forget. Hash the email
-                // (or send null) before posting; never transmits raw PII.
+                // Server-side route log — fire and forget. NOT gated on
+                // analytics opt-in: completed routes are always saved
+                // (pseudonymously, keyed only on emailHash for signed-in
+                // users; emailHash null for anonymous). The user's
+                // analytics opt-in covers GA + install/disclaimer events;
+                // route results sit outside that since they're useful
+                // research data and the disclaimer covers their capture.
                 const _routeEmail = getEmail();
                 const _routeEmailHash: string | null = _routeEmail
                     ? await emailHash(_routeEmail).catch(() => null)

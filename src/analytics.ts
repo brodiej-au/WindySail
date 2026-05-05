@@ -13,12 +13,21 @@ function sailGtag(): void {
     ((window as Record<string, unknown>).sailDataLayer as IArguments[]).push(arguments as unknown as IArguments);
 }
 
-function isEnabled(): boolean {
+/**
+ * Analytics is opt-in. Returns true ONLY if the user has explicitly
+ * enabled it. Missing / undefined / store-unavailable all → false, so a
+ * fresh install never transmits telemetry until the user opts in.
+ */
+export function isAnalyticsEnabled(): boolean {
     try {
-        return settingsStore.get('analyticsEnabled') !== false;
+        return settingsStore.get('analyticsEnabled') === true;
     } catch {
-        return true; // if store unavailable, default-on matches prior behavior
+        return false;
     }
+}
+
+function isEnabled(): boolean {
+    return isAnalyticsEnabled();
 }
 
 export function initAnalytics(): void {
