@@ -486,11 +486,21 @@
                 });
             }
 
-            // Identify models that were selected but didn't return results
+            // Identify models that were selected but didn't return results.
+            // Use the per-model `step.detail` set by the orchestrator when
+            // it has a specific reason (e.g. "Requires Windy Premium",
+            // "No data for this region"), falling back to the generic
+            // message only when nothing more specific is known.
             const succeededModels = routeResults.map(r => r.model);
             failedModels = settings.selectedModels
                 .filter(m => !succeededModels.includes(m))
-                .map(m => ({ model: m, reason: 'No data available or routing failed' }));
+                .map(m => {
+                    const step = pipelineSteps.find(s => s.id === `wind-${m}`);
+                    return {
+                        model: m,
+                        reason: step?.detail ?? 'No data available or routing failed',
+                    };
+                });
         } catch (err) {
             if (err instanceof DOMException && err.name === 'AbortError') {
                 // User cancelled — not an error

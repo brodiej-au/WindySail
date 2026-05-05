@@ -1,10 +1,24 @@
 import store from '@windy/store';
 import { getLatLonInterpolator } from '@windy/interpolator';
 import products from '@windy/products';
-import type { LatLonBounds, SwellGridData, CurrentGridData } from '../routing/types';
+import type { LatLonBounds, SwellGridData, CurrentGridData, WaveModelId } from '../routing/types';
 import { waitForRedraw, waitForProductReady, withWindyState } from './windyHelpers';
 import { buildOceanCacheKey, getSwell, setSwell, getCurrent, setCurrent } from './OceanCache';
 import { withTimeout, retryWithBackoff } from './asyncGuards';
+import { settingsStore } from '../stores/SettingsStore';
+
+/**
+ * Resolve the currently-selected wave product from settings, with a
+ * defensive fallback to ECMWF Waves if the stored value is unrecognised
+ * (e.g. an old build wrote a value we no longer ship).
+ */
+function selectedWaveProduct(): WaveModelId {
+    try {
+        const v = settingsStore.get('selectedWaveModel') as WaveModelId | undefined;
+        if (v) return v;
+    } catch {}
+    return 'ecmwfWaves';
+}
 
 const GRID_STEP = 1.0; // degrees — same as WindProvider
 const TIME_STEP_MS = 6 * 3600_000; // 6 hours between samples
@@ -113,18 +127,19 @@ export async function fetchSwellGridInner(
 
     let lastNonEmptyIdx = -1;
 
+    const waveProduct = selectedWaveProduct();
     try {
         // Give the UI a label during the otherwise-silent product-switch wait
         // (waitForProductReady can take up to 5s with no progress callback).
         onProgress?.('Switching to swell forecast…', 0);
 
         store.set('overlay', 'waves');
-        store.set('product', 'ecmwfWaves');
+        store.set('product', waveProduct);
         store.set('timestamp', timestamps[0]);
         await waitForProductReady(refLat, refLon, null);
 
         try {
-            const product = products['ecmwfWaves'];
+            const product = products[waveProduct];
             if (product) {
                 const calendar = await product.getCalendar();
                 if (calendar) {
@@ -559,13 +574,14 @@ async function _sampleSwellInner(
     // (waitForProductReady can take up to 5s with no progress callback).
     onProgress?.('Switching to swell forecast…', 0);
 
+    const waveProduct = selectedWaveProduct();
     store.set('overlay', 'waves');
-    store.set('product', 'ecmwfWaves');
+    store.set('product', waveProduct);
     store.set('timestamp', timestamps[0]);
     await waitForProductReady(refLat, refLon, null);
 
     try {
-        const product = products['ecmwfWaves'];
+        const product = products[waveProduct];
         if (product) {
             const calendar = await product.getCalendar();
             if (calendar) {

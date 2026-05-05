@@ -144,7 +144,43 @@ export interface PipelineStep {
     detail?: string;
 }
 
-export type WindModelId = 'gfs' | 'ecmwf' | 'icon' | 'bomAccess';
+/**
+ * Wind models available worldwide. These are the safe defaults shown
+ * flat in the picker — they always have data for any route.
+ */
+export type GlobalWindModelId = 'gfs' | 'ecmwf' | 'icon' | 'mblue';
+
+/**
+ * Regional wind models with limited geographic coverage. Surfaced in the
+ * settings UI under a "Regional" expander; the user opts in to the ones
+ * relevant to their cruising area. (`pointIsInBounds` filtering would
+ * work too, but static grouping is simpler and doesn't surprise users
+ * by hiding a model when they drag a waypoint.)
+ */
+export type RegionalWindModelId =
+    | 'iconEu' | 'iconD2'
+    | 'arome' | 'aromeFrance' | 'aromeAntilles' | 'aromeReunion'
+    | 'namConus' | 'namAlaska' | 'namHawaii'
+    | 'hrrrConus' | 'hrrrAlaska'
+    | 'canHrdps'
+    | 'czeAladin'
+    | 'bomAccess'
+    | 'ukv'
+    | 'jmaMsm';
+
+export type WindModelId = GlobalWindModelId | RegionalWindModelId;
+
+/**
+ * Wave / swell forecast products — mirrors `waveProducts` from
+ * `@windy/rootScope`. User picks exactly one; it powers the swell grid
+ * that feeds RouteEnricher's comfort scoring.
+ */
+export type WaveModelId =
+    | 'ecmwfWaves'
+    | 'gfsWaves'
+    | 'iconEuWaves'
+    | 'jmaCwmWaves'
+    | 'canRdwpsWaves';
 
 export interface ModelRouteResult {
     model: WindModelId;
@@ -238,6 +274,7 @@ export interface UserSettings {
     comfortWeight: number; // 0-1, modulates swell speed penalty
     showIsochrones: boolean; // show isochrone expansion on map during routing
     selectedModels: WindModelId[];
+    selectedWaveModel: WaveModelId; // single wave product used for swell sampling
     selectedPolarName: string;
 
     // Display units (independent per dimension; storage values remain canonical
@@ -278,6 +315,7 @@ export const DEFAULT_SETTINGS: UserSettings = {
     heightUnit: 'm',
     analyticsEnabled: true,
     selectedModels: ['gfs'],
+    selectedWaveModel: 'ecmwfWaves',
     selectedPolarName: 'Bavaria 38',
     motorboatMode: false,
     motorboatCruiseKt: 7,

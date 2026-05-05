@@ -7,14 +7,14 @@
             </div>
 
             <div class="modal-body">
-                    <!-- Wind Models -->
+                    <!-- Wind Models — global flat, regional behind expander -->
                     <div class="section mb-10">
                         <span class="size-xs label">
                             {t('settings.windModels')}
                             <InfoTooltip text={t('settings.infoWindModels')} />
                         </span>
                         <div class="model-list">
-                            {#each ALL_MODELS as model}
+                            {#each GLOBAL_WIND_MODELS as model}
                                 <label class="model-row size-s">
                                     <input type="checkbox" checked={selectedModels.includes(model)} on:change={() => toggleModel(model)} />
                                     <span class="model-dot" style:background={MODEL_COLORS[model]}></span>
@@ -22,6 +22,36 @@
                                 </label>
                             {/each}
                         </div>
+                        <details class="regional-expander">
+                            <summary class="size-xs">{t('settings.regionalModels')}</summary>
+                            <div class="model-list regional-list">
+                                {#each REGIONAL_WIND_MODELS as model}
+                                    <label class="model-row size-s">
+                                        <input type="checkbox" checked={selectedModels.includes(model)} on:change={() => toggleModel(model)} />
+                                        <span class="model-dot" style:background={MODEL_COLORS[model]}></span>
+                                        <span>{MODEL_LABELS[model]}</span>
+                                    </label>
+                                {/each}
+                            </div>
+                            <div class="size-xs regional-hint">{t('settings.regionalHint')}</div>
+                        </details>
+                    </div>
+
+                    <!-- Wave model — single-select dropdown -->
+                    <div class="section mb-10">
+                        <span class="size-xs label">
+                            {t('settings.waveModel')}
+                            <InfoTooltip text={t('settings.infoWaveModel')} />
+                        </span>
+                        <select
+                            class="wave-select size-s"
+                            bind:value={selectedWaveModel}
+                            on:change={() => settingsStore.set('selectedWaveModel', selectedWaveModel)}
+                        >
+                            {#each WAVE_MODELS as wm}
+                                <option value={wm}>{WAVE_MODEL_LABELS[wm]}</option>
+                            {/each}
+                        </select>
                     </div>
 
                     <!-- Units (label + compact pill selector per dimension) -->
@@ -277,21 +307,24 @@
     import { t, locale } from '../i18n';
     import { settingsStore } from '../stores/SettingsStore';
     import InfoTooltip from './InfoTooltip.svelte';
-    import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
+    import {
+        MODEL_COLORS, MODEL_LABELS,
+        GLOBAL_WIND_MODELS, REGIONAL_WIND_MODELS,
+        WAVE_MODELS, WAVE_MODEL_LABELS,
+    } from '../map/modelColors';
     import { applyAnalyticsOptOut } from '../analytics';
-    import type { WindModelId, UserSettings } from '../routing/types';
+    import type { WindModelId, WaveModelId, UserSettings } from '../routing/types';
     import {
         convertDistance, distanceToNm, distanceLabel,
         convertSpeed, speedToKt, speedLabel,
         convertHeight, heightToM, heightLabel,
     } from '../data/units';
 
-    const ALL_MODELS: WindModelId[] = ['gfs', 'ecmwf', 'icon', 'bomAccess'];
-
     let showModal = false;
 
     // Local reactive state — initialised from store
     let selectedModels: WindModelId[] = settingsStore.get('selectedModels');
+    let selectedWaveModel: WaveModelId = settingsStore.get('selectedWaveModel');
     let timeStep: number = settingsStore.get('timeStep');
     let maxDuration: number = settingsStore.get('maxDuration');
     let headingStep: number = settingsStore.get('headingStep');
@@ -456,6 +489,7 @@
 
     function onSettingsChange(settings: UserSettings): void {
         selectedModels = settings.selectedModels;
+        selectedWaveModel = settings.selectedWaveModel;
         timeStep = settings.timeStep;
         maxDuration = settings.maxDuration;
         headingStep = settings.headingStep;
@@ -624,6 +658,58 @@
         height: 8px;
         border-radius: 50%;
         flex-shrink: 0;
+    }
+
+    .regional-expander {
+        margin-top: 8px;
+        border-top: 1px solid rgba(255, 255, 255, 0.06);
+        padding-top: 6px;
+
+        summary {
+            cursor: pointer;
+            opacity: 0.7;
+            padding: 4px 0;
+            list-style: none;
+            user-select: none;
+            &:hover { opacity: 1; }
+            &::before {
+                content: '▸';
+                display: inline-block;
+                margin-right: 6px;
+                transition: transform 0.15s ease;
+                opacity: 0.7;
+            }
+        }
+        &[open] summary::before { transform: rotate(90deg); }
+    }
+    .regional-list {
+        margin-top: 6px;
+        padding-left: 14px;
+    }
+    .regional-hint {
+        opacity: 0.5;
+        margin-top: 6px;
+        padding-left: 14px;
+        line-height: 1.4;
+    }
+
+    .wave-select {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+        color: inherit;
+        padding: 6px 8px;
+        font-size: 14px;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='rgba(255,255,255,0.5)'/%3E%3C/svg%3E");
+        background-repeat: no-repeat;
+        background-position: right 8px center;
+        padding-right: 24px;
+        cursor: pointer;
+
+        option { background: #1a1a2e; color: #e0e0e0; }
+        &:focus { outline: none; border-color: rgba(255, 255, 255, 0.35); }
     }
 
     .slider-row {

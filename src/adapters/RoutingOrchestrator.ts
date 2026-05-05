@@ -6,7 +6,7 @@ import { clearCache as clearLandCache, prefetchTilesForBounds as prefetchLandTil
 import { clear as clearWindCache } from './WindCache';
 import { clear as clearOceanCache } from './OceanCache';
 import { WorkerBridge } from './WorkerBridge';
-import { MODEL_COLORS, MODEL_LABELS } from '../map/modelColors';
+import { MODEL_COLORS, MODEL_LABELS, isPremiumWindModel } from '../map/modelColors';
 import { enrichRoutePoints } from '../routing/RouteEnricher';
 import { distance } from '../routing/geo';
 
@@ -113,6 +113,10 @@ export class RoutingOrchestrator {
         const windGrids = new Map<WindModelId, WindGridData>();
         let swellGrid: SwellGridData | undefined;
         let currentGrid: CurrentGridData | null | undefined;
+        // Track per-model failure reasons so the UI can show a precise
+        // explanation (e.g. "Requires Windy Premium" vs. generic "Sampling
+        // failed") instead of a one-size-fits-all error.
+        const failedModels: { model: WindModelId; reason: string }[] = [];
 
         if (preloaded) {
             // Use pre-fetched grids — mark all sampling steps as done immediately
@@ -175,11 +179,8 @@ export class RoutingOrchestrator {
                         lastGrid,
                         signal,
                     );
-                    windGrids.set(model, grid);
-                    lastGrid = grid;
-                    step.status = 'done';
 
-                    // Count non-zero values for diagnostics
+                    // Count non-zero values for diagnostics + paywall/coverage detection.
                     let nonZeroCount = 0;
                     let totalCount = 0;
                     for (const lat of grid.windU) {
@@ -200,13 +201,30 @@ export class RoutingOrchestrator {
                     });
 
                     if (nonZeroCount === 0) {
+                        // All-zero is reliably "no data" — never genuine calm —
+                        // either the user lacks Premium for this model or it
+                        // doesn't cover their region. Distinguish so the UI
+                        // tells them which one to fix.
+                        const reason = isPremiumWindModel(model)
+                            ? 'Requires Windy Premium'
+                            : 'No data for this region';
+                        step.status = 'failed';
+                        step.detail = reason;
+                        failedModels.push({ model, reason });
                         console.warn(
-                            `[RoutingOrchestrator] Wind grid for model "${model}" has all-zero values — data may have failed silently.`,
+                            `[RoutingOrchestrator] Wind grid for "${model}" has all-zero values — ${reason}. Skipping this model.`,
                         );
+                        // Deliberately do NOT add to windGrids so the routing
+                        // phase doesn't try to compute against an empty grid.
+                    } else {
+                        windGrids.set(model, grid);
+                        lastGrid = grid;
+                        step.status = 'done';
                     }
                 } catch (err) {
                     step.status = 'failed';
                     step.detail = 'Sampling failed';
+                    failedModels.push({ model, reason: 'Sampling failed' });
                     console.warn(`[RoutingOrchestrator] Wind sampling failed for model "${model}":`, err);
                 }
             }
@@ -389,21 +407,33 @@ export class RoutingOrchestrator {
             if (outcome.status === 'fulfilled') {
                 results.push(outcome.value);
             } else {
+                const model = modelsWithGrids[i];
                 const reason = outcome.reason instanceof Error
                     ? outcome.reason.message
                     : String(outcome.reason ?? 'Unknown error');
                 failureReasons.push(reason);
+                // Replace the wind-sampling step's stale "Sampling wind n/n…"
+                // detail with the actual routing-stage failure reason. The
+                // sampling step itself succeeded, but for the user-facing
+                // failed-list we want the precise reason this model didn't
+                // produce a route, not a stale progress label.
+                const wstep = steps.find(s => s.id === `wind-${model}`);
+                if (wstep) wstep.detail = reason;
+                failedModels.push({ model, reason });
                 console.warn(
-                    `[RoutingOrchestrator] Routing failed for model "${modelsWithGrids[i]}":`,
+                    `[RoutingOrchestrator] Routing failed for model "${model}":`,
                     outcome.reason,
                 );
             }
         }
 
         if (results.length === 0) {
-            // Surface the actual worker reason (e.g. "All routes blocked by land")
-            // rather than a generic "All models failed" message.
-            const uniqueReasons = [...new Set(failureReasons)].filter(Boolean);
+            // Surface the actual reason rather than a generic "All models failed".
+            // Combine wind-sampling failures (e.g. "Requires Windy Premium" /
+            // "No data for this region") with worker-stage failures (e.g.
+            // "All routes blocked by land") so the user sees the precise cause.
+            const samplingReasons = failedModels.map(f => f.reason);
+            const uniqueReasons = [...new Set([...samplingReasons, ...failureReasons])].filter(Boolean);
             const reasonText = uniqueReasons.length === 1
                 ? uniqueReasons[0]
                 : uniqueReasons.join(' · ');
